@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { formatPercent, formatUsd, parsePercent, parseUsd } from "@/features/investing/format";
+import type { InvestingHolding } from "@/features/investing/types";
 import {
   investingMetaBadge,
   investingPageStack,
@@ -35,6 +36,20 @@ function dayChangeCellClass(s: string | undefined): string {
   return "text-[#6f675b]";
 }
 
+function toneClass(n: number): string {
+  if (n > 0) return "text-emerald-700";
+  if (n < 0) return "text-rose-700";
+  return "text-[#6f675b]";
+}
+
+function signedUsd(n: number): string {
+  return `${n > 0 ? "+" : ""}${formatUsd(n)}`;
+}
+
+function signedPct(n: number, digits = 1): string {
+  return `${n > 0 ? "+" : ""}${n.toFixed(digits)}%`;
+}
+
 function importErrorMessage(err: unknown): string {
   const raw = (err as { message?: string })?.message ?? "Unknown error";
   try {
@@ -44,6 +59,32 @@ function importErrorMessage(err: unknown): string {
     // Not a FastAPI JSON error body.
   }
   return raw;
+}
+
+/** Numbers derived from a holding row, shared by cells, the detail panel and filters. */
+function rowStats(h: InvestingHolding, totalValue: number) {
+  const value = parseUsd(h.marketValue);
+  const avg = parseUsd(h.avgBuyPrice);
+  const price = parseUsd(h.marketPrice);
+  const cost = h.shares * avg;
+  const pnl = value - cost;
+  const dayPct = parseDayChangePct(h.dayChangePercent);
+  const target = parsePercent(h.targetWeight);
+  const weight = parsePercent(h.currentWeight);
+  const targetValue = (totalValue * target) / 100;
+  return {
+    value,
+    cost,
+    pnl,
+    pnlPct: cost > 0 ? (pnl / cost) * 100 : 0,
+    // value = prev × (1 + d) → today's move in $
+    dayUsd: Number.isFinite(dayPct) ? value - value / (1 + dayPct / 100) : null,
+    priceVsAvgPct: avg > 0 ? ((price - avg) / avg) * 100 : 0,
+    target,
+    drift: weight - target,
+    rebalanceUsd: target > 0 ? targetValue - value : 0,
+    rebalanceShares: target > 0 && price > 0 ? (targetValue - value) / price : 0,
+  };
 }
 
 type SortKey =
@@ -56,6 +97,15 @@ type SortKey =
   | "dayChangePercent"
   | "marketValue"
   | "pnl";
+
+type RowFilter = "all" | "winners" | "losers" | "offTarget";
+
+const FILTERS: { key: RowFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "winners", label: "Winners" },
+  { key: "losers", label: "Losers" },
+  { key: "offTarget", label: "Off target" },
+];
 
 export default function InvestingTablePage() {
   const {
@@ -74,16 +124,29 @@ export default function InvestingTablePage() {
     isHoldingsDirty,
     isHoldingsSaving,
     importHoldings,
+    autofillHoldingProfiles,
   } = useInvesting();
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [expandedRowIds, setExpandedRowIds] = useState<Record<string, boolean>>({});
   const [sortBy, setSortBy] = useState<SortKey>("ticker");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [search, setSearch] = useState("");
+  const [rowFilter, setRowFilter] = useState<RowFilter>("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<
     { ok: true; summary: InvestingHoldingsImportSummary } | { ok: false; message: string } | null
   >(null);
+  const [isAutofilling, setAutofilling] = useState(false);
+  const [autofillResult, setAutofillResult] = useState<string | null>(null);
+
+  // Warn before closing the tab with unsaved edits (imports and autofill are unsaved until Save).
+  useEffect(() => {
+    if (!isHoldingsDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isHoldingsDirty]);
 
   async function handleImportFile(file: File | undefined) {
     if (!file) return;
@@ -101,16 +164,71 @@ export default function InvestingTablePage() {
     }
   }
 
+  async function handleAutofill() {
+    setAutofilling(true);
+    setAutofillResult(null);
+    try {
+      const { filled, notFound } = await autofillHoldingProfiles();
+      if (filled.length === 0 && notFound.length === 0) {
+        setAutofillResult("Every holding already has a name and industry.");
+      } else {
+        setAutofillResult(
+          [
+            filled.length ? `Filled ${filled.join(", ")} — review and press Save.` : "",
+            notFound.length ? `No data for ${notFound.join(", ")}.` : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+        );
+      }
+    } catch (err) {
+      setAutofillResult(`Autofill failed: ${importErrorMessage(err)}`);
+    } finally {
+      setAutofilling(false);
+    }
+  }
+
   const totals = useMemo(() => {
     const totalValue = holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0);
+    const totalCost = holdings.reduce((a, h) => a + h.shares * parseUsd(h.avgBuyPrice), 0);
     const totalTarget = holdings.reduce((a, h) => a + parsePercent(h.targetWeight), 0);
     const totalCurrent = holdings.reduce((a, h) => a + parsePercent(h.currentWeight), 0);
-    return { totalValue, totalTarget, totalCurrent };
+    const quoted = holdings.filter((h) => Number.isFinite(parseDayChangePct(h.dayChangePercent)));
+    const dayUsd = quoted.reduce((a, h) => a + (rowStats(h, totalValue).dayUsd ?? 0), 0);
+    return {
+      totalValue,
+      totalCost,
+      totalPnl: totalValue - totalCost,
+      totalPnlPct: totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0,
+      totalTarget,
+      totalCurrent,
+      dayUsd,
+      dayPct: totalValue - dayUsd > 0 ? (dayUsd / (totalValue - dayUsd)) * 100 : 0,
+      hasQuotes: quoted.length > 0,
+    };
   }, [holdings]);
+
+  const statsById = useMemo(
+    () => new Map(holdings.map((h) => [h.id, rowStats(h, totals.totalValue)])),
+    [holdings, totals.totalValue],
+  );
 
   const sortedHoldings = useMemo(() => {
     const factor = sortDir === "asc" ? 1 : -1;
-    return [...holdings].sort((a, b) => {
+    const q = search.trim().toLowerCase();
+    // Search and filters only apply in View mode, so a freshly added row is never hidden while editing.
+    const visible =
+      mode === "edit"
+        ? holdings
+        : holdings.filter((h) => {
+            const s = statsById.get(h.id)!;
+            if (q && ![h.ticker, h.name, h.industry].some((v) => (v ?? "").toLowerCase().includes(q))) return false;
+            if (rowFilter === "winners") return s.pnl > 0;
+            if (rowFilter === "losers") return s.pnl < 0;
+            if (rowFilter === "offTarget") return s.target > 0 && Math.abs(s.drift) >= 1;
+            return true;
+          });
+    return [...visible].sort((a, b) => {
       const compareNum = (x: number, y: number) => (x - y) * factor;
       const compareStr = (x: string, y: string) => x.localeCompare(y) * factor;
 
@@ -137,7 +255,17 @@ export default function InvestingTablePage() {
           return 0;
       }
     });
-  }, [holdings, sortBy, sortDir]);
+  }, [holdings, sortBy, sortDir, search, rowFilter, mode, statsById]);
+
+  const filterCounts = useMemo(() => {
+    const all = [...statsById.values()];
+    return {
+      all: all.length,
+      winners: all.filter((s) => s.pnl > 0).length,
+      losers: all.filter((s) => s.pnl < 0).length,
+      offTarget: all.filter((s) => s.target > 0 && Math.abs(s.drift) >= 1).length,
+    } satisfies Record<RowFilter, number>;
+  }, [statsById]);
 
   function toggleSort(key: SortKey) {
     if (sortBy === key) {
@@ -156,6 +284,8 @@ export default function InvestingTablePage() {
   function toggleExpanded(id: string) {
     setExpandedRowIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }
+
+  const isFiltered = mode === "view" && (search.trim() !== "" || rowFilter !== "all");
 
   return (
     <div className={investingPageStack}>
@@ -251,6 +381,15 @@ export default function InvestingTablePage() {
               <button onClick={addHolding} className={investingPrimarySaveActive}>
                 Add row
               </button>
+              <button
+                type="button"
+                onClick={() => void handleAutofill()}
+                disabled={isAutofilling}
+                title="Fill empty names and industries from Finviz"
+                className={["transition", isAutofilling ? investingPrimarySaveDisabled : investingToolbarBtn].join(" ")}
+              >
+                {isAutofilling ? "Looking up…" : "Autofill names & industry"}
+              </button>
               <button onClick={reset} className={investingToolbarBtn}>
                 Reset
               </button>
@@ -258,6 +397,28 @@ export default function InvestingTablePage() {
           ) : null}
         </div>
       </div>
+
+      {isHoldingsDirty ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+          <span>
+            <span aria-hidden>●</span> Unsaved changes — press Save to store them in the database.
+          </span>
+          {mode === "view" ? (
+            <button type="button" onClick={() => setMode("edit")} className={investingToolbarBtn}>
+              Go to Edit
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {autofillResult ? (
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-black/10 bg-[#faf8f2] px-4 py-3 text-sm text-[#3b352d]">
+          <p>{autofillResult}</p>
+          <button type="button" onClick={() => setAutofillResult(null)} className="text-xs opacity-70 hover:opacity-100">
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       {importResult ? (
         <div
@@ -275,7 +436,9 @@ export default function InvestingTablePage() {
                 Review and press Save to store in the database.
               </p>
               {importResult.summary.added.length > 0 ? (
-                <p>New: {importResult.summary.added.join(", ")} — set name, target and industry.</p>
+                <p>
+                  New: {importResult.summary.added.join(", ")} — use Autofill names &amp; industry, then set targets.
+                </p>
               ) : null}
               {importResult.summary.notInFile.length > 0 ? (
                 <p>Not in file (kept, delete if sold): {importResult.summary.notInFile.join(", ")}</p>
@@ -293,276 +456,441 @@ export default function InvestingTablePage() {
         </div>
       ) : null}
 
+      {mode === "view" ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search ticker, name, industry…"
+            aria-label="Search holdings"
+            className="w-full max-w-xs rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20"
+          />
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter holdings">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setRowFilter(f.key)}
+                className={[
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition",
+                  rowFilter === f.key
+                    ? "bg-[#1f1c17] text-[#f8f4eb]"
+                    : "border border-black/10 bg-white text-[#3b352d] hover:bg-[#faf8f2]",
+                ].join(" ")}
+              >
+                {f.label} <span className="opacity-60">{filterCounts[f.key]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="overflow-hidden rounded-2xl border border-black/5 bg-white/90 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed border-collapse text-left tabular-nums">
+          <table className="w-full min-w-[1080px] table-fixed border-collapse text-left tabular-nums">
             <thead className="sticky top-0 z-10 bg-[#f4efe4] text-xs text-[#7f7668]">
-            <tr>
-              <th className="w-[52px] px-2 py-2 font-medium" />
-              <th className="w-[88px] px-2 py-2 font-medium">
-                <button type="button" onClick={() => toggleSort("ticker")} className="inline-flex items-center gap-1">
-                  Ticker <span>{sortArrow("ticker")}</span>
-                </button>
-              </th>
-              <th className="w-[180px] px-2 py-2 text-left font-medium">Name</th>
-              <th className="w-[80px] px-2 py-2 text-left font-medium">
-                <button type="button" onClick={() => toggleSort("targetWeight")} className="inline-flex items-center gap-1">
-                  Target <span>{sortArrow("targetWeight")}</span>
-                </button>
-              </th>
-              <th className="w-[80px] px-2 py-2 text-left font-medium">
-                <button type="button" onClick={() => toggleSort("currentWeight")} className="inline-flex items-center gap-1">
-                  Current <span>{sortArrow("currentWeight")}</span>
-                </button>
-              </th>
-              <th className="w-[62px] px-2 py-2 text-left font-medium">
-                <button type="button" onClick={() => toggleSort("shares")} className="inline-flex items-center gap-1">
-                  Shares <span>{sortArrow("shares")}</span>
-                </button>
-              </th>
-              <th className="w-[90px] px-2 py-2 text-left font-medium">
-                <button type="button" onClick={() => toggleSort("avgBuyPrice")} className="inline-flex items-center gap-1">
-                  Avg buy <span>{sortArrow("avgBuyPrice")}</span>
-                </button>
-              </th>
-              <th className="w-[90px] px-2 py-2 text-left font-medium">
-                <button type="button" onClick={() => toggleSort("marketPrice")} className="inline-flex items-center gap-1">
-                  Market <span>{sortArrow("marketPrice")}</span>
-                </button>
-              </th>
-              <th className="w-[76px] px-2 py-2 text-left font-medium">
-                <button
-                  type="button"
-                  onClick={() => toggleSort("dayChangePercent")}
-                  className="inline-flex items-center gap-1"
-                >
-                  Day % <span>{sortArrow("dayChangePercent")}</span>
-                </button>
-              </th>
-              <th className="w-[94px] px-2 py-2 text-left font-medium">
-                <button type="button" onClick={() => toggleSort("marketValue")} className="inline-flex items-center gap-1">
-                  Value <span>{sortArrow("marketValue")}</span>
-                </button>
-              </th>
-              <th className="w-[110px] px-2 py-2 font-medium">
-                <button type="button" onClick={() => toggleSort("pnl")} className="inline-flex items-center gap-1">
-                  P&L <span>{sortArrow("pnl")}</span>
-                </button>
-              </th>
-              {mode === "edit" ? <th className="w-[88px] px-2 py-2 font-medium">Actions</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedHoldings.map((h) => (
-              <Fragment key={h.id}>
-                <tr
-                  className="border-t border-black/5 align-top transition hover:bg-[#faf8f2]"
-                  onClick={(e) => {
-                    const target = e.target as HTMLElement;
-                    if (target.closest("input,button,a")) return;
-                    toggleExpanded(h.id);
-                  }}
-                >
-                {mode === "edit" ? (
-                  <>
-                    <td className="px-2 py-2 text-center">
-                      <button
-                        type="button"
-                        onClick={() => toggleExpanded(h.id)}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-black/10 text-sm font-semibold text-[#6f675b] hover:bg-[#f4efe4]"
-                      >
-                        {expandedRowIds[h.id] ? "−" : "+"}
-                      </button>
-                    </td>
-                    <td className="px-2 py-2">
-                      <input
-                        value={h.ticker}
-                        onChange={(e) => updateHolding(h.id, { ticker: e.target.value.toUpperCase() })}
-                        className={`${inputBaseClasses()} font-semibold`}
-                        placeholder="AAPL"
-                      />
-                    </td>
-                    <td className="px-2 py-2">
-                      <input
-                        value={h.name}
-                        onChange={(e) => updateHolding(h.id, { name: e.target.value })}
-                        className={inputBaseClasses()}
-                        placeholder="Company name"
-                      />
-                    </td>
-                    <td className="px-2 py-2 text-left">
-                      <input
-                        value={h.targetWeight}
-                        onChange={(e) => updateHolding(h.id, { targetWeight: e.target.value })}
-                        onBlur={() =>
-                          updateHolding(h.id, {
-                            targetWeight: formatPercent(parsePercent(h.targetWeight)),
-                          })
-                        }
-                        className={`${inputBaseClasses()} text-left tabular-nums`}
-                        inputMode="decimal"
-                        placeholder="10.0%"
-                      />
-                    </td>
-                    <td className="px-2 py-2 text-left">
-                      <div className="w-full rounded-lg border border-black/10 bg-[#faf8f2] px-2 py-1.5 text-left text-sm font-semibold tabular-nums text-[#2f2922]">
-                        {formatPercent(parsePercent(h.currentWeight))}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 text-left">
-                      <input
-                        value={String(h.shares)}
-                        onChange={(e) => updateHolding(h.id, { shares: Number(e.target.value) || 0 })}
-                        className={`${inputBaseClasses()} text-left tabular-nums`}
-                        inputMode="numeric"
-                        placeholder="0"
-                      />
-                    </td>
-                    <td className="px-2 py-2 text-left">
-                      <input
-                        value={h.avgBuyPrice}
-                        onChange={(e) => updateHolding(h.id, { avgBuyPrice: e.target.value })}
-                        onBlur={() =>
-                          updateHolding(h.id, { avgBuyPrice: formatUsd(parseUsd(h.avgBuyPrice)) })
-                        }
-                        className={`${inputBaseClasses()} text-left tabular-nums`}
-                        inputMode="decimal"
-                        placeholder="$0.00"
-                      />
-                    </td>
-                    <td className="px-2 py-2 text-left">
-                      <input
-                        value={h.marketPrice}
-                        onChange={(e) => updateHolding(h.id, { marketPrice: e.target.value })}
-                        onBlur={() =>
-                          updateHolding(h.id, { marketPrice: formatUsd(parseUsd(h.marketPrice)) })
-                        }
-                        className={`${inputBaseClasses()} text-left tabular-nums`}
-                        inputMode="decimal"
-                        placeholder="$0.00"
-                      />
-                    </td>
-                    <td className="px-2 py-2 text-left">
-                      <div
-                        title="Session change from quotes (Yahoo). Refresh market to update."
-                        className={[
-                          "w-full rounded-lg border border-black/10 bg-[#faf8f2] px-2 py-1.5 text-sm font-semibold tabular-nums",
-                          dayChangeCellClass(h.dayChangePercent),
-                        ].join(" ")}
-                      >
-                        {h.dayChangePercent ?? "—"}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 text-left">
-                      <input
-                        value={h.marketValue}
-                        onChange={(e) => updateHolding(h.id, { marketValue: e.target.value })}
-                        onBlur={() =>
-                          updateHolding(h.id, { marketValue: formatUsd(parseUsd(h.marketValue)) })
-                        }
-                        className={`${inputBaseClasses()} text-left tabular-nums`}
-                        inputMode="decimal"
-                        placeholder="$0.00"
-                      />
-                    </td>
-                    <td className="px-2 py-2">
-                      <div
-                        className={[
-                          "w-full rounded-lg border border-black/10 bg-[#faf8f2] px-2 py-1.5 text-sm font-semibold tabular-nums",
-                          parseUsd(h.pnl) >= 0 ? "text-emerald-700" : "text-rose-700",
-                        ].join(" ")}
-                      >
-                        {formatUsd(parseUsd(h.pnl))}
-                      </div>
-                    </td>
-                    {mode === "edit" ? (
-                      <td className="px-2 py-2">
-                        <button
-                          onClick={() => deleteHolding(h.id)}
-                          className={investingToolbarBtn}
-                          type="button"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <td className="px-2 py-2 text-center text-sm text-[#8f8676]">
-                      {expandedRowIds[h.id] ? "−" : "+"}
-                    </td>
-                    <td className="px-2 py-2 text-sm font-semibold text-[#2f2922]">{h.ticker}</td>
-                    <td className="px-2 py-2 text-sm text-[#2f2922]">{h.name}</td>
-                    <td className="px-2 py-2 text-left text-sm tabular-nums text-[#2f2922] whitespace-nowrap">
-                      {formatPercent(parsePercent(h.targetWeight))}
-                    </td>
-                    <td className="px-2 py-2 text-left text-sm tabular-nums text-[#2f2922] whitespace-nowrap">
-                      {formatPercent(parsePercent(h.currentWeight))}
-                    </td>
-                    <td className="px-2 py-2 text-left text-sm tabular-nums text-[#2f2922] whitespace-nowrap">
-                      {h.shares}
-                    </td>
-                    <td className="px-2 py-2 text-left text-sm tabular-nums text-[#2f2922] whitespace-nowrap">
-                      {formatUsd(parseUsd(h.avgBuyPrice))}
-                    </td>
-                    <td className="px-2 py-2 text-left text-sm tabular-nums text-[#2f2922] whitespace-nowrap">
-                      {formatUsd(parseUsd(h.marketPrice))}
-                    </td>
-                    <td
-                      className={[
-                        "px-2 py-2 text-left text-sm font-semibold tabular-nums whitespace-nowrap",
-                        dayChangeCellClass(h.dayChangePercent),
-                      ].join(" ")}
-                      title="Session change from quotes. Refresh market to update."
-                    >
-                      {h.dayChangePercent ?? "—"}
-                    </td>
-                    <td className="px-2 py-2 text-left text-sm tabular-nums text-[#2f2922] whitespace-nowrap">
-                      {formatUsd(parseUsd(h.marketValue))}
-                    </td>
-                    <td className="px-2 py-2 text-left">
-                      <span
-                        className={[
-                          "inline-flex min-w-[96px] justify-start rounded-full border border-black/10 bg-[#faf8f2] px-2.5 py-1 text-xs font-semibold tabular-nums whitespace-nowrap",
-                          parseUsd(h.pnl) >= 0 ? "text-emerald-700" : "text-rose-700",
-                        ].join(" ")}
-                      >
-                        {formatUsd(parseUsd(h.pnl))}
-                      </span>
-                    </td>
-                  </>
-                )}
+              <tr>
+                <th className="w-[52px] px-2 py-2 font-medium" />
+                <th className="w-[88px] px-2 py-2 font-medium">
+                  <button type="button" onClick={() => toggleSort("ticker")} className="inline-flex items-center gap-1">
+                    Ticker <span>{sortArrow("ticker")}</span>
+                  </button>
+                </th>
+                <th className="w-[180px] px-2 py-2 text-left font-medium">Name</th>
+                <th className="w-[80px] px-2 py-2 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("targetWeight")}
+                    className="inline-flex items-center gap-1"
+                  >
+                    Target <span>{sortArrow("targetWeight")}</span>
+                  </button>
+                </th>
+                <th className="w-[84px] px-2 py-2 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("currentWeight")}
+                    className="inline-flex items-center gap-1"
+                  >
+                    Current <span>{sortArrow("currentWeight")}</span>
+                  </button>
+                </th>
+                <th className="w-[62px] px-2 py-2 text-left font-medium">
+                  <button type="button" onClick={() => toggleSort("shares")} className="inline-flex items-center gap-1">
+                    Shares <span>{sortArrow("shares")}</span>
+                  </button>
+                </th>
+                <th className="w-[90px] px-2 py-2 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("avgBuyPrice")}
+                    className="inline-flex items-center gap-1"
+                  >
+                    Avg buy <span>{sortArrow("avgBuyPrice")}</span>
+                  </button>
+                </th>
+                <th className="w-[90px] px-2 py-2 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("marketPrice")}
+                    className="inline-flex items-center gap-1"
+                  >
+                    Market <span>{sortArrow("marketPrice")}</span>
+                  </button>
+                </th>
+                <th className="w-[86px] px-2 py-2 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("dayChangePercent")}
+                    className="inline-flex items-center gap-1"
+                  >
+                    Day <span>{sortArrow("dayChangePercent")}</span>
+                  </button>
+                </th>
+                <th className="w-[100px] px-2 py-2 text-left font-medium">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("marketValue")}
+                    className="inline-flex items-center gap-1"
+                  >
+                    Value <span>{sortArrow("marketValue")}</span>
+                  </button>
+                </th>
+                <th className="w-[116px] px-2 py-2 font-medium">
+                  <button type="button" onClick={() => toggleSort("pnl")} className="inline-flex items-center gap-1">
+                    P&L <span>{sortArrow("pnl")}</span>
+                  </button>
+                </th>
+                {mode === "edit" ? <th className="w-[88px] px-2 py-2 font-medium">Actions</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {sortedHoldings.length === 0 ? (
+                <tr>
+                  <td colSpan={mode === "edit" ? 12 : 11} className="px-4 py-8 text-center text-sm text-[#8f8676]">
+                    {holdings.length === 0
+                      ? "No holdings yet — Add row in Edit mode, or Import XLSX."
+                      : "No holdings match this search or filter."}
+                  </td>
                 </tr>
-                {expandedRowIds[h.id] ? (
-                  <tr className="border-t border-black/5 bg-[#faf8f2]/70">
-                    <td colSpan={mode === "edit" ? 12 : 11} className="px-4 py-3 text-sm">
+              ) : null}
+              {sortedHoldings.map((h) => {
+                const s = statsById.get(h.id)!;
+                return (
+                  <Fragment key={h.id}>
+                    <tr
+                      className="border-t border-black/5 align-top transition hover:bg-[#faf8f2]"
+                      onClick={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest("input,button,a")) return;
+                        toggleExpanded(h.id);
+                      }}
+                    >
                       {mode === "edit" ? (
-                        <div className="grid gap-2 md:grid-cols-2">
-                          <label className="text-xs text-[#6f675b]">
-                            Industry
+                        <>
+                          <td className="px-2 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpanded(h.id)}
+                              className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-black/10 text-sm font-semibold text-[#6f675b] hover:bg-[#f4efe4]"
+                            >
+                              {expandedRowIds[h.id] ? "−" : "+"}
+                            </button>
+                          </td>
+                          <td className="px-2 py-2">
                             <input
-                              value={h.industry}
-                              onChange={(e) => updateHolding(h.id, { industry: e.target.value })}
-                              className={`${inputBaseClasses()} mt-1`}
-                              placeholder="ETF / Tech / ..."
+                              value={h.ticker}
+                              onChange={(e) => updateHolding(h.id, { ticker: e.target.value.toUpperCase() })}
+                              className={`${inputBaseClasses()} font-semibold`}
+                              placeholder="AAPL"
                             />
-                          </label>
-                        </div>
+                          </td>
+                          <td className="px-2 py-2">
+                            <input
+                              value={h.name}
+                              onChange={(e) => updateHolding(h.id, { name: e.target.value })}
+                              className={inputBaseClasses()}
+                              placeholder="Company name"
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-left">
+                            <input
+                              value={h.targetWeight}
+                              onChange={(e) => updateHolding(h.id, { targetWeight: e.target.value })}
+                              onBlur={() =>
+                                updateHolding(h.id, {
+                                  targetWeight: formatPercent(parsePercent(h.targetWeight)),
+                                })
+                              }
+                              className={`${inputBaseClasses()} text-left tabular-nums`}
+                              inputMode="decimal"
+                              placeholder="10.0%"
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-left">
+                            <div className="w-full rounded-lg border border-black/10 bg-[#faf8f2] px-2 py-1.5 text-left text-sm font-semibold tabular-nums text-[#2f2922]">
+                              {formatPercent(parsePercent(h.currentWeight))}
+                            </div>
+                          </td>
+                          <td className="px-2 py-2 text-left">
+                            <input
+                              value={String(h.shares)}
+                              onChange={(e) => updateHolding(h.id, { shares: Number(e.target.value) || 0 })}
+                              className={`${inputBaseClasses()} text-left tabular-nums`}
+                              inputMode="decimal"
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-left">
+                            <input
+                              value={h.avgBuyPrice}
+                              onChange={(e) => updateHolding(h.id, { avgBuyPrice: e.target.value })}
+                              onBlur={() => updateHolding(h.id, { avgBuyPrice: formatUsd(parseUsd(h.avgBuyPrice)) })}
+                              className={`${inputBaseClasses()} text-left tabular-nums`}
+                              inputMode="decimal"
+                              placeholder="$0.00"
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-left">
+                            <input
+                              value={h.marketPrice}
+                              onChange={(e) => updateHolding(h.id, { marketPrice: e.target.value })}
+                              onBlur={() => updateHolding(h.id, { marketPrice: formatUsd(parseUsd(h.marketPrice)) })}
+                              className={`${inputBaseClasses()} text-left tabular-nums`}
+                              inputMode="decimal"
+                              placeholder="$0.00"
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-left">
+                            <div
+                              title="Session change from quotes (Yahoo). Refresh market to update."
+                              className={[
+                                "w-full rounded-lg border border-black/10 bg-[#faf8f2] px-2 py-1.5 text-sm font-semibold tabular-nums",
+                                dayChangeCellClass(h.dayChangePercent),
+                              ].join(" ")}
+                            >
+                              {h.dayChangePercent ?? "—"}
+                            </div>
+                          </td>
+                          <td className="px-2 py-2 text-left">
+                            <input
+                              value={h.marketValue}
+                              onChange={(e) => updateHolding(h.id, { marketValue: e.target.value })}
+                              onBlur={() => updateHolding(h.id, { marketValue: formatUsd(parseUsd(h.marketValue)) })}
+                              className={`${inputBaseClasses()} text-left tabular-nums`}
+                              inputMode="decimal"
+                              placeholder="$0.00"
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <div
+                              className={[
+                                "w-full rounded-lg border border-black/10 bg-[#faf8f2] px-2 py-1.5 text-sm font-semibold tabular-nums",
+                                parseUsd(h.pnl) >= 0 ? "text-emerald-700" : "text-rose-700",
+                              ].join(" ")}
+                            >
+                              {formatUsd(parseUsd(h.pnl))}
+                            </div>
+                          </td>
+                          <td className="px-2 py-2">
+                            <button onClick={() => deleteHolding(h.id)} className={investingToolbarBtn} type="button">
+                              Delete
+                            </button>
+                          </td>
+                        </>
                       ) : (
-                        <div className="grid gap-1">
-                          <p className="text-xs text-[#8f8676]">
-                            <span className="font-medium text-[#655d51]">Industry:</span> {h.industry}
-                          </p>
-                        </div>
+                        <>
+                          <td className="px-2 py-2 text-center text-sm text-[#8f8676]">
+                            {expandedRowIds[h.id] ? "−" : "+"}
+                          </td>
+                          <td className="px-2 py-2 text-sm font-semibold text-[#2f2922]">{h.ticker}</td>
+                          <td className="px-2 py-2 text-sm text-[#2f2922]">
+                            <span className="block truncate" title={h.name}>
+                              {h.name}
+                            </span>
+                            {h.industry && h.industry !== "—" ? (
+                              <span className="block truncate text-[11px] text-[#8f8676]" title={h.industry}>
+                                {h.industry}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 text-left text-sm tabular-nums text-[#2f2922]">
+                            {formatPercent(parsePercent(h.targetWeight))}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 text-left text-sm tabular-nums text-[#2f2922]">
+                            {formatPercent(parsePercent(h.currentWeight))}
+                            {s.target > 0 && Math.abs(s.drift) >= 1 ? (
+                              <span
+                                className="block text-[11px] text-[#8f8676]"
+                                title="Current − target, percentage points"
+                              >
+                                {s.drift > 0 ? "▲" : "▼"} {Math.abs(s.drift).toFixed(1)} pp
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 text-left text-sm tabular-nums text-[#2f2922]">
+                            {h.shares}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 text-left text-sm tabular-nums text-[#2f2922]">
+                            {formatUsd(parseUsd(h.avgBuyPrice))}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 text-left text-sm tabular-nums text-[#2f2922]">
+                            {formatUsd(parseUsd(h.marketPrice))}
+                          </td>
+                          <td
+                            className="whitespace-nowrap px-2 py-2 text-left text-sm tabular-nums"
+                            title="Session change from quotes. Refresh market to update."
+                          >
+                            <span className={`font-semibold ${dayChangeCellClass(h.dayChangePercent)}`}>
+                              {h.dayChangePercent ?? "—"}
+                            </span>
+                            {s.dayUsd != null ? (
+                              <span className="block text-[11px] text-[#8f8676]">{signedUsd(s.dayUsd)}</span>
+                            ) : null}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 text-left text-sm tabular-nums text-[#2f2922]">
+                            {formatUsd(parseUsd(h.marketValue))}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 text-left text-sm tabular-nums">
+                            <span className={`font-semibold ${toneClass(s.pnl)}`}>{signedUsd(s.pnl)}</span>
+                            <span className={`block text-[11px] ${toneClass(s.pnlPct)}`}>{signedPct(s.pnlPct)}</span>
+                          </td>
+                        </>
                       )}
-                    </td>
-                  </tr>
-                ) : null}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+                    </tr>
+                    {expandedRowIds[h.id] ? (
+                      <tr className="border-t border-black/5 bg-[#faf8f2]/70">
+                        <td colSpan={mode === "edit" ? 12 : 11} className="px-4 py-3 text-sm">
+                          {mode === "edit" ? (
+                            <div className="grid gap-2 md:grid-cols-2">
+                              <label className="text-xs text-[#6f675b]">
+                                Industry
+                                <input
+                                  value={h.industry}
+                                  onChange={(e) => updateHolding(h.id, { industry: e.target.value })}
+                                  className={`${inputBaseClasses()} mt-1`}
+                                  placeholder="ETF / Tech / ..."
+                                />
+                              </label>
+                            </div>
+                          ) : (
+                            <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
+                              <div>
+                                <p className="text-[11px] text-[#8f8676]">Cost basis</p>
+                                <p className="font-semibold text-[#1f1c17]">{formatUsd(s.cost)}</p>
+                                <p className="text-[11px] text-[#8f8676]">
+                                  {h.shares} × {formatUsd(parseUsd(h.avgBuyPrice))}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] text-[#8f8676]">Price vs avg buy</p>
+                                <p className={`font-semibold ${toneClass(s.priceVsAvgPct)}`}>
+                                  {signedPct(s.priceVsAvgPct)}
+                                </p>
+                                <p className="text-[11px] text-[#8f8676]">
+                                  {formatUsd(parseUsd(h.marketPrice))} now
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] text-[#8f8676]">Weight vs target</p>
+                                <p className="font-semibold text-[#1f1c17]">
+                                  {formatPercent(parsePercent(h.currentWeight))}{" "}
+                                  <span className="font-normal text-[#8f8676]">
+                                    / {s.target > 0 ? formatPercent(s.target) : "no target"}
+                                  </span>
+                                </p>
+                                <p className="text-[11px]">
+                                  {s.target <= 0 ? (
+                                    <span className="text-[#8f8676]">Set a target in Edit</span>
+                                  ) : Math.abs(s.drift) < 1 ? (
+                                    <span className="text-[#8f8676]">On target — hold</span>
+                                  ) : s.rebalanceUsd > 0 ? (
+                                    <span className="text-emerald-700">
+                                      Buy {formatUsd(s.rebalanceUsd)} ≈ {s.rebalanceShares.toFixed(1)} sh
+                                    </span>
+                                  ) : (
+                                    <span className="text-rose-700">
+                                      Trim {formatUsd(-s.rebalanceUsd)} ≈ {(-s.rebalanceShares).toFixed(1)} sh
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] text-[#8f8676]">Industry</p>
+                                <p className="text-[#1f1c17]">
+                                  {h.industry && h.industry !== "—" ? h.industry : "Unclassified"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[11px] text-[#8f8676]">Research</p>
+                                <p className="flex gap-3">
+                                  <a
+                                    href={`https://finance.yahoo.com/quote/${encodeURIComponent(h.ticker)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-[#3b352d] underline decoration-black/20 underline-offset-2 hover:text-[#1f1c17]"
+                                  >
+                                    Yahoo ↗
+                                  </a>
+                                  <a
+                                    href={`https://finviz.com/quote.ashx?t=${encodeURIComponent(h.ticker)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-[#3b352d] underline decoration-black/20 underline-offset-2 hover:text-[#1f1c17]"
+                                  >
+                                    Finviz ↗
+                                  </a>
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+            {holdings.length > 0 && !isFiltered ? (
+              <tfoot>
+                <tr className="border-t-2 border-black/15 bg-[#f6f3ea] text-sm font-semibold text-[#1f1c17]">
+                  <td className="px-2 py-2.5" />
+                  <td className="px-2 py-2.5">Total</td>
+                  <td className="px-2 py-2.5 text-xs font-normal text-[#6f675b]">
+                    {holdings.length} positions · cost {formatUsd(totals.totalCost)}
+                  </td>
+                  <td
+                    className={`px-2 py-2.5 ${Math.abs(totals.totalTarget - 100) > 0.5 && totals.totalTarget > 0 ? "text-amber-700" : ""}`}
+                    title={Math.abs(totals.totalTarget - 100) > 0.5 ? "Targets should add up to 100%" : undefined}
+                  >
+                    {formatPercent(totals.totalTarget)}
+                  </td>
+                  <td className="px-2 py-2.5">{formatPercent(totals.totalCurrent)}</td>
+                  <td className="px-2 py-2.5" colSpan={3} />
+                  <td className="whitespace-nowrap px-2 py-2.5">
+                    {totals.hasQuotes ? (
+                      <>
+                        <span className={toneClass(totals.dayUsd)}>{signedUsd(totals.dayUsd)}</span>
+                        <span className={`block text-[11px] font-normal ${toneClass(totals.dayPct)}`}>
+                          {signedPct(totals.dayPct, 2)}
+                        </span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-2 py-2.5">{formatUsd(totals.totalValue)}</td>
+                  <td className="whitespace-nowrap px-2 py-2.5">
+                    <span className={toneClass(totals.totalPnl)}>{signedUsd(totals.totalPnl)}</span>
+                    <span className={`block text-[11px] font-normal ${toneClass(totals.totalPnlPct)}`}>
+                      {signedPct(totals.totalPnlPct)}
+                    </span>
+                  </td>
+                  {mode === "edit" ? <td className="px-2 py-2.5" /> : null}
+                </tr>
+              </tfoot>
+            ) : null}
+          </table>
         </div>
       </div>
     </div>

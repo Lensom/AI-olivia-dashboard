@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from html import unescape
 from typing import Annotated
 import json
 import re
@@ -31,6 +32,8 @@ from app.investing.schemas import (
     InvestingMetricsResponse,
     InvestingMetricsUpdateRequest,
     InvestingQuotesResponse,
+    InvestingProfilesResponse,
+    InvestingTickerProfile,
     InvestingNotesResponse,
     InvestingNotesUpdateRequest,
     InvestingPickingResponse,
@@ -638,6 +641,61 @@ def _calc_metrics_from_holdings(holdings: list[dict]) -> tuple[str, str, dict[st
     div_yield_percent = f"{(weighted_div_yield / div_weight_total * 100.0):.2f}%" if div_weight_total > 0 else "—"
     beta_value = f"{(weighted_beta / beta_weight_total):.2f}" if beta_weight_total > 0 else "—"
     return div_yield_percent, beta_value, allocation_percent
+
+
+_PROFILE_CACHE_TTL_SECONDS = 24 * 60 * 60
+_profile_cache: dict[str, tuple[InvestingTickerProfile | None, float]] = {}
+
+
+def _fetch_finviz_profile(ticker: str) -> InvestingTickerProfile | None:
+    """Company/fund name and an industry label: sector for stocks, "ETF · <category>" for funds."""
+    now = time.time()
+    cached = _profile_cache.get(ticker)
+    if cached:
+        ttl = _PROFILE_CACHE_TTL_SECONDS if cached[0] else _FUNDAMENTALS_FAILURE_TTL_SECONDS
+        if now - cached[1] < ttl:
+            return cached[0]
+
+    url = f"https://finviz.com/quote.ashx?t={quote(ticker)}&p=d"
+    req = Request(url, headers={"User-Agent": _BROWSER_UA, "Accept": "text/html,application/xhtml+xml,*/*"})
+    try:
+        with urlopen(req, timeout=7) as response:
+            html = response.read().decode("utf-8", "ignore")
+    except (HTTPError, URLError, TimeoutError):
+        _profile_cache[ticker] = (None, now)
+        return None
+
+    # <title>MSFT - Microsoft Corp Stock Price and Quote</title>
+    title = re.search(r"<title>\s*[^<]*?\s-\s(.*?)\s+Stock Price and Quote\s*</title>", html, re.S)
+    name = unescape(title.group(1).strip()) if title else ""
+
+    # Funds carry an "Asset Type" field; their sector link is not meaningful (VOO shows "Financial").
+    if 'snapshot-td-label">Asset Type<' in html:
+        category = re.search(r'snapshot-td-label">Category<.*?<b>(.*?)</b>', html, re.S)
+        category_text = unescape(re.sub(r"<[^>]+>", "", category.group(1))).strip() if category else ""
+        industry = f"ETF · {category_text}" if category_text else "ETF"
+    else:
+        sector = re.search(r'href="screener\?v=111&(?:amp;)?f=sec_[^"]*"[^>]*>([^<]+)</a>', html)
+        industry = unescape(sector.group(1).strip()) if sector else ""
+
+    profile = InvestingTickerProfile(name=name, industry=industry) if (name or industry) else None
+    _profile_cache[ticker] = (profile, now)
+    return profile
+
+
+@router.get("/profiles", response_model=InvestingProfilesResponse)
+def get_profiles(
+    tickers: Annotated[str, Query(description="Comma-separated tickers, e.g. AAPL,VOO")] = "",
+    user: Annotated[UserResponse, Depends(get_current_user)] = None,
+):
+    """Name and industry per ticker (Finviz), used to autofill holdings. Unknown tickers are omitted."""
+    _ = user.id
+    unique = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))[:50]
+    if not unique:
+        return InvestingProfilesResponse()
+    with ThreadPoolExecutor(max_workers=_QUOTE_WORKERS) as pool:
+        results = list(pool.map(_fetch_finviz_profile, unique))
+    return InvestingProfilesResponse(profiles={t: p for t, p in zip(unique, results) if p})
 
 
 @router.get("/quotes", response_model=InvestingQuotesResponse)

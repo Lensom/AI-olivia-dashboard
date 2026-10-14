@@ -138,6 +138,7 @@ type InvestingStore = {
   refreshMarketPrices: () => Promise<void>;
   saveHoldings: () => Promise<void>;
   importHoldings: (file: File) => Promise<InvestingHoldingsImportSummary>;
+  autofillHoldingProfiles: () => Promise<{ filled: string[]; notFound: string[] }>;
   setNotes: (next: string) => void;
   refreshNotes: () => Promise<void>;
   saveNotes: () => Promise<void>;
@@ -642,6 +643,52 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
     return { added, updated, notInFile, skipped: res.skipped ?? [] };
   }
 
+  /** Fills placeholder names / industries from Finviz as unsaved edits; user-entered values are kept. */
+  async function autofillHoldingProfiles(): Promise<{ filled: string[]; notFound: string[] }> {
+    if (!token) throw { status: 401, message: "Not signed in" };
+    const isPlaceholderName = (h: InvestingHolding) => {
+      const n = (h.name ?? "").trim();
+      return !n || n.toUpperCase() === h.ticker.trim().toUpperCase() || n === "New holding";
+    };
+    const isPlaceholderIndustry = (h: InvestingHolding) => {
+      const i = (h.industry ?? "").trim();
+      return !i || i === "—";
+    };
+    const tickers = Array.from(
+      new Set(
+        holdings
+          .filter((h) => h.ticker.trim() && (isPlaceholderName(h) || isPlaceholderIndustry(h)))
+          .map((h) => h.ticker.trim().toUpperCase()),
+      ),
+    );
+    if (tickers.length === 0) return { filled: [], notFound: [] };
+
+    const res = await apiFetch<{ profiles: Record<string, { name: string; industry: string }> }>(
+      `/investing/profiles?tickers=${encodeURIComponent(tickers.join(","))}`,
+      { token },
+    );
+    const profiles = res.profiles ?? {};
+    const filled = tickers.filter((t) => profiles[t]);
+    const notFound = tickers.filter((t) => !profiles[t]);
+    if (filled.length > 0) {
+      setHoldings((prev) =>
+        normalizeHoldings(
+          prev.map((h) => {
+            const p = profiles[h.ticker.trim().toUpperCase()];
+            if (!p) return h;
+            return {
+              ...h,
+              name: isPlaceholderName(h) && p.name ? p.name : h.name,
+              industry: isPlaceholderIndustry(h) && p.industry ? p.industry : h.industry,
+            };
+          }),
+        ),
+      );
+      setHoldingsDirty(true);
+    }
+    return { filled, notFound };
+  }
+
   async function refreshMetrics() {
     if (!token) {
       setMetricsState({ divYieldPercent: "—", beta: "—", allocationPercent: {} });
@@ -882,6 +929,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       refreshMarketPrices,
       saveHoldings,
       importHoldings,
+      autofillHoldingProfiles,
       setNotes: (next) => {
         setNotesState(next);
         setNotesDirty(true);

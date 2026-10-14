@@ -51,6 +51,15 @@ class InvestingHoldingsImportResponse(BaseModel):
     skipped: list[str] = Field(default_factory=list)
 
 
+class InvestingTickerProfile(BaseModel):
+    name: str = ""
+    industry: str = ""
+
+
+class InvestingProfilesResponse(BaseModel):
+    profiles: dict[str, InvestingTickerProfile] = Field(default_factory=dict)
+
+
 class InvestingQuotesResponse(BaseModel):
     prices: dict[str, float] = Field(default_factory=dict)
     day_change_percent: dict[str, float] = Field(
