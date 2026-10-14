@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Annotated
 import json
@@ -10,7 +11,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from psycopg import Connection
 from psycopg.types.json import Json
 
@@ -23,6 +24,8 @@ from app.investing.schemas import (
     InvestingCapitalEntriesResponse,
     InvestingCapitalEntriesUpdateRequest,
     InvestingCapitalEntry,
+    InvestingHoldingImportRow,
+    InvestingHoldingsImportResponse,
     InvestingHoldingsResponse,
     InvestingHoldingsUpdateRequest,
     InvestingMetricsResponse,
@@ -267,21 +270,11 @@ def _calc_activity_yearly_summary(rows: list[dict]) -> list[InvestingActivityYea
 
 
 def _fetch_yahoo_prices(tickers: list[str]) -> dict[str, float]:
-    if not tickers:
-        return {}
-    symbols = ",".join(tickers)
-    url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={quote(symbols)}"
-    try:
-        with urlopen(url, timeout=8) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
-        return {}
-    result = payload.get("quoteResponse", {}).get("result", [])
+    rows = _fetch_yahoo_quote_rows(tickers)
     prices: dict[str, float] = {}
-    for item in result:
-        symbol = str(item.get("symbol", "")).upper().strip()
+    for symbol, item in rows.items():
         price = item.get("regularMarketPrice")
-        if symbol and isinstance(price, (int, float)):
+        if isinstance(price, (int, float)):
             prices[symbol] = float(price)
     return prices
 
@@ -327,14 +320,19 @@ def _fetch_market_prices(tickers: list[str]) -> dict[str, float]:
 
     if missing:
         yahoo_prices = _fetch_yahoo_prices(missing)
+        need_stooq: list[str] = []
         for ticker in missing:
             price = yahoo_prices.get(ticker)
             if isinstance(price, (int, float)) and float(price) > 0:
                 value = float(price)
                 result[ticker] = value
                 _price_cache[ticker] = (value, now)
-                continue
-            stooq_price = _fetch_stooq_price(ticker)
+            else:
+                need_stooq.append(ticker)
+        # Parallel so an unreachable Stooq costs one timeout, not one per ticker.
+        with ThreadPoolExecutor(max_workers=_QUOTE_WORKERS) as pool:
+            stooq_prices = list(pool.map(_fetch_stooq_price, need_stooq))
+        for ticker, stooq_price in zip(need_stooq, stooq_prices):
             if isinstance(stooq_price, (int, float)) and float(stooq_price) > 0:
                 value = float(stooq_price)
                 result[ticker] = value
@@ -342,23 +340,36 @@ def _fetch_market_prices(tickers: list[str]) -> dict[str, float]:
     return result
 
 
+_QUOTE_WORKERS = 10
+
+
+def _fetch_yahoo_chart_quote(ticker: str) -> dict | None:
+    """One ticker via Yahoo v8 chart (the v7 bulk quote API now requires a crumb and returns nothing)."""
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{quote(ticker)}?range=1d&interval=1d"
+    req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urlopen(req, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        meta = payload["chart"]["result"][0]["meta"]
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, KeyError, IndexError, TypeError):
+        return None
+    price = meta.get("regularMarketPrice")
+    if not isinstance(price, (int, float)):
+        return None
+    row: dict = {"regularMarketPrice": float(price)}
+    prev = meta.get("chartPreviousClose")
+    if isinstance(prev, (int, float)) and prev > 0:
+        row["regularMarketChangePercent"] = (float(price) / float(prev) - 1) * 100
+    return row
+
+
 def _fetch_yahoo_quote_rows(tickers: list[str]) -> dict[str, dict]:
+    """Ticker (uppercase) → {regularMarketPrice, regularMarketChangePercent?}, fetched in parallel."""
     if not tickers:
         return {}
-    symbols = ",".join(tickers)
-    url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={quote(symbols)}"
-    try:
-        with urlopen(url, timeout=8) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
-        return {}
-    result = payload.get("quoteResponse", {}).get("result", [])
-    rows: dict[str, dict] = {}
-    for item in result:
-        symbol = str(item.get("symbol", "")).upper().strip()
-        if symbol:
-            rows[symbol] = item
-    return rows
+    with ThreadPoolExecutor(max_workers=_QUOTE_WORKERS) as pool:
+        results = list(pool.map(_fetch_yahoo_chart_quote, tickers))
+    return {t.upper().strip(): row for t, row in zip(tickers, results) if row}
 
 
 # Base symbol (BTC, ETH) → CoinGecko id for /simple/price (fills gaps when Yahoo/Stooq miss crypto).
@@ -751,6 +762,111 @@ def update_holdings(
     conn.commit()
     updated_at = str(row[0]) if row else None
     return InvestingHoldingsResponse(holdings=holdings_json, updated_at=updated_at)
+
+
+# Broker export columns (case-insensitive) → import field. Share (%), Profit, Growth are derived, so ignored.
+_IMPORT_COLUMNS = {
+    "ticker": "ticker",
+    "qty": "shares",
+    "entry price": "avgBuyPrice",
+    "price": "marketPrice",
+    "value": "marketValue",
+}
+
+
+def _import_number(value: object) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    raw = re.sub(r"[\s$]", "", str(value or ""))
+    if not raw:
+        return None
+    if "," in raw and "." not in raw:
+        raw = raw.replace(",", ".")
+    else:
+        raw = raw.replace(",", "")
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _import_ticker(value: object) -> str:
+    # "AAPL.US" → "AAPL" (Yahoo quotes use bare US tickers); other exchange suffixes are kept.
+    ticker = str(value or "").strip().upper()
+    return ticker[:-3] if ticker.endswith(".US") else ticker
+
+
+def _read_import_table(filename: str, content: bytes) -> list[list[object]]:
+    if filename.endswith(".csv"):
+        import csv
+        import io
+
+        text = content.decode("utf-8-sig", errors="replace")
+        dialect = csv.Sniffer().sniff(text[:2048], delimiters=",;\t") if text.strip() else csv.excel
+        return [list(r) for r in csv.reader(io.StringIO(text), dialect)]
+
+    import io
+
+    from openpyxl import load_workbook
+
+    try:
+        wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Could not read the spreadsheet. Save it as .xlsx.") from exc
+    try:
+        return [list(r) for r in wb.worksheets[0].iter_rows(values_only=True)]
+    finally:
+        wb.close()
+
+
+@router.post("/holdings/import", response_model=InvestingHoldingsImportResponse)
+async def import_holdings(
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    file: UploadFile = File(...),
+):
+    """Parse a holdings spreadsheet. Nothing is persisted: the client merges rows and saves via PUT /holdings."""
+    filename = (file.filename or "").lower()
+    if not filename.endswith((".xlsx", ".xlsm", ".csv")):
+        raise HTTPException(status_code=400, detail="Upload an .xlsx or .csv file.")
+    table = _read_import_table(filename, await file.read())
+
+    header_idx = next(
+        (i for i, r in enumerate(table) if any(str(c or "").strip().lower() == "ticker" for c in r)),
+        None,
+    )
+    if header_idx is None:
+        raise HTTPException(status_code=400, detail="No header row with a 'Ticker' column found.")
+    columns: dict[str, int] = {}
+    for i, cell in enumerate(table[header_idx]):
+        key = _IMPORT_COLUMNS.get(str(cell or "").strip().lower())
+        if key and key not in columns:
+            columns[key] = i
+    missing = [label for label, key in _IMPORT_COLUMNS.items() if key not in columns]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing columns: {', '.join(missing)}.")
+
+    rows: list[InvestingHoldingImportRow] = []
+    skipped: list[str] = []
+    for r in table[header_idx + 1 :]:
+        cell = lambda key: r[columns[key]] if columns[key] < len(r) else None  # noqa: E731
+        ticker = _import_ticker(cell("ticker"))
+        if not ticker:
+            continue
+        nums = {key: _import_number(cell(key)) for key in ("shares", "avgBuyPrice", "marketPrice", "marketValue")}
+        if nums["shares"] is None or nums["avgBuyPrice"] is None:
+            skipped.append(ticker)
+            continue
+        price = nums["marketPrice"] or 0.0
+        rows.append(
+            InvestingHoldingImportRow(
+                ticker=ticker,
+                shares=nums["shares"],
+                avgBuyPrice=nums["avgBuyPrice"],
+                marketPrice=price,
+                marketValue=nums["marketValue"] if nums["marketValue"] is not None else price * nums["shares"],
+            )
+        )
+    return InvestingHoldingsImportResponse(rows=rows, skipped=skipped)
 
 
 @router.get("/capital-entries", response_model=InvestingCapitalEntriesResponse)

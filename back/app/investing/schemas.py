@@ -21,7 +21,7 @@ class InvestingHolding(BaseModel):
     industry: str
     targetWeight: str
     currentWeight: str
-    shares: int
+    shares: float
     avgBuyPrice: str
     marketPrice: str
     marketValue: str
@@ -36,6 +36,19 @@ class InvestingHoldingsResponse(BaseModel):
 
 class InvestingHoldingsUpdateRequest(BaseModel):
     holdings: list[InvestingHolding] = Field(default_factory=list)
+
+
+class InvestingHoldingImportRow(BaseModel):
+    ticker: str
+    shares: float
+    avgBuyPrice: float
+    marketPrice: float
+    marketValue: float
+
+
+class InvestingHoldingsImportResponse(BaseModel):
+    rows: list[InvestingHoldingImportRow]
+    skipped: list[str] = Field(default_factory=list)
 
 
 class InvestingQuotesResponse(BaseModel):

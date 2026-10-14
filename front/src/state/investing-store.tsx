@@ -137,6 +137,7 @@ type InvestingStore = {
   refreshHoldings: () => Promise<void>;
   refreshMarketPrices: () => Promise<void>;
   saveHoldings: () => Promise<void>;
+  importHoldings: (file: File) => Promise<InvestingHoldingsImportSummary>;
   setNotes: (next: string) => void;
   refreshNotes: () => Promise<void>;
   saveNotes: () => Promise<void>;
@@ -144,6 +145,22 @@ type InvestingStore = {
   updateMetrics: (
     patch: Partial<{ divYieldPercent: string; beta: string; allocationPercent: Record<string, string> }>,
   ) => Promise<void>;
+};
+
+export type InvestingHoldingsImportSummary = {
+  added: string[];
+  updated: string[];
+  /** Holdings already in the table but absent from the file (kept as-is). */
+  notInFile: string[];
+  skipped: string[];
+};
+
+type InvestingHoldingImportRow = {
+  ticker: string;
+  shares: number;
+  avgBuyPrice: number;
+  marketPrice: number;
+  marketValue: number;
 };
 
 const InvestingContext = createContext<InvestingStore | null>(null);
@@ -278,37 +295,32 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
         "/investing/holdings",
         { token },
       );
-      let hydratedHoldings = normalizeHoldings(res.holdings);
+      const persisted = normalizeHoldings(res.holdings);
+      // Show persisted holdings right away; live quotes are applied when (and if) they arrive.
+      setHoldings(persisted);
+      setHoldingsMeta({ source: "server", updatedAt: res.updated_at });
+      setHoldingsDirty(false);
       const uniqueTickers = Array.from(
         new Set(
-          hydratedHoldings
+          persisted
             .map((h) => (h.ticker ?? "").trim().toUpperCase())
             .filter((ticker) => ticker.length > 0),
         ),
       );
       if (uniqueTickers.length > 0) {
-        try {
-          const quoteRes = await apiFetch<{
-            prices: Record<string, number>;
-            day_change_percent?: Record<string, number>;
-          }>(`/investing/quotes?tickers=${encodeURIComponent(uniqueTickers.join(","))}`, { token });
-          hydratedHoldings = applyMarketPrices(
-            hydratedHoldings,
-            quoteRes.prices ?? {},
-            quoteRes.day_change_percent ?? {},
-          );
-        } catch {
-          // Keep persisted holdings if quote provider is unavailable.
-        }
+        void apiFetch<{
+          prices: Record<string, number>;
+          day_change_percent?: Record<string, number>;
+        }>(`/investing/quotes?tickers=${encodeURIComponent(uniqueTickers.join(","))}`, { token })
+          .then((quoteRes) =>
+            setHoldings((prev) =>
+              applyMarketPrices(prev, quoteRes.prices ?? {}, quoteRes.day_change_percent ?? {}),
+            ),
+          )
+          .catch(() => {
+            // Keep persisted holdings if quote provider is unavailable.
+          });
       }
-      if (res.holdings.length > 0) {
-        setHoldings(hydratedHoldings);
-        setHoldingsMeta({ source: "server", updatedAt: res.updated_at });
-      } else {
-        setHoldings([]);
-        setHoldingsMeta({ source: "server", updatedAt: res.updated_at });
-      }
-      setHoldingsDirty(false);
     } finally {
       setHoldingsLoading(false);
     }
@@ -577,6 +589,59 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /** Parses a spreadsheet server-side and merges it into the table as unsaved edits (Save persists to DB). */
+  async function importHoldings(file: File): Promise<InvestingHoldingsImportSummary> {
+    if (!token) throw { status: 401, message: "Not signed in" };
+    const body = new FormData();
+    body.append("file", file);
+    const res = await apiFetch<{ rows: InvestingHoldingImportRow[]; skipped: string[] }>(
+      "/investing/holdings/import",
+      { token, method: "POST", body },
+    );
+
+    const byTicker = new Map(res.rows.map((r) => [r.ticker.toUpperCase(), r]));
+    const added: string[] = [];
+    const updated: string[] = [];
+    const notInFile: string[] = [];
+    const seen = new Set<string>();
+    const merged = holdings.map((h) => {
+      const ticker = (h.ticker ?? "").trim().toUpperCase();
+      const row = byTicker.get(ticker);
+      if (!row || seen.has(ticker)) {
+        if (!row) notInFile.push(h.ticker);
+        return h;
+      }
+      seen.add(ticker);
+      updated.push(ticker);
+      return {
+        ...h,
+        shares: row.shares,
+        avgBuyPrice: formatUsd(row.avgBuyPrice),
+        marketPrice: formatUsd(row.marketPrice),
+        marketValue: formatUsd(row.marketValue),
+      };
+    });
+    for (const row of res.rows) {
+      const ticker = row.ticker.toUpperCase();
+      if (seen.has(ticker)) continue;
+      seen.add(ticker);
+      added.push(ticker);
+      merged.push({
+        ...createEmptyHolding(),
+        ticker,
+        name: ticker,
+        shares: row.shares,
+        avgBuyPrice: formatUsd(row.avgBuyPrice),
+        marketPrice: formatUsd(row.marketPrice),
+        marketValue: formatUsd(row.marketValue),
+      });
+    }
+
+    setHoldings(normalizeHoldings(merged));
+    setHoldingsDirty(true);
+    return { added, updated, notInFile, skipped: res.skipped ?? [] };
+  }
+
   async function refreshMetrics() {
     if (!token) {
       setMetricsState({ divYieldPercent: "—", beta: "—", allocationPercent: {} });
@@ -816,6 +881,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       refreshHoldings,
       refreshMarketPrices,
       saveHoldings,
+      importHoldings,
       setNotes: (next) => {
         setNotesState(next);
         setNotesDirty(true);

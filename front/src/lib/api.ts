@@ -25,7 +25,8 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const url = `${API_BASE}${path}`;
   const headers = new Headers(opts.headers);
-  headers.set("Content-Type", "application/json");
+  // FormData needs the browser-generated multipart boundary, so leave Content-Type unset for it.
+  if (!(opts.body instanceof FormData)) headers.set("Content-Type", "application/json");
   if (opts.token) headers.set("Authorization", `Bearer ${opts.token}`);
 
   const res = await fetch(url, { ...opts, headers });

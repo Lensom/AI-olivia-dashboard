@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { formatPercent, formatUsd, parsePercent, parseUsd } from "@/features/investing/format";
 import {
   investingMetaBadge,
@@ -9,7 +9,7 @@ import {
   investingPrimarySaveDisabled,
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
-import { useInvesting } from "@/state/investing-store";
+import { useInvesting, type InvestingHoldingsImportSummary } from "@/state/investing-store";
 
 function inputBaseClasses() {
   return "w-full rounded-lg border border-black/10 bg-white/90 px-2 py-1 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20 focus:bg-white";
@@ -33,6 +33,17 @@ function dayChangeCellClass(s: string | undefined): string {
   if (n > 0) return "text-emerald-700";
   if (n < 0) return "text-rose-700";
   return "text-[#6f675b]";
+}
+
+function importErrorMessage(err: unknown): string {
+  const raw = (err as { message?: string })?.message ?? "Unknown error";
+  try {
+    const detail = (JSON.parse(raw) as { detail?: unknown }).detail;
+    if (typeof detail === "string") return detail;
+  } catch {
+    // Not a FastAPI JSON error body.
+  }
+  return raw;
 }
 
 type SortKey =
@@ -62,11 +73,33 @@ export default function InvestingTablePage() {
     isMarketPricesLoading,
     isHoldingsDirty,
     isHoldingsSaving,
+    importHoldings,
   } = useInvesting();
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [expandedRowIds, setExpandedRowIds] = useState<Record<string, boolean>>({});
   const [sortBy, setSortBy] = useState<SortKey>("ticker");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<
+    { ok: true; summary: InvestingHoldingsImportSummary } | { ok: false; message: string } | null
+  >(null);
+
+  async function handleImportFile(file: File | undefined) {
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const summary = await importHoldings(file);
+      setImportResult({ ok: true, summary });
+      setMode("edit");
+    } catch (err) {
+      setImportResult({ ok: false, message: importErrorMessage(err) });
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   const totals = useMemo(() => {
     const totalValue = holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0);
@@ -164,6 +197,22 @@ export default function InvestingTablePage() {
           >
             {isMetricsLoading ? "Refreshing metrics…" : "Refresh metrics"}
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xlsm,.csv"
+            className="hidden"
+            onChange={(e) => void handleImportFile(e.target.files?.[0])}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+            title="Columns: Ticker, Qty, Entry Price, Price, Value"
+            className={["transition", isImporting ? investingPrimarySaveDisabled : investingToolbarBtn].join(" ")}
+          >
+            {isImporting ? "Importing…" : "Import XLSX"}
+          </button>
           <div className="flex rounded-full border border-black/10 bg-white p-1">
             <button
               type="button"
@@ -209,6 +258,40 @@ export default function InvestingTablePage() {
           ) : null}
         </div>
       </div>
+
+      {importResult ? (
+        <div
+          className={[
+            "flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm",
+            importResult.ok
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-rose-200 bg-rose-50 text-rose-900",
+          ].join(" ")}
+        >
+          {importResult.ok ? (
+            <div className="grid gap-0.5">
+              <p className="font-medium">
+                Imported: {importResult.summary.updated.length} updated, {importResult.summary.added.length} added.
+                Review and press Save to store in the database.
+              </p>
+              {importResult.summary.added.length > 0 ? (
+                <p>New: {importResult.summary.added.join(", ")} — set name, target and industry.</p>
+              ) : null}
+              {importResult.summary.notInFile.length > 0 ? (
+                <p>Not in file (kept, delete if sold): {importResult.summary.notInFile.join(", ")}</p>
+              ) : null}
+              {importResult.summary.skipped.length > 0 ? (
+                <p>Skipped (missing Qty or Entry Price): {importResult.summary.skipped.join(", ")}</p>
+              ) : null}
+            </div>
+          ) : (
+            <p>Import failed: {importResult.message}</p>
+          )}
+          <button type="button" onClick={() => setImportResult(null)} className="text-xs opacity-70 hover:opacity-100">
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       <div className="overflow-hidden rounded-2xl border border-black/5 bg-white/90 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
         <div className="overflow-x-auto">
