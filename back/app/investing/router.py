@@ -534,20 +534,32 @@ def _enrich_picking_rows(rows: list[dict]) -> list[dict]:
     return out
 
 
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
+)
+# Failed fetches are retried sooner than successful ones are refreshed.
+_FUNDAMENTALS_FAILURE_TTL_SECONDS = 5 * 60
+
+
+def _finviz_field(html: str, boxover: str) -> str:
+    """Text of the first <b> value right after a Finviz snapshot label (e.g. "1.08", "3.64 (0.68%)", "-")."""
+    m = re.search(rf'data-boxover-html="{re.escape(boxover)}".*?<b>([^<]*)</b>', html, re.S)
+    return m.group(1).strip() if m else ""
+
+
 def _fetch_finviz_fundamentals(ticker: str) -> tuple[float | None, float | None]:
+    """(dividend yield as a fraction, beta). None = unknown; a non-payer's yield is 0.0, not None."""
     now = time.time()
     cached = _fundamentals_cache.get(ticker)
-    if cached and now - cached[2] < _FUNDAMENTALS_CACHE_TTL_SECONDS:
-        return cached[0], cached[1]
+    if cached:
+        failed = cached[0] is None and cached[1] is None
+        ttl = _FUNDAMENTALS_FAILURE_TTL_SECONDS if failed else _FUNDAMENTALS_CACHE_TTL_SECONDS
+        if now - cached[2] < ttl:
+            return cached[0], cached[1]
 
     url = f"https://finviz.com/quote.ashx?t={quote(ticker)}&p=d"
-    req = Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "text/html,application/xhtml+xml,*/*",
-        },
-    )
+    # Finviz rejects bare "Mozilla/5.0"; it needs a full browser User-Agent.
+    req = Request(url, headers={"User-Agent": _BROWSER_UA, "Accept": "text/html,application/xhtml+xml,*/*"})
     try:
         with urlopen(req, timeout=7) as response:
             html = response.read().decode("utf-8", "ignore")
@@ -555,19 +567,15 @@ def _fetch_finviz_fundamentals(ticker: str) -> tuple[float | None, float | None]
         _fundamentals_cache[ticker] = (None, None, now)
         return None, None
 
-    beta_match = re.search(r'data-boxover-html="Beta".*?<b>([^<]+)</b>', html, re.S)
-    beta_text = beta_match.group(1).strip() if beta_match else ""
+    beta_text = _finviz_field(html, "Beta")
     beta = _parse_num(beta_text) if beta_text and beta_text != "-" else None
     if isinstance(beta, float) and beta <= 0:
         beta = None
 
-    div_match = re.search(
-        r'data-boxover-html="Trailing 12 Months Dividend".*?<b>[^<]*\(([-+]?\d+(?:\.\d+)?)%\)</b>',
-        html,
-        re.S,
-    )
-    div_percent = _parse_num(div_match.group(1)) if div_match else None
-    div_yield = (div_percent / 100.0) if isinstance(div_percent, float) and div_percent > 0 else None
+    div_yield: float | None = None
+    if 'data-boxover-html="Trailing 12 Months Dividend"' in html:
+        pct = re.search(r"\(([-+]?\d+(?:\.\d+)?)%\)", _finviz_field(html, "Trailing 12 Months Dividend"))
+        div_yield = float(pct.group(1)) / 100.0 if pct else 0.0
 
     _fundamentals_cache[ticker] = (div_yield, beta, now)
     return div_yield, beta
@@ -609,11 +617,15 @@ def _calc_metrics_from_holdings(holdings: list[dict]) -> tuple[str, str, dict[st
     beta_weight_total = 0.0
     allocation_percent: dict[str, str] = {}
 
+    tickers_with_value = list(values_by_ticker)
+    with ThreadPoolExecutor(max_workers=_QUOTE_WORKERS) as pool:
+        fundamentals = dict(zip(tickers_with_value, pool.map(_fetch_finviz_fundamentals, tickers_with_value)))
+
     for ticker, value in values_by_ticker.items():
         weight = value / total_value
         allocation_percent[ticker] = f"{(weight * 100.0):.2f}%"
 
-        div_yield, beta = _fetch_finviz_fundamentals(ticker)
+        div_yield, beta = fundamentals[ticker]
         if isinstance(div_yield, (int, float)):
             weighted_div_yield += weight * float(div_yield)
             div_weight_total += weight
@@ -622,8 +634,9 @@ def _calc_metrics_from_holdings(holdings: list[dict]) -> tuple[str, str, dict[st
             weighted_beta += weight * float(beta)
             beta_weight_total += weight
 
-    div_yield_percent = f"{(weighted_div_yield * 100.0):.2f}%" if div_weight_total > 0 else "—"
-    beta_value = f"{weighted_beta:.2f}" if beta_weight_total > 0 else "—"
+    # Average over the holdings we have data for, so a missing ticker doesn't drag the result toward 0.
+    div_yield_percent = f"{(weighted_div_yield / div_weight_total * 100.0):.2f}%" if div_weight_total > 0 else "—"
+    beta_value = f"{(weighted_beta / beta_weight_total):.2f}" if beta_weight_total > 0 else "—"
     return div_yield_percent, beta_value, allocation_percent
 
 
