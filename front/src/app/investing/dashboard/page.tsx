@@ -36,6 +36,7 @@ export default function InvestingDashboardPage() {
     holdingsMeta,
     isHoldingsLoading,
     activitiesSummary,
+    refills,
     metrics,
     isMetricsLoading,
     updateMetrics,
@@ -54,6 +55,9 @@ export default function InvestingDashboardPage() {
 
   const positions = useMemo(() => buildPositions(holdings), [holdings]);
   const totals = useMemo(() => buildTotals(positions), [positions]);
+
+  // Money actually deposited (Finance → Refills), not cost basis, which includes reinvested gains.
+  const topped = useMemo(() => refills.reduce((a, r) => a + parseUsd(r.amount), 0), [refills]);
 
   const realized = useMemo(() => {
     const pnl = activitiesSummary.reduce((a, y) => a + parseUsd(y.sales_pnl), 0);
@@ -142,17 +146,37 @@ export default function InvestingDashboardPage() {
             )
           }
         />
-        <KpiTile
-          label="Total return (unrealized)"
-          value={signedUsd(totals.pnl)}
-          valueTone={toneClass(totals.pnl)}
-          sub={
-            <>
-              <span className={`font-semibold ${toneClass(totals.pnlPct)}`}>{signedPct(totals.pnlPct, 1)}</span> on{" "}
-              {formatUsd(totals.cost)} invested
-            </>
-          }
-        />
+        {topped > 0 ? (
+          <KpiTile
+            label="Total return"
+            value={signedUsd(totals.value - topped)}
+            valueTone={toneClass(totals.value - topped)}
+            sub={
+              <>
+                <span className={`font-semibold ${toneClass(totals.value - topped)}`}>
+                  {signedPct(((totals.value - topped) / topped) * 100, 1)}
+                </span>{" "}
+                on {formatUsd(topped)} topped
+                <span className="mt-0.5 block text-[#8f8676]">
+                  Positions vs cost: {signedUsd(totals.pnl)} ({signedPct(totals.pnlPct, 1)})
+                </span>
+              </>
+            }
+          />
+        ) : (
+          // No refills recorded yet: fall back to cost basis so the tile still says something useful.
+          <KpiTile
+            label="Total return (vs cost basis)"
+            value={signedUsd(totals.pnl)}
+            valueTone={toneClass(totals.pnl)}
+            sub={
+              <>
+                <span className={`font-semibold ${toneClass(totals.pnlPct)}`}>{signedPct(totals.pnlPct, 1)}</span> on{" "}
+                {formatUsd(totals.cost)} cost · add refills on Finance
+              </>
+            }
+          />
+        )}
         <KpiTile
           label="Today"
           value={totals.hasQuotes ? signedUsd(totals.dayUsd) : "—"}

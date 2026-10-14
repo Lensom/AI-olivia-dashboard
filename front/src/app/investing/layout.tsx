@@ -14,7 +14,7 @@ import {
 const STOCK_TABS = [
   { href: "/investing/dashboard", label: "Overview" },
   { href: "/investing/holdings", label: "Portfolio" },
-  { href: "/investing/finance", label: "Funding & buys" },
+  { href: "/investing/finance", label: "Finance" },
   { href: "/investing/picking", label: "Allocation rules" },
   { href: "/investing/activities", label: "Activities" },
   { href: "/investing/analytics", label: "Analytics" },
