@@ -1,51 +1,246 @@
-import { RequireAuth } from "@/components/auth/require-auth";
-import { InvestingMenuOrder } from "@/components/categories/investing-menu-order";
-import { SubcategoriesSection } from "@/components/categories/subcategories-section";
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { RequireAuth } from "@/components/auth/require-auth";
+import { formatUsd, parseUsd } from "@/features/investing/format";
+import { investingPageHref, investingPageLabel } from "@/features/investing/nav";
+import { investingToolbarBtn } from "@/features/investing/ui/investing-classes";
+import { useCategories, type Subcategory } from "@/state/categories-store";
+import { useInvesting } from "@/state/investing-store";
+
+const DESCRIPTION: Record<string, string> = {
+  total: "Net worth across stocks, crypto, savings and debts",
+  dashboard: "Today's moves, allocation, risk and rebalancing",
+  table: "Holdings table, import, targets",
+  finance: "Deposits, fees and annualized return",
+  picking: "Buckets and buy zones",
+  activities: "Every buy and sell, import from broker",
+  analytics: "Yearly returns vs the S&P 500",
+  notes: "Your rules, checked against live numbers",
+  crypto: "BTC / ETH holdings, funding and split rule",
+};
 
 export default function InvestingPage() {
+  const { categories, subcategoriesByCategoryId, refreshSubcategories, reorderSubcategories, createSubcategory } =
+    useCategories();
+  const { holdings, refills, activities, pickingRows, notes } = useInvesting();
+  const investing = useMemo(() => categories.find((c) => c.slug === "investing"), [categories]);
+  const saved = useMemo(
+    () => (investing ? (subcategoriesByCategoryId[investing.id] ?? []) : []),
+    [investing, subcategoriesByCategoryId],
+  );
+
+  const [reordering, setReordering] = useState(false);
+  // Local order while reordering, so tiles move instantly; saved to the server after each change.
+  const [draft, setDraft] = useState<Subcategory[] | null>(null);
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  useEffect(() => {
+    if (investing?.id) void refreshSubcategories(investing.id);
+  }, [investing?.id, refreshSubcategories]);
+
+  const tiles = draft ?? saved;
+
+  // A live figure per page where the data is already loaded (stocks data is app-wide).
+  const metric = useMemo(() => {
+    const value = holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0);
+    const topped = refills.reduce((a, r) => a + parseUsd(r.amount), 0);
+    const words = notes.trim() ? notes.trim().split(/\s+/).length : 0;
+    return {
+      dashboard: value > 0 ? formatUsd(value) : null,
+      table: holdings.length ? `${holdings.length} holdings` : null,
+      finance: topped > 0 ? `${formatUsd(topped)} deposited` : null,
+      activities: activities.length ? `${activities.length} trades` : null,
+      picking: pickingRows.length ? `${pickingRows.length} on the list` : null,
+      notes: words ? `${words} words` : null,
+    } as Record<string, string | null>;
+  }, [holdings, refills, activities, pickingRows, notes]);
+
+  async function commit(next: Subcategory[]) {
+    if (!investing) return;
+    setDraft(next);
+    setBusy(true);
+    setError(null);
+    try {
+      await reorderSubcategories(
+        investing.id,
+        next.map((s) => s.id),
+      );
+    } catch {
+      setError("Couldn't save the new order.");
+      setDraft(null);
+      await refreshSubcategories(investing.id);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function moveTo(id: number, toIndex: number) {
+    const from = tiles.findIndex((s) => s.id === id);
+    if (from < 0 || toIndex < 0 || toIndex >= tiles.length || from === toIndex) return;
+    const next = [...tiles];
+    const [item] = next.splice(from, 1);
+    next.splice(toIndex, 0, item!);
+    return next;
+  }
+
+  async function addPage() {
+    if (!investing || newName.trim().length < 2) return;
+    try {
+      await createSubcategory(investing.id, newName.trim());
+      setNewName("");
+      setAdding(false);
+    } catch {
+      setError("Couldn't create the page.");
+    }
+  }
+
   return (
     <RequireAuth>
-      <div className="space-y-7">
-        <section className="rounded-[1.75rem] border border-black/5 bg-[#f1ece1] p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] md:p-8">
-          <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">
-            Category
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold leading-tight text-[#1f1c17] md:text-4xl">
-            Investing
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-[#655d51]">
-            Portfolio workspace with live API-driven holdings, market quotes and portfolio metrics.
-          </p>
-
-          <div className="mt-5 flex flex-wrap gap-2.5">
-            <span className="rounded-full border border-black/10 bg-white/70 px-3 py-1 text-xs font-medium text-[#6f675b]">
-              Rebalance: working draft
-            </span>
-            <Link
-              href="/investing/dashboard"
-              className="rounded-full border border-black/10 bg-[#1f1c17] px-3 py-1 text-xs font-medium text-[#f8f4eb] hover:bg-[#2c2923]"
-            >
-              Stocks workspace
-            </Link>
-            <Link
-              href="/investing/activities"
-              className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-medium text-[#3b352d] hover:bg-[#faf8f2]"
-            >
-              Activities
-            </Link>
-            <Link
-              href="/investing/crypto"
-              className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-medium text-[#3b352d] hover:bg-[#faf8f2]"
-            >
-              Crypto
-            </Link>
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">Category</p>
+            <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">Investing</h1>
+            <p className="mt-1.5 text-sm text-[#655d51]">
+              {reordering
+                ? "Drag tiles (or use the arrows) to set the order. It applies to the sidebar and the Stocks tabs."
+                : "Your investing pages, in the same order as the sidebar."}
+            </p>
           </div>
-        </section>
+          <div className="flex items-center gap-2">
+            {busy ? <span className="text-xs text-[#8f8676]">Saving…</span> : null}
+            <button
+              type="button"
+              onClick={() => {
+                setReordering((v) => !v);
+                setDraft(null);
+                setAdding(false);
+              }}
+              className={
+                reordering
+                  ? "rounded-full bg-[#1f1c17] px-3.5 py-1.5 text-xs font-medium text-[#f8f4eb] hover:bg-[#2c2923]"
+                  : investingToolbarBtn
+              }
+            >
+              {reordering ? "Done" : "Reorder"}
+            </button>
+          </div>
+        </div>
+        {error ? <p className="text-sm text-rose-700">{error}</p> : null}
 
-        <InvestingMenuOrder />
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Investing pages">
+          {tiles.map((s, index) => {
+            const href = investingPageHref(s.slug);
+            const label = investingPageLabel(s.slug, s.name);
+            const isDragging = dragId === s.id;
+            const body = (
+              <>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[15px] font-semibold text-[#1f1c17]">{label}</span>
+                  {reordering ? (
+                    <span className="select-none text-lg leading-none text-[#b0a79a]" aria-hidden>
+                      ⠿
+                    </span>
+                  ) : metric[s.slug] ? (
+                    <span className="shrink-0 rounded-full bg-[#f4efe4] px-2 py-0.5 text-[11px] font-medium tabular-nums text-[#3b352d]">
+                      {metric[s.slug]}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1 text-xs text-[#6f675b]">{DESCRIPTION[s.slug] ?? "Custom page"}</p>
+              </>
+            );
+            return (
+              <li
+                key={s.id}
+                draggable={reordering}
+                onDragStart={(e) => {
+                  setDragId(s.id);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragOver={(e) => {
+                  if (!reordering || dragId == null || dragId === s.id) return;
+                  e.preventDefault();
+                  const next = moveTo(dragId, index);
+                  if (next) setDraft(next); // live preview while dragging
+                }}
+                onDrop={(e) => e.preventDefault()}
+                onDragEnd={() => {
+                  setDragId(null);
+                  if (draft && draft.map((d) => d.id).join() !== saved.map((d) => d.id).join()) void commit(draft);
+                }}
+                className={[
+                  "rounded-2xl border bg-white/90 shadow-[0_8px_30px_rgba(18,16,13,0.05)] transition",
+                  reordering ? "cursor-grab border-dashed border-black/15 active:cursor-grabbing" : "border-black/5",
+                  isDragging ? "opacity-50" : "",
+                ].join(" ")}
+              >
+                {reordering ? (
+                  <div className="flex items-center gap-3 p-4">
+                    <span className="w-5 text-center text-xs tabular-nums text-[#b0a79a]">{index + 1}</span>
+                    <div className="min-w-0 flex-1">{body}</div>
+                    <span className="flex flex-col gap-1">
+                      {[
+                        { d: -1, label: "↑", aria: `Move ${label} earlier` },
+                        { d: 1, label: "↓", aria: `Move ${label} later` },
+                      ].map(({ d, label: arrow, aria }) => (
+                        <button
+                          key={d}
+                          type="button"
+                          disabled={busy || index + d < 0 || index + d >= tiles.length}
+                          onClick={() => {
+                            const next = moveTo(s.id, index + d);
+                            if (next) void commit(next);
+                          }}
+                          className="rounded-md border border-black/10 bg-white px-1.5 text-xs leading-5 text-[#3b352d] hover:bg-[#faf8f2] disabled:opacity-30"
+                          aria-label={aria}
+                        >
+                          {arrow}
+                        </button>
+                      ))}
+                    </span>
+                  </div>
+                ) : (
+                  <Link href={href} className="block rounded-2xl p-4 hover:bg-white">
+                    {body}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+          {tiles.length === 0 ? <li className="text-sm text-[#8f8676]">Loading pages…</li> : null}
+        </ul>
 
-        <SubcategoriesSection categorySlug="investing" />
+        {reordering ? (
+          adding ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void addPage()}
+                placeholder="Page name"
+                className="w-56 rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-sm outline-none focus:border-black/20"
+                autoFocus
+              />
+              <button type="button" onClick={() => void addPage()} className={investingToolbarBtn}>
+                Add
+              </button>
+              <button type="button" onClick={() => setAdding(false)} className="text-xs text-[#6f675b] hover:text-[#1f1c17]">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setAdding(true)} className="text-xs text-[#6f675b] underline decoration-black/15 underline-offset-2 hover:text-[#1f1c17]">
+              + Add a custom page
+            </button>
+          )
+        ) : null}
       </div>
     </RequireAuth>
   );

@@ -77,6 +77,21 @@ On **Portfolio**, click **Import XLSX** and choose a `.xlsx` or `.csv` file. The
 - Nothing is saved until you press **Save**. Imports, autofill and manual edits all stay unsaved until then. An amber banner and a warning when closing the tab protect unsaved changes.
 - The old binary `.xls` format isn't supported; save the file as `.xlsx` first.
 
+### Importing trades (Activities)
+
+On **Activities**, click **Import XLSX** and choose a broker trade export with these columns:
+
+| Trade# | Order# | Time | Ticker | Direction | Price | Quantity | Amount | Fee | Profit |
+|---|---|---|---|---|---|---|---|---|---|
+| 159553933 | 154766710 | 21.07.2021 20:31:12 | AMD.US | buy | 88.76 | 1 | 88.76 | €1.72 | $0 |
+
+- **Currency exchanges** (`RUR/USD`, `EUR/USD`, any ticker with `/`) are skipped; they aren't stock trades.
+- **No duplicates.** A trade is skipped if its Trade# was imported before, or if a hand-entered trade has the same direction, ticker, date and quantity with a price within 0.5%. Importing the same file twice adds nothing.
+- **Currency:** `.US` tickers trade in USD; otherwise the currency of the Profit value is used (e.g. `₽0` means RUB). Fees and profits in another currency are converted to the trade's currency at that day's rate.
+- **Names and categories** come from your existing trades for the same ticker first, then from Finviz.
+- Rows that can't be read (bad date, unknown direction…) are listed by row number.
+- As with holdings, nothing is saved until you press **Save**.
+
 ## Project structure
 
 ```

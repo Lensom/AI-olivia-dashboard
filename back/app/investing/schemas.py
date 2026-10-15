@@ -44,6 +44,9 @@ class InvestingHoldingImportRow(BaseModel):
     avgBuyPrice: float
     marketPrice: float
     marketValue: float
+    # From Finviz; empty when the lookup fails (the client then falls back to the ticker).
+    name: str = ""
+    industry: str = ""
 
 
 class InvestingHoldingsImportResponse(BaseModel):
@@ -51,9 +54,53 @@ class InvestingHoldingsImportResponse(BaseModel):
     skipped: list[str] = Field(default_factory=list)
 
 
+class InvestingActivityImportRow(BaseModel):
+    trade_id: str
+    type: str
+    ticker: str
+    name: str = ""
+    category: str = ""
+    count: float
+    price: float
+    currency: str
+    amount: float
+    # Fee and profit converted to the trade currency when the broker reported them in another one.
+    commission: float = 0
+    gains_losses: float = 0
+    date: str  # DD.MM.YYYY
+
+
+class InvestingActivitiesImportResponse(BaseModel):
+    rows: list[InvestingActivityImportRow]
+    # Currency exchanges (e.g. RUR/USD) are not stock trades.
+    skipped_fx: int = 0
+    # "row N: reason" for rows that couldn't be read.
+    skipped_invalid: list[str] = Field(default_factory=list)
+
+
+class InvestingTickerFundamentals(BaseModel):
+    beta: float | None = None
+    # Trailing-12-month yield, %; 0 for non-payers, None when unknown.
+    div_yield_percent: float | None = None
+
+
+class InvestingFundamentalsResponse(BaseModel):
+    fundamentals: dict[str, InvestingTickerFundamentals] = Field(default_factory=dict)
+
+
+class InvestingBenchmarkResponse(BaseModel):
+    symbol: str
+    # Calendar-year total return (dividends reinvested), %, keyed by year; the current year is year-to-date.
+    yearly_return_percent: dict[str, float] = Field(default_factory=dict)
+    as_of: str | None = None
+
+
 class InvestingTickerProfile(BaseModel):
     name: str = ""
     industry: str = ""
+    # Trailing P/E and diluted EPS as Finviz shows them; empty for funds and loss-making companies.
+    pe: str = ""
+    eps: str = ""
 
 
 class InvestingProfilesResponse(BaseModel):
@@ -109,7 +156,7 @@ class InvestingActivity(BaseModel):
     name: str = ""
     ticker: str = ""
     category: str = ""
-    count: int = 0
+    count: float = 0
     price: str = "0"
     currency: str = "USD"
     amount: str = "0"
@@ -248,3 +295,44 @@ class InvestingCryptoUpdateRequest(BaseModel):
     purchase_rows: list[CryptoPurchaseRow] = Field(default_factory=list)
     refill_rows: list[CryptoRefillRow] = Field(default_factory=list)
     rules: CryptoRules = Field(default_factory=CryptoRules)
+
+
+# ---- Total (net worth across stocks, crypto, savings, cash and debts) ----
+
+class TotalAccount(BaseModel):
+    id: str
+    name: str = ""
+    # stocks | savings | crypto | owed_to_me | i_owe
+    category: str = "savings"
+    amount: str = "0"
+    currency: str = "USD"
+    # manual: amount typed by the user; stocks / crypto: live value from the app (amount ignored).
+    source: str = "manual"
+
+
+class TotalMonth(BaseModel):
+    id: str
+    month: str  # YYYY-MM
+    total_usd: float
+    # USD per goal group when recorded from the page (empty for months typed in by hand).
+    breakdown: dict[str, float] = Field(default_factory=dict)
+
+
+class InvestingTotalData(BaseModel):
+    accounts: list[TotalAccount] = Field(default_factory=list)
+    # Target share per group, %: stocks / savings / crypto.
+    goals: dict[str, float] = Field(default_factory=lambda: {"stocks": 70.0, "savings": 20.0, "crypto": 10.0})
+    months: list[TotalMonth] = Field(default_factory=list)
+    # Currency → USD per 1 unit, replacing the official rate.
+    rate_overrides: dict[str, float] = Field(default_factory=dict)
+
+
+class InvestingTotalResponse(InvestingTotalData):
+    updated_at: str | None = None
+
+
+class InvestingRatesResponse(BaseModel):
+    # Currency code → USD per 1 unit (USD = 1).
+    to_usd: dict[str, float] = Field(default_factory=dict)
+    date: str | None = None
+    source: str = "NBU"

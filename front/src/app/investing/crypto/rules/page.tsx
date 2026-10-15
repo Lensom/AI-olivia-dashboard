@@ -7,6 +7,7 @@ import {
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { formatCryptoUsd, parseCryptoAmount } from "@/features/investing/crypto-format";
+import { buildCoinPositions, rebalancingSplit, ruleBtcShare } from "@/features/investing/crypto-stats";
 import { useCrypto } from "@/state/crypto-store";
 import { cryptoInputClasses } from "../_inputs";
 import { useMemo, useState } from "react";
@@ -14,6 +15,8 @@ import { useMemo, useState } from "react";
 export default function CryptoRulesPage() {
   const {
     rules,
+    holdings,
+    purchaseRows,
     setRules,
     cryptoMeta,
     isCryptoLoading,
@@ -37,6 +40,18 @@ export default function CryptoRulesPage() {
     const t = b + e || 100;
     return { btc: (base * b) / t, eth: (base * e) / t };
   }, [previewUsd, btcPct, ethPct]);
+
+  // Current BTC/ETH values, to suggest a split that moves the mix back toward the rule.
+  const positions = useMemo(() => buildCoinPositions(holdings, purchaseRows), [holdings, purchaseRows]);
+  const btcValue = positions.find((p) => p.symbol === "BTC")?.value ?? 0;
+  const ethValue = positions.find((p) => p.symbol === "ETH")?.value ?? 0;
+  const share = ruleBtcShare(rules);
+  const rebalance = rebalancingSplit(parseCryptoAmount(previewUsd), btcValue, ethValue, share);
+  const mixNow = btcValue + ethValue > 0 ? btcValue / (btcValue + ethValue) : null;
+  const mixAfter = (split: { btc: number; eth: number }) => {
+    const total = btcValue + ethValue + split.btc + split.eth;
+    return total > 0 ? ((btcValue + split.btc) / total) * 100 : 0;
+  };
 
   return (
     <div className="space-y-5">
@@ -73,7 +88,7 @@ export default function CryptoRulesPage() {
         <article className="rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
           <h2 className="text-sm font-semibold text-[#1f1c17]">New deposit split</h2>
           <p className="mt-1 text-xs text-[#655d51]">
-            Percentages for the next top-up. They don’t have to add to 100% — the preview scales proportionally.
+            Your target BTC / ETH mix. Percentages needn’t add to 100% — they’re used as a ratio.
           </p>
           {Math.abs(sumPct - 100) > 0.01 && sumPct > 0 ? (
             <p className="mt-2 text-xs text-amber-700">
@@ -133,16 +148,29 @@ export default function CryptoRulesPage() {
             className={`${cryptoInputClasses()} mt-3 max-w-[200px] text-center tabular-nums`}
             inputMode="decimal"
           />
-          <div className="mt-4 space-y-3 rounded-xl border border-black/5 bg-[#faf8f2] p-4">
-            <p className="text-center text-sm tabular-nums text-[#3b352d]">
-              <span className="font-semibold text-[#1f1c17]">{rules.btc_percent}%</span> BTC ≈{" "}
-              {formatCryptoUsd(preview.btc)}
-            </p>
-            <p className="text-center text-sm tabular-nums text-[#3b352d]">
-              <span className="font-semibold text-[#1f1c17]">{rules.eth_percent}%</span> ETH ≈{" "}
-              {formatCryptoUsd(preview.eth)}
-            </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-black/5 bg-[#faf8f2] p-4">
+              <p className="text-xs font-medium text-[#6f675b]">Fixed split ({rules.btc_percent}/{rules.eth_percent})</p>
+              <p className="mt-2 text-sm tabular-nums text-[#1f1c17]">BTC {formatCryptoUsd(preview.btc)}</p>
+              <p className="text-sm tabular-nums text-[#1f1c17]">ETH {formatCryptoUsd(preview.eth)}</p>
+              {mixNow != null ? (
+                <p className="mt-2 text-[11px] text-[#8f8676]">BTC share after: {mixAfter(preview).toFixed(1)}%</p>
+              ) : null}
+            </div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="text-xs font-medium text-emerald-900">Toward the rule</p>
+              <p className="mt-2 text-sm tabular-nums text-[#1f1c17]">BTC {formatCryptoUsd(rebalance.btc)}</p>
+              <p className="text-sm tabular-nums text-[#1f1c17]">ETH {formatCryptoUsd(rebalance.eth)}</p>
+              {mixNow != null ? (
+                <p className="mt-2 text-[11px] text-emerald-900/70">BTC share after: {mixAfter(rebalance).toFixed(1)}%</p>
+              ) : null}
+            </div>
           </div>
+          <p className="mt-2 text-[11px] text-[#8f8676]">
+            {mixNow == null
+              ? "Add BTC and ETH on Portfolio to get a rebalancing suggestion."
+              : `Your BTC share is ${(mixNow * 100).toFixed(1)}% now vs ${(share * 100).toFixed(0)}% in the rule. “Toward the rule” puts the deposit into the under-weight coin first.`}
+          </p>
           {(rules.btc_note || rules.eth_note) && (
             <div className="mt-4 space-y-2 text-xs text-[#655d51]">
               {rules.btc_note ? (

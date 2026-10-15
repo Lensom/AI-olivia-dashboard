@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/state/auth-store";
+import { investingNavItems, isBuiltInInvestingPage } from "@/features/investing/nav";
 import { useCategories } from "@/state/categories-store";
 
 function isActive(pathname: string, href: string) {
@@ -74,29 +75,25 @@ export function Sidebar() {
 
                     {showChildren ? (
                       <div className="ml-2 border-l border-black/5 pl-2">
-                        {subs.map((sub) => {
-                          const childHref =
-                            cat.slug === "investing" &&
+                        {(cat.slug === "investing"
+                          ? // Built-in pages share names/order with the Stocks tabs; custom subcategories follow.
                             [
-                              "dashboard",
-                              "table",
-                              "notes",
-                              "analytics",
-                              "finance",
-                              "activities",
-                              "picking",
-                              "crypto",
-                            ].includes(sub.slug)
-                              ? sub.slug === "table"
-                                ? "/investing/holdings"
-                                : sub.slug === "crypto"
-                                  ? "/investing/crypto"
-                                  : `/investing/${sub.slug}`
-                              : `/c/${cat.slug}/${sub.slug}`;
+                              ...investingNavItems(subs).map((item) => ({
+                                key: item.slug,
+                                name: item.label,
+                                href: item.href,
+                              })),
+                              ...subs
+                                .filter((s) => !isBuiltInInvestingPage(s.slug))
+                                .map((s) => ({ key: String(s.id), name: s.name, href: `/c/${cat.slug}/${s.slug}` })),
+                            ]
+                          : subs.map((s) => ({ key: String(s.id), name: s.name, href: `/c/${cat.slug}/${s.slug}` }))
+                        ).map((sub) => {
+                          const childHref = sub.href;
                           const childActive = isActive(pathname, childHref);
                           return (
                             <Link
-                              key={sub.id}
+                              key={sub.key}
                               href={childHref}
                               className={[
                                 "block rounded-lg px-2 py-1.5 text-xs font-medium transition",

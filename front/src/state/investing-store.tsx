@@ -1,10 +1,10 @@
 "use client";
 
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { InvestingHolding } from "@/features/investing/types";
 import { useAuth } from "./auth-store";
 import { apiFetch } from "@/lib/api";
-import { formatUsd, parseUsd } from "@/features/investing/format";
+import { formatUsd, parseInvestingDateMs, parseUsd } from "@/features/investing/format";
 
 export type InvestingCapitalEntry = {
   id: string;
@@ -138,6 +138,7 @@ type InvestingStore = {
   refreshMarketPrices: () => Promise<void>;
   saveHoldings: () => Promise<void>;
   importHoldings: (file: File) => Promise<InvestingHoldingsImportSummary>;
+  importActivities: (file: File) => Promise<InvestingActivitiesImportSummary>;
   autofillHoldingProfiles: () => Promise<{ filled: string[]; notFound: string[] }>;
   setNotes: (next: string) => void;
   refreshNotes: () => Promise<void>;
@@ -146,6 +147,31 @@ type InvestingStore = {
   updateMetrics: (
     patch: Partial<{ divYieldPercent: string; beta: string; allocationPercent: Record<string, string> }>,
   ) => Promise<void>;
+};
+
+export type InvestingActivitiesImportSummary = {
+  added: number;
+  addedBuys: number;
+  addedSells: number;
+  /** Already present: same broker Trade#, or a matching hand-entered trade. */
+  duplicates: number;
+  skippedFx: number;
+  invalid: string[];
+};
+
+type InvestingActivityImportRow = {
+  trade_id: string;
+  type: "buy" | "sell";
+  ticker: string;
+  name: string;
+  category: string;
+  count: number;
+  price: number;
+  currency: string;
+  amount: number;
+  commission: number;
+  gains_losses: number;
+  date: string;
 };
 
 export type InvestingHoldingsImportSummary = {
@@ -162,7 +188,21 @@ type InvestingHoldingImportRow = {
   avgBuyPrice: number;
   marketPrice: number;
   marketValue: number;
+  /** Looked up server-side; empty when unknown. */
+  name?: string;
+  industry?: string;
 };
+
+/** Name not set by the user: empty, the default, or just the ticker (e.g. after an import). */
+function isPlaceholderName(h: InvestingHolding): boolean {
+  const n = (h.name ?? "").trim();
+  return !n || n.toUpperCase() === h.ticker.trim().toUpperCase() || n === "New holding";
+}
+
+function isPlaceholderIndustry(h: InvestingHolding): boolean {
+  const i = (h.industry ?? "").trim();
+  return !i || i === "—";
+}
 
 const InvestingContext = createContext<InvestingStore | null>(null);
 
@@ -245,6 +285,8 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
   const [isHoldingsDirty, setHoldingsDirty] = useState(false);
   const [isHoldingsSaving, setHoldingsSaving] = useState(false);
   const [notes, setNotesState] = useState("");
+  // Latest typed text, read after an async save to tell whether newer edits arrived meanwhile.
+  const latestNotesRef = useRef("");
   const [notesMeta, setNotesMeta] = useState<{ updatedAt: string | null }>({ updatedAt: null });
   const [isNotesLoading, setNotesLoading] = useState(false);
   const [isNotesSaving, setNotesSaving] = useState(false);
@@ -511,6 +553,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
 
   async function refreshNotes() {
     if (!token) {
+      latestNotesRef.current = "";
       setNotesState("");
       setNotesMeta({ updatedAt: null });
       setNotesDirty(false);
@@ -521,6 +564,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       const res = await apiFetch<{ notes: string; updated_at: string | null }>("/investing/notes", {
         token,
       });
+      latestNotesRef.current = res.notes ?? "";
       setNotesState(res.notes ?? "");
       setNotesMeta({ updatedAt: res.updated_at ?? null });
       setNotesDirty(false);
@@ -531,16 +575,17 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
 
   async function saveNotes() {
     if (!token || !isNotesDirty) return;
+    const sent = notes;
     setNotesSaving(true);
     try {
       const res = await apiFetch<{ notes: string; updated_at: string | null }>("/investing/notes", {
         token,
         method: "PUT",
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ notes: sent }),
       });
-      setNotesState(res.notes ?? "");
       setNotesMeta({ updatedAt: res.updated_at ?? null });
-      setNotesDirty(false);
+      // Text typed while the request was in flight must not be overwritten or marked as saved.
+      if (latestNotesRef.current === sent) setNotesDirty(false);
     } finally {
       setNotesSaving(false);
     }
@@ -616,6 +661,8 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       updated.push(ticker);
       return {
         ...h,
+        name: isPlaceholderName(h) && row.name ? row.name : h.name,
+        industry: isPlaceholderIndustry(h) && row.industry ? row.industry : h.industry,
         shares: row.shares,
         avgBuyPrice: formatUsd(row.avgBuyPrice),
         marketPrice: formatUsd(row.marketPrice),
@@ -630,7 +677,8 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       merged.push({
         ...createEmptyHolding(),
         ticker,
-        name: ticker,
+        name: row.name || ticker,
+        industry: row.industry || "—",
         shares: row.shares,
         avgBuyPrice: formatUsd(row.avgBuyPrice),
         marketPrice: formatUsd(row.marketPrice),
@@ -643,17 +691,83 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
     return { added, updated, notInFile, skipped: res.skipped ?? [] };
   }
 
+  /**
+   * Parses a broker trade export server-side and adds trades not already recorded, as unsaved edits.
+   * A trade counts as recorded if its Trade# was imported before, or a hand-entered row has the same
+   * type, ticker, date and quantity with a price within 0.5%.
+   */
+  async function importActivities(file: File): Promise<InvestingActivitiesImportSummary> {
+    if (!token) throw { status: 401, message: "Not signed in" };
+    const body = new FormData();
+    body.append("file", file);
+    const res = await apiFetch<{ rows: InvestingActivityImportRow[]; skipped_fx: number; skipped_invalid: string[] }>(
+      "/investing/activities/import",
+      { token, method: "POST", body },
+    );
+
+    const knownIds = new Set(activities.map((a) => a.id));
+    const sameTrade = (a: InvestingActivity, r: InvestingActivityImportRow) => {
+      if (a.type !== r.type || a.ticker.trim().toUpperCase() !== r.ticker || a.date.trim() !== r.date) return false;
+      if (Math.abs(Number(a.count) - r.count) > 1e-6) return false;
+      const p = parseUsd(a.price);
+      return p > 0 && Math.abs(p - r.price) / r.price <= 0.005;
+    };
+    // Names and categories from the user's own history win over the ticker lookup (FORD.US is Ford, not
+    // Forward Industries).
+    const historyByTicker = new Map<string, { name: string; category: string }>();
+    for (const a of activities) {
+      const t = a.ticker.trim().toUpperCase();
+      if (t && !historyByTicker.has(t) && (a.name.trim() || a.category.trim())) {
+        historyByTicker.set(t, { name: a.name.trim(), category: a.category.trim() });
+      }
+    }
+
+    const fmt = (n: number) => String(Math.round(n * 10000) / 10000);
+    const added: InvestingActivity[] = [];
+    let duplicates = 0;
+    for (const r of res.rows) {
+      const id = `trade-${r.trade_id}`;
+      if (knownIds.has(id) || activities.some((a) => sameTrade(a, r))) {
+        duplicates += 1;
+        continue;
+      }
+      knownIds.add(id);
+      const hist = historyByTicker.get(r.ticker);
+      added.push({
+        id,
+        type: r.type,
+        name: hist?.name || r.name || r.ticker,
+        ticker: r.ticker,
+        category: hist?.category || r.category,
+        count: r.count,
+        price: fmt(r.price),
+        currency: r.currency,
+        amount: fmt(r.amount),
+        gains_losses: fmt(r.gains_losses),
+        commission: fmt(r.commission),
+        date: r.date,
+      });
+    }
+    if (added.length > 0) {
+      // Newest first at the top, where Edit mode shows freshly added rows.
+      const ms = (d: string) => parseInvestingDateMs(d) ?? 0;
+      added.sort((a, b) => ms(b.date) - ms(a.date));
+      setActivities((prev) => [...added, ...prev]);
+      setActivitiesDirty(true);
+    }
+    return {
+      added: added.length,
+      addedBuys: added.filter((a) => a.type === "buy").length,
+      addedSells: added.filter((a) => a.type === "sell").length,
+      duplicates,
+      skippedFx: res.skipped_fx ?? 0,
+      invalid: res.skipped_invalid ?? [],
+    };
+  }
+
   /** Fills placeholder names / industries from Finviz as unsaved edits; user-entered values are kept. */
   async function autofillHoldingProfiles(): Promise<{ filled: string[]; notFound: string[] }> {
     if (!token) throw { status: 401, message: "Not signed in" };
-    const isPlaceholderName = (h: InvestingHolding) => {
-      const n = (h.name ?? "").trim();
-      return !n || n.toUpperCase() === h.ticker.trim().toUpperCase() || n === "New holding";
-    };
-    const isPlaceholderIndustry = (h: InvestingHolding) => {
-      const i = (h.industry ?? "").trim();
-      return !i || i === "—";
-    };
     const tickers = Array.from(
       new Set(
         holdings
@@ -929,8 +1043,10 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       refreshMarketPrices,
       saveHoldings,
       importHoldings,
+      importActivities,
       autofillHoldingProfiles,
       setNotes: (next) => {
+        latestNotesRef.current = next;
         setNotesState(next);
         setNotesDirty(true);
       },

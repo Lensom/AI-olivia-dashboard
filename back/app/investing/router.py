@@ -27,12 +27,17 @@ from app.investing.schemas import (
     InvestingCapitalEntry,
     InvestingHoldingImportRow,
     InvestingHoldingsImportResponse,
+    InvestingActivitiesImportResponse,
+    InvestingActivityImportRow,
     InvestingHoldingsResponse,
     InvestingHoldingsUpdateRequest,
     InvestingMetricsResponse,
     InvestingMetricsUpdateRequest,
     InvestingQuotesResponse,
     InvestingProfilesResponse,
+    InvestingBenchmarkResponse,
+    InvestingFundamentalsResponse,
+    InvestingTickerFundamentals,
     InvestingTickerProfile,
     InvestingNotesResponse,
     InvestingNotesUpdateRequest,
@@ -48,6 +53,9 @@ from app.investing.schemas import (
     CryptoRules,
     InvestingCryptoResponse,
     InvestingCryptoUpdateRequest,
+    InvestingRatesResponse,
+    InvestingTotalData,
+    InvestingTotalResponse,
 )
 
 
@@ -182,7 +190,7 @@ def _enrich_activities_with_usd(rows: list[dict]) -> list[dict]:
     for row in rows:
         raw_type = str(row.get("type", "")).strip().lower()
         kind = "sell" if raw_type in {"sell", "sale", "sold"} else "buy"
-        count = int(_parse_num(str(row.get("count", "0"))))
+        count = _parse_num(str(row.get("count", "0")))
         legacy_buy_price = str(row.get("buyPrice", "0"))
         legacy_sell_price = str(row.get("sellPrice", "0"))
         price_value = _parse_num(str(row.get("price", "")))
@@ -208,7 +216,7 @@ def _enrich_activities_with_usd(rows: list[dict]) -> list[dict]:
             {
                 **row,
                 "type": kind,
-                "count": count,
+                "count": int(count) if float(count).is_integer() else count,
                 "price": f"{price_value:.6f}".rstrip("0").rstrip(".") if price_value else "0",
                 "amount": f"{amount:.6f}".rstrip("0").rstrip(".") if amount else "0",
                 "gains_losses": f"{gains_losses:.6f}".rstrip("0").rstrip(".") if gains_losses else "0",
@@ -546,8 +554,10 @@ _FUNDAMENTALS_FAILURE_TTL_SECONDS = 5 * 60
 
 def _finviz_field(html: str, boxover: str) -> str:
     """Text of the first <b> value right after a Finviz snapshot label (e.g. "1.08", "3.64 (0.68%)", "-")."""
-    m = re.search(rf'data-boxover-html="{re.escape(boxover)}".*?<b>([^<]*)</b>', html, re.S)
-    return m.group(1).strip() if m else ""
+    # Take the first <b> after the label and strip inner tags: coloured values are wrapped in a <span>,
+    # and matching "<b>[^<]*</b>" would skip them and read a later cell instead.
+    m = re.search(rf'data-boxover-html="{re.escape(boxover)}".*?<b>(.*?)</b>', html, re.S)
+    return unescape(re.sub(r"<[^>]+>", "", m.group(1))).strip() if m else ""
 
 
 def _fetch_finviz_fundamentals(ticker: str) -> tuple[float | None, float | None]:
@@ -678,7 +688,20 @@ def _fetch_finviz_profile(ticker: str) -> InvestingTickerProfile | None:
         sector = re.search(r'href="screener\?v=111&(?:amp;)?f=sec_[^"]*"[^>]*>([^<]+)</a>', html)
         industry = unescape(sector.group(1).strip()) if sector else ""
 
-    profile = InvestingTickerProfile(name=name, industry=industry) if (name or industry) else None
+    def number_field(boxover: str) -> str:
+        text = _finviz_field(html, boxover)
+        return text if re.fullmatch(r"-?\d+(?:\.\d+)?", text) else ""  # "-" means not applicable
+
+    profile = (
+        InvestingTickerProfile(
+            name=name,
+            industry=industry,
+            pe=number_field("Price-to-Earnings (ttm)"),
+            eps=number_field("Diluted EPS (ttm)"),
+        )
+        if (name or industry)
+        else None
+    )
     _profile_cache[ticker] = (profile, now)
     return profile
 
@@ -696,6 +719,69 @@ def get_profiles(
     with ThreadPoolExecutor(max_workers=_QUOTE_WORKERS) as pool:
         results = list(pool.map(_fetch_finviz_profile, unique))
     return InvestingProfilesResponse(profiles={t: p for t, p in zip(unique, results) if p})
+
+
+@router.get("/fundamentals", response_model=InvestingFundamentalsResponse)
+def get_fundamentals(
+    tickers: Annotated[str, Query(description="Comma-separated tickers, e.g. AAPL,VOO")] = "",
+    user: Annotated[UserResponse, Depends(get_current_user)] = None,
+):
+    """Per-ticker beta and dividend yield (Finviz, cached); tickers with no data are omitted."""
+    _ = user.id
+    unique = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))[:50]
+    if not unique:
+        return InvestingFundamentalsResponse()
+    with ThreadPoolExecutor(max_workers=_QUOTE_WORKERS) as pool:
+        results = list(pool.map(_fetch_finviz_fundamentals, unique))
+    out: dict[str, InvestingTickerFundamentals] = {}
+    for t, (div_yield, beta) in zip(unique, results):
+        if div_yield is None and beta is None:
+            continue
+        out[t] = InvestingTickerFundamentals(
+            beta=beta,
+            div_yield_percent=round(div_yield * 100.0, 4) if div_yield is not None else None,
+        )
+    return InvestingFundamentalsResponse(fundamentals=out)
+
+
+_BENCHMARK_CACHE_TTL_SECONDS = 6 * 60 * 60
+_benchmark_cache: dict[str, tuple[InvestingBenchmarkResponse, float]] = {}
+
+
+@router.get("/benchmark", response_model=InvestingBenchmarkResponse)
+def get_benchmark(
+    symbol: Annotated[str, Query(description="Benchmark ticker, e.g. SPY")] = "SPY",
+    user: Annotated[UserResponse, Depends(get_current_user)] = None,
+):
+    """Calendar-year total returns from Yahoo monthly adjusted closes (last bar of each year vs the previous)."""
+    _ = user.id
+    sym = symbol.strip().upper() or "SPY"
+    now = time.time()
+    cached = _benchmark_cache.get(sym)
+    if cached and now - cached[1] < _BENCHMARK_CACHE_TTL_SECONDS:
+        return cached[0]
+
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{quote(sym)}?range=10y&interval=1mo&events=div"
+    req = Request(url, headers={"User-Agent": _BROWSER_UA})
+    try:
+        with urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode("utf-8"))["chart"]["result"][0]
+        timestamps = result["timestamp"]
+        adjclose = result["indicators"]["adjclose"][0]["adjclose"]
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, KeyError, IndexError, TypeError):
+        return InvestingBenchmarkResponse(symbol=sym)
+
+    last_by_year: dict[int, float] = {}
+    for ts, price in zip(timestamps, adjclose):
+        if isinstance(price, (int, float)) and price > 0:
+            last_by_year[datetime.utcfromtimestamp(ts).year] = float(price)
+    years = sorted(last_by_year)
+    yearly = {
+        str(y): round((last_by_year[y] / last_by_year[y - 1] - 1) * 100.0, 2) for y in years if y - 1 in last_by_year
+    }
+    res = InvestingBenchmarkResponse(symbol=sym, yearly_return_percent=yearly, as_of=datetime.utcnow().isoformat())
+    _benchmark_cache[sym] = (res, now)
+    return res
 
 
 @router.get("/quotes", response_model=InvestingQuotesResponse)
@@ -937,7 +1023,155 @@ async def import_holdings(
                 marketValue=nums["marketValue"] if nums["marketValue"] is not None else price * nums["shares"],
             )
         )
+    # Broker exports carry no company names, so look them up (in parallel, cached) for the new rows.
+    if rows:
+        with ThreadPoolExecutor(max_workers=_QUOTE_WORKERS) as pool:
+            profiles = list(pool.map(_fetch_finviz_profile, [r.ticker for r in rows]))
+        for r, p in zip(rows, profiles):
+            if p:
+                r.name, r.industry = p.name, p.industry
     return InvestingHoldingsImportResponse(rows=rows, skipped=skipped)
+
+
+# Broker trade export columns (case-insensitive) → field. Order# is ignored.
+_TRADE_IMPORT_COLUMNS = {
+    "trade#": "trade_id",
+    "time": "time",
+    "ticker": "ticker",
+    "direction": "direction",
+    "price": "price",
+    "quantity": "quantity",
+    "amount": "amount",
+    "fee": "fee",
+    "profit": "profit",
+}
+_TRADE_REQUIRED = ("trade_id", "time", "ticker", "direction", "price", "quantity")
+_CURRENCY_SYMBOLS = {"$": "USD", "€": "EUR", "₽": "RUB", "£": "GBP", "¥": "JPY"}
+
+
+def _import_money(value: object) -> tuple[float | None, str | None]:
+    """"€1.72" → (1.72, "EUR"); "$-0.05" → (-0.05, "USD"); 0.2 → (0.2, None)."""
+    if isinstance(value, (int, float)):
+        return float(value), None
+    raw = str(value or "").strip()
+    currency = next((code for sym, code in _CURRENCY_SYMBOLS.items() if sym in raw), None)
+    code = re.search(r"\b(USD|EUR|RUB|RUR|GBP)\b", raw.upper())
+    if currency is None and code:
+        currency = "RUB" if code.group(1) == "RUR" else code.group(1)
+    return _import_number(re.sub(r"[^0-9.,\-]", "", raw)), currency
+
+
+def _import_trade_date(value: object) -> str | None:
+    """Cell (datetime or "21.07.2021 20:31:12" / "2021-07-21 …") → "21.07.2021"."""
+    if isinstance(value, datetime):
+        return value.strftime("%d.%m.%Y")
+    raw = str(value or "").strip()
+    m = re.match(r"(\d{1,2})[./-](\d{1,2})[./-](\d{4})", raw)
+    if m:
+        return f"{int(m.group(1)):02d}.{int(m.group(2)):02d}.{m.group(3)}"
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", raw)
+    if m:
+        return f"{m.group(3)}.{m.group(2)}.{m.group(1)}"
+    return None
+
+
+def _to_trade_currency(amount: float, from_ccy: str | None, trade_ccy: str, date: str) -> float:
+    """Convert a fee/profit reported in another currency into the trade's currency on the trade date."""
+    if not amount or not from_ccy or from_ccy == trade_ccy:
+        return amount
+    src = _fetch_fx_rate_to_usd(from_ccy, date)
+    dst = _fetch_fx_rate_to_usd(trade_ccy, date)
+    return amount * src / dst if src and dst else amount
+
+
+@router.post("/activities/import", response_model=InvestingActivitiesImportResponse)
+async def import_activities(
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    file: UploadFile = File(...),
+):
+    """Parse a broker trade export. Nothing is persisted: the client de-duplicates, merges and saves via PUT."""
+    filename = (file.filename or "").lower()
+    if not filename.endswith((".xlsx", ".xlsm", ".csv")):
+        raise HTTPException(status_code=400, detail="Upload an .xlsx or .csv file.")
+    table = _read_import_table(filename, await file.read())
+
+    header_idx = next(
+        (i for i, r in enumerate(table) if any(str(c or "").strip().lower() == "trade#" for c in r)),
+        None,
+    )
+    if header_idx is None:
+        raise HTTPException(status_code=400, detail="No header row with a 'Trade#' column found.")
+    columns: dict[str, int] = {}
+    for i, cell in enumerate(table[header_idx]):
+        key = _TRADE_IMPORT_COLUMNS.get(str(cell or "").strip().lower())
+        if key and key not in columns:
+            columns[key] = i
+    missing = [label for label, key in _TRADE_IMPORT_COLUMNS.items() if key in _TRADE_REQUIRED and key not in columns]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing columns: {', '.join(missing)}.")
+
+    rows: list[InvestingActivityImportRow] = []
+    skipped_fx = 0
+    invalid: list[str] = []
+    for n, r in enumerate(table[header_idx + 1 :], start=header_idx + 2):
+        cell = lambda key: r[columns[key]] if key in columns and columns[key] < len(r) else None  # noqa: E731
+        raw_ticker = str(cell("ticker") or "").strip().upper()
+        if not raw_ticker and not cell("trade_id"):
+            continue  # blank line
+        if "/" in raw_ticker:
+            skipped_fx += 1  # RUR/USD, EUR/USD: currency exchange, not a stock trade
+            continue
+        direction = str(cell("direction") or "").strip().lower()
+        kind = "sell" if direction in {"sell", "sale", "sold", "продажа"} else "buy" if direction in {"buy", "покупка"} else None
+        date = _import_trade_date(cell("time"))
+        qty = _import_number(cell("quantity"))
+        price, _ = _import_money(cell("price"))
+        trade_id = str(cell("trade_id") or "").strip()
+        if trade_id.endswith(".0"):
+            trade_id = trade_id[:-2]  # numeric cell read as float
+        problem = (
+            "no ticker" if not raw_ticker
+            else "unknown direction" if kind is None
+            else "unreadable date" if date is None
+            else "no quantity" if not qty
+            else "no price" if price is None
+            else "no Trade#" if not trade_id
+            else None
+        )
+        if problem:
+            invalid.append(f"row {n} ({raw_ticker or '?'}): {problem}")
+            continue
+
+        fee, fee_ccy = _import_money(cell("fee"))
+        profit, profit_ccy = _import_money(cell("profit"))
+        # .US listings trade in USD; otherwise the profit column's currency is the best hint (e.g. "₽0" for FXIP).
+        currency = "USD" if raw_ticker.endswith(".US") else (profit_ccy or "USD")
+        amount, _ = _import_money(cell("amount"))
+        rows.append(
+            InvestingActivityImportRow(
+                trade_id=trade_id,
+                type=kind,
+                ticker=_import_ticker(raw_ticker),
+                count=qty,
+                price=price,
+                currency=currency,
+                amount=amount if amount else qty * price,
+                commission=round(_to_trade_currency(fee or 0.0, fee_ccy, currency, date), 4),
+                gains_losses=round(_to_trade_currency(profit or 0.0, profit_ccy, currency, date), 4) if kind == "sell" else 0.0,
+                date=date,
+            )
+        )
+
+    # Names/categories for tickers (the client prefers names already in the user's history).
+    tickers = list(dict.fromkeys(r.ticker for r in rows))
+    if tickers:
+        with ThreadPoolExecutor(max_workers=_QUOTE_WORKERS) as pool:
+            profiles = dict(zip(tickers, pool.map(_fetch_finviz_profile, tickers)))
+        for r in rows:
+            p = profiles.get(r.ticker)
+            if p:
+                r.name, r.category = p.name, p.industry
+    return InvestingActivitiesImportResponse(rows=rows, skipped_fx=skipped_fx, skipped_invalid=invalid)
 
 
 @router.get("/capital-entries", response_model=InvestingCapitalEntriesResponse)
@@ -1326,3 +1560,71 @@ def update_crypto(
         updated_at=updated_at,
     )
 
+
+
+# ---- Total: net worth across stocks, crypto, savings, cash and debts ----
+
+
+@router.get("/total", response_model=InvestingTotalResponse)
+def get_total(
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+):
+    row = conn.execute("SELECT data, updated_at FROM investing_total WHERE user_id = %s", (user.id,)).fetchone()
+    if not row:
+        return InvestingTotalResponse()
+    data = InvestingTotalData(**(row[0] if isinstance(row[0], dict) else {}))
+    return InvestingTotalResponse(**data.model_dump(), updated_at=str(row[1]))
+
+
+@router.put("/total", response_model=InvestingTotalResponse)
+def update_total(
+    payload: InvestingTotalData,
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+):
+    # One row per month (last one wins), oldest first.
+    months = {m.month: m for m in payload.months if re.fullmatch(r"\d{4}-\d{2}", m.month)}
+    payload.months = [months[k] for k in sorted(months)]
+    data = payload.model_dump()
+    row = conn.execute(
+        """
+        INSERT INTO investing_total(user_id, data, updated_at)
+        VALUES (%s, %s, NOW())
+        ON CONFLICT (user_id)
+        DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
+        RETURNING updated_at
+        """,
+        (user.id, Json(data)),
+    ).fetchone()
+    conn.commit()
+    return InvestingTotalResponse(**data, updated_at=str(row[0]) if row else None)
+
+
+_RATES_CACHE_TTL_SECONDS = 3 * 60 * 60
+_rates_cache: tuple[InvestingRatesResponse, float] | None = None
+
+
+@router.get("/rates", response_model=InvestingRatesResponse)
+def get_rates(user: Annotated[UserResponse, Depends(get_current_user)]):
+    """Official National Bank of Ukraine rates, converted to USD per 1 unit of each currency."""
+    _ = user.id
+    global _rates_cache
+    now = time.time()
+    if _rates_cache and now - _rates_cache[1] < _RATES_CACHE_TTL_SECONDS:
+        return _rates_cache[0]
+    url = "https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json"
+    try:
+        with urlopen(Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=10) as response:
+            rows = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+        return _rates_cache[0] if _rates_cache else InvestingRatesResponse(to_usd={"USD": 1.0})
+    uah_per = {str(r.get("cc", "")).upper(): float(r["rate"]) for r in rows if isinstance(r.get("rate"), (int, float)) and r["rate"] > 0}
+    usd_uah = uah_per.get("USD")
+    if not usd_uah:
+        return InvestingRatesResponse(to_usd={"USD": 1.0})
+    to_usd = {cc: rate / usd_uah for cc, rate in uah_per.items()}
+    to_usd.update({"USD": 1.0, "UAH": 1.0 / usd_uah})
+    res = InvestingRatesResponse(to_usd=to_usd, date=str(rows[0].get("exchangedate", "")) or None)
+    _rates_cache = (res, now)
+    return res

@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo } from "react";
 import { RequireAuth } from "@/components/auth/require-auth";
+import { investingNavItems } from "@/features/investing/nav";
 import {
   investingPageStack,
   investingTabNavWrap,
@@ -10,16 +12,7 @@ import {
   investingTabPillIdle,
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
-
-const STOCK_TABS = [
-  { href: "/investing/dashboard", label: "Overview" },
-  { href: "/investing/holdings", label: "Portfolio" },
-  { href: "/investing/finance", label: "Finance" },
-  { href: "/investing/picking", label: "Allocation rules" },
-  { href: "/investing/activities", label: "Activities" },
-  { href: "/investing/analytics", label: "Analytics" },
-  { href: "/investing/notes", label: "Notes" },
-] as const;
+import { useCategories } from "@/state/categories-store";
 
 function stockTabActive(pathname: string, href: string): boolean {
   if (href === "/investing/dashboard") {
@@ -30,12 +23,19 @@ function stockTabActive(pathname: string, href: string): boolean {
 
 export default function InvestingLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { categories, subcategoriesByCategoryId } = useCategories();
+  // Same names and order as the sidebar. Crypto and Total are separate workspaces, not Stocks tabs.
+  const stockTabs = useMemo(() => {
+    const investing = categories.find((c) => c.slug === "investing");
+    const subs = investing ? (subcategoriesByCategoryId[investing.id] ?? []) : [];
+    return investingNavItems(subs).filter((item) => item.slug !== "crypto" && item.slug !== "total");
+  }, [categories, subcategoriesByCategoryId]);
 
   if (pathname === "/investing") {
     return <>{children}</>;
   }
 
-  if (pathname.startsWith("/investing/crypto")) {
+  if (pathname.startsWith("/investing/crypto") || pathname.startsWith("/investing/total")) {
     return <>{children}</>;
   }
 
@@ -62,7 +62,7 @@ export default function InvestingLayout({ children }: { children: React.ReactNod
         </div>
 
         <nav className={investingTabNavWrap} aria-label="Stocks workspace">
-          {STOCK_TABS.map((tab) => {
+          {stockTabs.map((tab) => {
             const active = stockTabActive(pathname, tab.href);
             return (
               <Link

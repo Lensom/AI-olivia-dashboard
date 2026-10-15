@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { investingPageHref } from "@/features/investing/nav";
 import { useCategories } from "@/state/categories-store";
 
 type SubcategoriesSectionProps = {
@@ -9,17 +10,7 @@ type SubcategoriesSectionProps = {
 };
 
 function hrefForSubcategory(categorySlug: string, subSlug: string) {
-  if (
-    categorySlug === "investing" &&
-    ["dashboard", "table", "notes", "analytics", "finance", "activities", "picking", "crypto"].includes(
-      subSlug,
-    )
-  ) {
-    if (subSlug === "table") return "/investing/holdings";
-    if (subSlug === "crypto") return "/investing/crypto";
-    return `/investing/${subSlug}`;
-  }
-  return `/c/${categorySlug}/${subSlug}`;
+  return categorySlug === "investing" ? investingPageHref(subSlug) : `/c/${categorySlug}/${subSlug}`;
 }
 
 export function SubcategoriesSection({ categorySlug }: SubcategoriesSectionProps) {

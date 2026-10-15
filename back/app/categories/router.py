@@ -130,16 +130,27 @@ def _ensure_investing_defaults(conn: Connection, *, user_id: int, category_id: i
     if not category or category[0] != "investing":
         return
 
+    # Same names and order as the frontend's Investing nav (front/src/features/investing/nav.ts).
     defaults = [
-        ("Dashboard", "dashboard"),
-        ("Holdings", "table"),
-        ("Notes", "notes"),
-        ("Analytics", "analytics"),
+        ("Total", "total"),
+        ("Overview", "dashboard"),
+        ("Portfolio", "table"),
         ("Finance", "finance"),
+        ("Allocation rules", "picking"),
         ("Activities", "activities"),
-        ("Picking", "picking"),
+        ("Analytics", "analytics"),
+        ("Notes", "notes"),
         ("Crypto", "crypto"),
     ]
+    # Rows created with the old default names are renamed; names the user changed are left alone.
+    legacy_names = {"dashboard": "Dashboard", "table": "Holdings", "picking": "Picking"}
+    for name, slug in defaults:
+        old = legacy_names.get(slug)
+        if old:
+            conn.execute(
+                "UPDATE subcategories SET name = %s WHERE category_id = %s AND slug = %s AND name = %s",
+                (name, category_id, slug, old),
+            )
     for name, slug in defaults:
         exists = conn.execute(
             """
@@ -150,7 +161,15 @@ def _ensure_investing_defaults(conn: Connection, *, user_id: int, category_id: i
         ).fetchone()
         if exists:
             continue
-        ord_val = _next_subcategory_sort_order(conn, user_id=user_id, category_id=category_id)
+        if slug == "total":
+            # Net worth sits above the Stocks pages, also for users whose menu existed before it.
+            first = conn.execute(
+                "SELECT COALESCE(MIN(sort_order), 10) FROM subcategories WHERE user_id = %s AND category_id = %s",
+                (user_id, category_id),
+            ).fetchone()
+            ord_val = int(first[0]) - 10 if first and first[0] is not None else 0
+        else:
+            ord_val = _next_subcategory_sort_order(conn, user_id=user_id, category_id=category_id)
         conn.execute(
             """
             INSERT INTO subcategories(user_id, category_id, name, slug, sort_order)

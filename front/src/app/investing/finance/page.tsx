@@ -7,6 +7,7 @@ import { formatUsd, parseInvestingDateMs, parseUsd } from "@/features/investing/
 import {
   currentYearPace,
   depositsVsBuys,
+  feeBreakdown,
   refillsByYear,
   xirrFromRefills,
 } from "@/features/investing/funding-stats";
@@ -113,20 +114,14 @@ export default function InvestingFinancePage() {
     [holdings],
   );
 
-  const { totalInvested, totalCommission } = useMemo(() => {
-    let inv = 0;
-    let comm = 0;
-    for (const r of refills) {
-      inv += parseUsd(r.amount);
-      comm += parseUsd(r.commission);
-    }
-    return { totalInvested: inv, totalCommission: comm };
-  }, [refills]);
+  const totalInvested = useMemo(() => refills.reduce((a, r) => a + parseUsd(r.amount), 0), [refills]);
 
-  const operatingExpenses = useMemo(() => {
-    if (!operatingExpensesUsd.trim()) return totalCommission;
-    return parseUsd(operatingExpensesUsd);
-  }, [operatingExpensesUsd, totalCommission]);
+  // All fees: refill commissions + buy and sell commissions from Activities, unless overridden manually.
+  const fees = useMemo(
+    () => feeBreakdown(refills, activitiesSummary, operatingExpensesUsd),
+    [refills, activitiesSummary, operatingExpensesUsd],
+  );
+  const operatingExpenses = fees.total;
 
   const netAfterFees = totalInvested - operatingExpenses;
   const gainOnGrossPct = totalInvested > 0 ? ((currentValue - totalInvested) / totalInvested) * 100 : 0;
@@ -182,7 +177,6 @@ export default function InvestingFinancePage() {
     [refillRowsView],
   );
 
-  const usingDefaultOperating = !operatingExpensesUsd.trim();
 
   const [isYearlyOpen, setYearlyOpen] = useState(true);
   const [isRefillsOpen, setRefillsOpen] = useState(true);
@@ -237,9 +231,9 @@ export default function InvestingFinancePage() {
           label="Operating expenses, $"
           value={formatUsd(operatingExpenses)}
           hint={
-            usingDefaultOperating
-              ? "From sum of refill commissions (override below)."
-              : "Manual override is active."
+            fees.isOverride
+              ? `Manual override is active (calculated: ${formatUsd(fees.computed)}).`
+              : `Refills ${formatUsd(fees.refill)} · Buys ${formatUsd(fees.buy)} · Sells ${formatUsd(fees.sell)}`
           }
         />
         <StatCard label="Current value" value={formatUsd(currentValue)} hint="Live from holdings quotes." />
@@ -371,13 +365,13 @@ export default function InvestingFinancePage() {
               <div className="mt-4 rounded-xl border border-black/5 bg-[#faf8f2] p-3">
                 <label className="block text-xs font-medium text-[#6f675b]">Operating expenses override, $</label>
                 <p className="mt-0.5 text-[11px] text-[#8f8676]">
-                  Leave empty to use the sum of commission per refill. Set a total (e.g. all-in fees) to match your
-                  spreadsheet.
+                  Leave empty to use all fees: refill commissions plus buy and sell commissions from Activities. Set a
+                  total only to match another source (e.g. a broker statement).
                 </p>
                 <input
                   value={operatingExpensesUsd}
                   onChange={(e) => setOperatingExpensesUsd(e.target.value)}
-                  placeholder={`e.g. 643.79 (default from commissions: ${totalCommission.toFixed(2)})`}
+                  placeholder={`Leave empty to use ${fees.computed.toFixed(2)} (refills + buys + sells)`}
                   className={`${inputBaseClasses()} mt-2`}
                 />
               </div>

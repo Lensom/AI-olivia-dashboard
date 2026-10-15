@@ -116,6 +116,31 @@ export function currentYearPace(refills: InvestingRefillRow[], nowMs = Date.now(
   };
 }
 
+export type FeeBreakdown = {
+  refill: number;
+  buy: number;
+  sell: number;
+  /** refill + buy + sell, before any manual override. */
+  computed: number;
+  /** What the app uses: the manual override if one is set, otherwise `computed`. */
+  total: number;
+  isOverride: boolean;
+};
+
+/** All fees paid: refill commissions plus buy and sell commissions from Activities (USD). */
+export function feeBreakdown(
+  refills: InvestingRefillRow[],
+  activityYears: InvestingActivityYearSummary[],
+  overrideUsd: string,
+): FeeBreakdown {
+  const refill = refills.reduce((a, r) => a + parseUsd(r.commission), 0);
+  const buy = activityYears.reduce((a, y) => a + parseUsd(y.purchases_commission), 0);
+  const sell = activityYears.reduce((a, y) => a + parseUsd(y.sales_commission), 0);
+  const computed = refill + buy + sell;
+  const isOverride = overrideUsd.trim() !== "";
+  return { refill, buy, sell, computed, total: isOverride ? parseUsd(overrideUsd) : computed, isOverride };
+}
+
 export type FlowYearRow = {
   year: string;
   deposited: number;
