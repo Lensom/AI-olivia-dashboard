@@ -13,6 +13,8 @@ import { formatUsd, parseInvestingDateMs, parseUsd } from "@/features/investing/
 import { investingTableScrollWrap } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/state/auth-store";
+import { dividendsLast12mUsd } from "@/features/investing/broker-section";
+import { useBroker } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
 
 const BENCHMARK = "SPY";
@@ -57,7 +59,9 @@ type Fundamentals = Record<string, { beta: number | null; div_yield_percent: num
 export default function InvestingAnalyticsPage() {
   const { token } = useAuth();
   const { holdings, capitalEntries, refills, activitiesSummary } = useInvesting();
+  const { cashUsd, dividends } = useBroker();
   const [nowYear] = useState(() => new Date().getFullYear());
+  const [nowMs] = useState(() => Date.now());
   const [bench, setBench] = useState<Record<string, number> | null>(null);
   const [fundamentals, setFundamentals] = useState<Fundamentals | null>(null);
 
@@ -82,6 +86,8 @@ export default function InvestingAnalyticsPage() {
   }, [token, tickerKey]);
 
   const holdingsValue = useMemo(() => holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0), [holdings]);
+  // Year to date compares the whole account (positions + broker cash) with the year-end snapshot.
+  const accountValue = holdingsValue + cashUsd;
 
   // ---- Performance by year: capital entries (year-end snapshots) + current year to date ----
   const yearRows = useMemo<YearRow[]>(() => {
@@ -106,7 +112,7 @@ export default function InvestingAnalyticsPage() {
       });
     }
     const last = rows[rows.length - 1];
-    if (last && last.year < nowYear && holdingsValue > 0) {
+    if (last && last.year < nowYear && accountValue > 0) {
       // Same method as the 1Y column: deposits treated as made at the start of the year.
       const deposit = refills
         .filter((r) => {
@@ -119,15 +125,15 @@ export default function InvestingAnalyticsPage() {
         year: nowYear,
         label: `${nowYear} YTD`,
         deposit,
-        endValue: holdingsValue,
+        endValue: accountValue,
         invested: last.invested + deposit,
-        ret: base > 0 ? ((holdingsValue - base) / base) * 100 : null,
+        ret: base > 0 ? ((accountValue - base) / base) * 100 : null,
         bench: bench?.[String(nowYear)] ?? null,
         ytd: true,
       });
     }
     return rows;
-  }, [capitalEntries, refills, holdingsValue, bench, nowYear]);
+  }, [capitalEntries, refills, accountValue, bench, nowYear]);
 
   // A first year that started after January can't be compared with the index's full calendar year.
   const firstYearPartial = useMemo(() => {
@@ -334,7 +340,7 @@ export default function InvestingAnalyticsPage() {
               {firstYearPartial
                 ? `${firstYearPartial} is a partial year (you started mid-year), so the cards above leave it out. `
                 : ""}
-              * Year to date uses current holdings value, so uninvested cash is not counted.
+              * Year to date uses current holdings plus broker cash (enter it on Finance).
             </p>
           </article>
         </>
@@ -363,9 +369,13 @@ export default function InvestingAnalyticsPage() {
             <span className="font-semibold text-[#1f1c17]">
               {riskRows.portfolioBeta == null ? "…" : riskRows.portfolioBeta.toFixed(2)}
             </span>
-            {" · "}Dividends{" "}
+            {" · "}Expected dividends{" "}
             <span className="font-semibold text-[#1f1c17]">
               {fundamentals == null ? "…" : `${formatUsd(riskRows.income)}/yr (${riskRows.yieldPct.toFixed(2)}%)`}
+            </span>
+            {" · "}Received, last 12 months{" "}
+            <span className="font-semibold text-[#1f1c17]">
+              {dividends.length ? formatUsd(dividendsLast12mUsd(dividends, nowMs)) : "not recorded"}
             </span>
           </p>
         </div>

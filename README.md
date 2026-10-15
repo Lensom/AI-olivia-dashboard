@@ -49,7 +49,7 @@ The frontend calls the API on port 8000 of the same host the page was opened fro
 
 ## Features: Investing
 
-The **Investing** page (`/investing`) shows every investing page as a tile with a live figure. **Reorder** lets you drag tiles (or use arrows) to change the order of the sidebar and the Stocks tabs; you can also add custom pages there. Page names and links are defined once in `front/src/features/investing/nav.ts`.
+The **Investing** page (`/investing`) starts with **Needs attention**: rules you've broken (fees over your limit, return under your minimum, ETF share out of range, a position over its cap, holdings or net-worth groups drifting from target), opportunities (a stock in its buy zone, idle broker cash) and to-dos (record this month on Total, enter broker cash, record dividends). Each item links to the page that fixes it; the limits are editable under **Thresholds**. Below it, every investing page is a tile with a live figure. **Reorder** lets you drag tiles (or use arrows) to change the order of the sidebar and the Stocks tabs; you can also add custom pages there. Page names and links are defined once in `front/src/features/investing/nav.ts`.
 
 ### Total (`/investing/total`)
 
@@ -65,7 +65,7 @@ Net worth in one number, replacing a monthly spreadsheet:
 |---|---|---|
 | **Overview** | `/investing/dashboard` | Portfolio value and today's change; total return against money actually deposited; realized P&L; dividend income and beta. Heatmap (size = weight, color = today's move), today's movers, winners and losers, allocation by holding and industry, concentration risk, rebalance-to-target suggestions, capital history. |
 | **Portfolio** | `/investing/holdings` | Holdings table with View/Edit modes, sorting, search, filters (winners, losers, off target) and totals. Expand a row for cost basis, buy/trim to target and Yahoo/Finviz links. **Import XLSX** and **Autofill names & industry**. |
-| **Finance** | `/investing/finance` | Deposits and all fees (refill + buy + sell commissions); net gain, annualized (XIRR) return, fees as % of deposits; current-year pace; yearly summary; deposits vs buys with an estimate of uninvested cash. |
+| **Finance** | `/investing/finance` | Deposits and all fees (refill + buy + sell commissions); net gain, annualized (XIRR) return, fees as % of deposits; current-year pace; **broker cash** (any currency, counted in current value, returns and XIRR) and a **dividends log** (gross, tax withheld, net USD at the payment date's rate; last 12 months vs the yield estimate); yearly summary; deposits vs buys. |
 | **Allocation rules** | `/investing/picking` | Buckets (ETF / REIT / Fund, Value / Blue chips) with their target share and position limit checked against the portfolio. Each stock gets a **Strong buy / May buy / Wait** signal from your buy zones, upside to price goals, and **Autofill fundamentals** (P/E, EPS, beta, yield). |
 | **Activities** | `/investing/activities` | One trade log (newest first) with View/Edit modes, search, buy/sell and year filters, a summary of what's shown, a per-ticker breakdown and yearly totals. **Import XLSX** from a broker export. |
 | **Analytics** | `/investing/analytics` | Yearly return vs the S&P 500 (SPY, dividends reinvested), value vs money invested, a year-by-year table, risk & income by holding (beta contribution, dividend income) and trading results by year. |
@@ -144,7 +144,7 @@ All `/investing/*` and `/categories/*` endpoints need an `Authorization: Bearer 
 | Categories | `GET/POST /categories`, `GET/POST /categories/{id}/subcategories`, `PUT …/reorder` |
 | Imports | `POST /investing/holdings/import`, `POST /investing/activities/import` (parse a file and return rows; nothing is saved) |
 | Market data | `GET /investing/quotes`, `/profiles`, `/fundamentals` (all `?tickers=`), `GET /investing/benchmark?symbol=SPY`, `GET /investing/rates`, `GET/PUT /investing/metrics` |
-| Sections | `GET/PUT` on `/investing/holdings`, `/refills`, `/activities`, `/capital-entries`, `/picking`, `/notes`, `/crypto`, `/total` |
+| Sections | `GET/PUT` on `/investing/holdings`, `/refills`, `/activities`, `/capital-entries`, `/picking`, `/notes`, `/crypto`, `/total`, `/broker` (cash, dividends, attention thresholds) |
 
 ## Market data notes
 

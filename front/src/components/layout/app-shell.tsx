@@ -4,6 +4,7 @@ import { Header } from "./header";
 import { Sidebar } from "./sidebar";
 import { AuthProvider } from "@/state/auth-store";
 import { CategoriesProvider } from "@/state/categories-store";
+import { BrokerProvider } from "@/state/broker-store";
 import { InvestingProvider } from "@/state/investing-store";
 
 type AppShellProps = {
@@ -17,10 +18,12 @@ export function AppShell({ children }: AppShellProps) {
         <Header />
         <CategoriesProvider>
           <InvestingProvider>
-            <div className="mx-auto flex w-full max-w-[1760px] flex-1 gap-5 px-4 py-7 md:px-5 md:py-8">
-              <Sidebar />
-              <main className="min-w-0 flex-1">{children}</main>
-            </div>
+            <BrokerProvider>
+              <div className="mx-auto flex w-full max-w-[1760px] flex-1 gap-5 px-4 py-7 md:px-5 md:py-8">
+                <Sidebar />
+                <main className="min-w-0 flex-1">{children}</main>
+              </div>
+            </BrokerProvider>
           </InvestingProvider>
         </CategoriesProvider>
         <Footer />

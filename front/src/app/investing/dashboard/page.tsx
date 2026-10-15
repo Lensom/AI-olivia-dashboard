@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { dividendsLast12mUsd } from "@/features/investing/broker-section";
+import { useBroker } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
 import { formatInvestingAxisDate, formatUsd, parseInvestingDateMs, parsePercent, parseUsd } from "@/features/investing/format";
 import { CapitalValueLineChart } from "@/features/investing/charts/capital-value-line-chart";
@@ -50,6 +52,8 @@ export default function InvestingDashboardPage() {
     isCapitalEntriesDirty,
     isCapitalEntriesSaving,
   } = useInvesting();
+  const { cashUsd, dividends } = useBroker();
+  const [nowMs] = useState(() => Date.now());
   const [isEditingEntries, setEditingEntries] = useState(false);
   const [metricsDraft, setMetricsDraft] = useState<null | { divYieldPercent: string; beta: string }>(null);
 
@@ -58,6 +62,9 @@ export default function InvestingDashboardPage() {
 
   // Money actually deposited (Finance → Refills), not cost basis, which includes reinvested gains.
   const topped = useMemo(() => refills.reduce((a, r) => a + parseUsd(r.amount), 0), [refills]);
+  // What the account is worth: positions plus uninvested broker cash.
+  const accountValue = totals.value + cashUsd;
+  const dividends12m = useMemo(() => dividendsLast12mUsd(dividends, nowMs), [dividends, nowMs]);
 
   const realized = useMemo(() => {
     const pnl = activitiesSummary.reduce((a, y) => a + parseUsd(y.sales_pnl), 0);
@@ -149,14 +156,14 @@ export default function InvestingDashboardPage() {
         {topped > 0 ? (
           <KpiTile
             label="Total return"
-            value={signedUsd(totals.value - topped)}
-            valueTone={toneClass(totals.value - topped)}
+            value={signedUsd(accountValue - topped)}
+            valueTone={toneClass(accountValue - topped)}
             sub={
               <>
-                <span className={`font-semibold ${toneClass(totals.value - topped)}`}>
-                  {signedPct(((totals.value - topped) / topped) * 100, 1)}
+                <span className={`font-semibold ${toneClass(accountValue - topped)}`}>
+                  {signedPct(((accountValue - topped) / topped) * 100, 1)}
                 </span>{" "}
-                on {formatUsd(topped)} topped
+                on {formatUsd(topped)} topped{cashUsd > 0 ? ` · incl. ${formatUsd(cashUsd)} cash` : ""}
                 <span className="mt-0.5 block text-[#8f8676]">
                   Positions vs cost: {signedUsd(totals.pnl)} ({signedPct(totals.pnlPct, 1)})
                 </span>
@@ -234,6 +241,7 @@ export default function InvestingDashboardPage() {
           <>
             {[
               ["Div yield", isMetricsLoading ? "…" : metrics.divYieldPercent],
+              ["Dividends, last 12 months", dividends.length ? formatUsd(dividends12m) : "Not recorded"],
               ["Est. annual dividends", annualIncome == null ? "—" : formatUsd(annualIncome)],
               ["Est. monthly", annualIncome == null ? "—" : formatUsd(annualIncome / 12)],
               ["Beta", isMetricsLoading ? "…" : metrics.beta],

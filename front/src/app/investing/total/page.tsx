@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MonthlyTotalChart, type MonthlyTotalPoint } from "@/features/investing/charts/monthly-total-chart";
 import { parseCryptoAmount } from "@/features/investing/crypto-format";
 import { formatUsd, parseUsd } from "@/features/investing/format";
+import { accountUsd, totalSums, type TotalAccount, type TotalCategory, type TotalSource } from "@/features/investing/total-stats";
 import {
   investingMetaBadge,
   investingPageStack,
@@ -15,14 +16,15 @@ import {
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/state/auth-store";
+import { useBroker } from "@/state/broker-store";
 import { useCrypto } from "@/state/crypto-store";
 import { useInvesting } from "@/state/investing-store";
 
 // ---- Types (mirror back/app/investing/schemas.py) ----
 
-type Category = "stocks" | "savings" | "crypto" | "owed_to_me" | "i_owe";
-type Source = "manual" | "stocks" | "crypto";
-type Account = { id: string; name: string; category: Category; amount: string; currency: string; source: Source };
+type Category = TotalCategory;
+type Source = TotalSource;
+type Account = TotalAccount;
 type Month = { id: string; month: string; total_usd: number; breakdown: Record<string, number> };
 type TotalData = {
   accounts: Account[];
@@ -114,6 +116,7 @@ export default function InvestingTotalPage() {
   const { token } = useAuth();
   const { holdings } = useInvesting();
   const { holdings: cryptoHoldings } = useCrypto();
+  const { cashUsd: brokerCashUsd } = useBroker();
 
   const [data, setData] = useState<TotalData | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -178,7 +181,11 @@ export default function InvestingTotalPage() {
   }
 
   // ---- Live values ----
-  const stocksValue = useMemo(() => holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0), [holdings]);
+  // The live Stocks account is the whole broker account: positions plus uninvested cash.
+  const stocksValue = useMemo(
+    () => holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0) + brokerCashUsd,
+    [holdings, brokerCashUsd],
+  );
   const cryptoValue = useMemo(
     () => cryptoHoldings.reduce((a, h) => a + parseCryptoAmount(String(h.valueUsd ?? "")), 0),
     [cryptoHoldings],
@@ -193,20 +200,10 @@ export default function InvestingTotalPage() {
   );
 
   const rows = useMemo(() => {
-    return (data?.accounts ?? []).map((a) => {
-      const live = a.source === "stocks" ? stocksValue : a.source === "crypto" ? cryptoValue : null;
-      const rate = live != null ? 1 : rateFor(a.currency);
-      const usd = live ?? (rate != null ? parseCryptoAmount(a.amount) * rate : 0);
-      return { a, usd, rate, live: live != null, missingRate: live == null && rate == null };
-    });
+    return (data?.accounts ?? []).map((a) => ({ a, ...accountUsd(a, { stocks: stocksValue, crypto: cryptoValue }, rateFor) }));
   }, [data, stocksValue, cryptoValue, rateFor]);
 
-  const sums = useMemo(() => {
-    const by: Record<string, number> = { stocks: 0, savings: 0, crypto: 0, owed_to_me: 0, i_owe: 0 };
-    for (const r of rows) by[r.a.category] = (by[r.a.category] ?? 0) + r.usd;
-    const assets = by.stocks + by.savings + by.crypto;
-    return { by, assets, net: assets + by.owed_to_me - by.i_owe };
-  }, [rows]);
+  const sums = useMemo(() => totalSums(rows.map((r) => ({ category: r.a.category, usd: r.usd }))), [rows]);
 
   // ---- History ----
   const months = useMemo(() => [...(data?.months ?? [])].sort((a, b) => a.month.localeCompare(b.month)), [data]);
@@ -490,7 +487,7 @@ export default function InvestingTotalPage() {
                       <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-[#3b352d]">
                         {live ? (
                           <Link href={a.source === "stocks" ? "/investing/holdings" : "/investing/crypto"} className="text-xs underline decoration-black/15 underline-offset-2">
-                            from {a.source === "stocks" ? "Portfolio" : "Crypto"}
+                            from {a.source === "stocks" ? (brokerCashUsd > 0 ? "Portfolio + cash" : "Portfolio") : "Crypto"}
                           </Link>
                         ) : (
                           `${parseCryptoAmount(a.amount).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${CURRENCY_SIGN[a.currency] ?? a.currency}`

@@ -336,3 +336,43 @@ class InvestingRatesResponse(BaseModel):
     to_usd: dict[str, float] = Field(default_factory=dict)
     date: str | None = None
     source: str = "NBU"
+
+
+# ---- Broker: uninvested cash, dividends received, and thresholds for the "Needs attention" checks ----
+
+class BrokerCashBalance(BaseModel):
+    id: str
+    currency: str = "USD"
+    amount: str = "0"
+
+
+class BrokerDividend(BaseModel):
+    id: str
+    date: str = ""  # DD.MM.YYYY
+    ticker: str = ""
+    amount: str = "0"  # gross, in `currency`
+    tax: str = "0"  # withheld, in `currency`
+    currency: str = "USD"
+    # Calculated on read at the payment date's rate; not stored.
+    amount_usd: float = 0
+    tax_usd: float = 0
+
+
+class AttentionRules(BaseModel):
+    max_fees_pct: float = 3.5
+    min_annual_return_pct: float = 6.0
+    etf_min_pct: float = 40.0
+    etf_max_pct: float = 50.0
+    drift_pp: float = 5.0
+    max_position_pct: float = 25.0
+    max_cash_pct: float = 5.0
+
+
+class InvestingBrokerData(BaseModel):
+    cash: list[BrokerCashBalance] = Field(default_factory=list)
+    dividends: list[BrokerDividend] = Field(default_factory=list)
+    rules: AttentionRules = Field(default_factory=AttentionRules)
+
+
+class InvestingBrokerResponse(InvestingBrokerData):
+    updated_at: str | None = None

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { RequireAuth } from "@/components/auth/require-auth";
+import { AttentionStrip } from "@/features/investing/attention-strip";
 import { formatUsd, parseUsd } from "@/features/investing/format";
 import { investingPageHref, investingPageLabel } from "@/features/investing/nav";
 import { investingToolbarBtn } from "@/features/investing/ui/investing-classes";
@@ -110,7 +111,7 @@ export default function InvestingPage() {
             <p className="mt-1.5 text-sm text-[#655d51]">
               {reordering
                 ? "Drag tiles (or use the arrows) to set the order. It applies to the sidebar and the Stocks tabs."
-                : "Your investing pages, in the same order as the sidebar."}
+                : "What needs your attention, and your investing pages in sidebar order."}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -133,6 +134,8 @@ export default function InvestingPage() {
           </div>
         </div>
         {error ? <p className="text-sm text-rose-700">{error}</p> : null}
+
+        {reordering ? null : <AttentionStrip />}
 
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Investing pages">
           {tiles.map((s, index) => {

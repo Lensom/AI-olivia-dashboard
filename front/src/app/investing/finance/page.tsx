@@ -21,6 +21,8 @@ import {
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { InvestingSubsectionHeader } from "@/features/investing/ui/investing-subsection-header";
+import { BrokerCashAndDividends } from "@/features/investing/broker-section";
+import { useBroker } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
 
 function inputBaseClasses() {
@@ -108,11 +110,11 @@ export default function InvestingFinancePage() {
     saveRefills,
     refreshRefills,
   } = useInvesting();
+  const { cashUsd } = useBroker();
 
-  const currentValue = useMemo(
-    () => holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0),
-    [holdings],
-  );
+  const holdingsValue = useMemo(() => holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0), [holdings]);
+  // Broker cash belongs to the account's value; dividends paid land in it, so they aren't added again.
+  const currentValue = holdingsValue + cashUsd;
 
   const totalInvested = useMemo(() => refills.reduce((a, r) => a + parseUsd(r.amount), 0), [refills]);
 
@@ -236,7 +238,11 @@ export default function InvestingFinancePage() {
               : `Refills ${formatUsd(fees.refill)} · Buys ${formatUsd(fees.buy)} · Sells ${formatUsd(fees.sell)}`
           }
         />
-        <StatCard label="Current value" value={formatUsd(currentValue)} hint="Live from holdings quotes." />
+        <StatCard
+          label="Current value"
+          value={formatUsd(currentValue)}
+          hint={cashUsd > 0 ? `Holdings ${formatUsd(holdingsValue)} + broker cash ${formatUsd(cashUsd)}` : "Live from holdings quotes (no broker cash entered)."}
+        />
         <StatCard label="Total topped" value={formatUsd(totalInvested)} hint="Sum of Invest column." />
         <StatCard
           label="Topped − fee"
@@ -310,6 +316,8 @@ export default function InvestingFinancePage() {
           </p>
         </div>
       </section>
+
+      <BrokerCashAndDividends holdingsValue={holdingsValue} />
 
       <section className={investingSubsectionStack}>
         <InvestingSubsectionHeader

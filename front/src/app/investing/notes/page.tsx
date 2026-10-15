@@ -9,6 +9,7 @@ import {
   investingPrimarySaveActive,
   investingPrimarySaveDisabled,
 } from "@/features/investing/ui/investing-classes";
+import { useBroker } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
 
 const AUTOSAVE_MS = 1500;
@@ -102,6 +103,7 @@ export default function InvestingNotesPage() {
     operatingExpensesUsd,
     activitiesSummary,
   } = useInvesting();
+  const { cashUsd } = useBroker();
   const [mode, setMode] = useState<"write" | "preview">("write");
   const [saveError, setSaveError] = useState(false);
 
@@ -146,7 +148,8 @@ export default function InvestingNotesPage() {
 
   // Live numbers to check written rules against.
   const facts = useMemo(() => {
-    const value = holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0);
+    const holdingsValue = holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0);
+    const value = holdingsValue + cashUsd; // account value: positions + broker cash
     const etfValue = holdings
       .filter((h) => (h.industry ?? "").trim().toUpperCase().startsWith("ETF"))
       .reduce((a, h) => a + parseUsd(h.marketValue), 0);
@@ -155,12 +158,12 @@ export default function InvestingNotesPage() {
     const largest = [...holdings].sort((a, b) => parseUsd(b.marketValue) - parseUsd(a.marketValue))[0];
     return {
       value,
-      etfPct: value > 0 ? (etfValue / value) * 100 : 0,
+      etfPct: holdingsValue > 0 ? (etfValue / holdingsValue) * 100 : 0,
       feesPct: topped > 0 ? (fees / topped) * 100 : null,
       xirr: xirrFromRefills(refills, value),
-      largest: largest && value > 0 ? { ticker: largest.ticker, pct: (parseUsd(largest.marketValue) / value) * 100 } : null,
+      largest: largest && holdingsValue > 0 ? { ticker: largest.ticker, pct: (parseUsd(largest.marketValue) / holdingsValue) * 100 } : null,
     };
-  }, [holdings, refills, operatingExpensesUsd, activitiesSummary]);
+  }, [holdings, refills, operatingExpensesUsd, activitiesSummary, cashUsd]);
 
   const words = notes.trim() ? notes.trim().split(/\s+/).length : 0;
   const status = saveError
@@ -242,7 +245,7 @@ export default function InvestingNotesPage() {
         <aside className={`${card} h-fit space-y-2`}>
           <h2 className="text-sm font-semibold text-[#1f1c17]">Your numbers</h2>
           <p className="pb-1 text-[11px] text-[#8f8676]">Live values to check your rules against. Click to open.</p>
-          <Fact label="Portfolio value" value={formatUsd(facts.value)} href="/investing/holdings" />
+          <Fact label="Account value" value={formatUsd(facts.value)} hint={cashUsd > 0 ? `incl. ${formatUsd(cashUsd)} broker cash` : undefined} href="/investing/holdings" />
           <Fact
             label="ETF share"
             value={`${facts.etfPct.toFixed(1)}%`}

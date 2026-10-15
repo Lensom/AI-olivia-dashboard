@@ -54,6 +54,8 @@ from app.investing.schemas import (
     InvestingCryptoResponse,
     InvestingCryptoUpdateRequest,
     InvestingRatesResponse,
+    InvestingBrokerData,
+    InvestingBrokerResponse,
     InvestingTotalData,
     InvestingTotalResponse,
 )
@@ -1628,3 +1630,51 @@ def get_rates(user: Annotated[UserResponse, Depends(get_current_user)]):
     res = InvestingRatesResponse(to_usd=to_usd, date=str(rows[0].get("exchangedate", "")) or None)
     _rates_cache = (res, now)
     return res
+
+
+# ---- Broker: cash, dividends, attention thresholds ----
+
+
+def _broker_response(data: InvestingBrokerData, updated_at: str | None) -> InvestingBrokerResponse:
+    """Adds USD amounts to dividends, converted at the payment date's rate (cached per currency and day)."""
+    for d in data.dividends:
+        cur = (d.currency or "USD").strip().upper() or "USD"
+        fx = _fetch_fx_rate_to_usd(cur, d.date) or (1.0 if cur == "USD" else 0.0)
+        d.amount_usd = round(_parse_num(d.amount) * fx, 2)
+        d.tax_usd = round(_parse_num(d.tax) * fx, 2)
+    return InvestingBrokerResponse(**data.model_dump(), updated_at=updated_at)
+
+
+@router.get("/broker", response_model=InvestingBrokerResponse)
+def get_broker(
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+):
+    row = conn.execute("SELECT data, updated_at FROM investing_broker WHERE user_id = %s", (user.id,)).fetchone()
+    if not row:
+        return InvestingBrokerResponse()
+    return _broker_response(InvestingBrokerData(**(row[0] if isinstance(row[0], dict) else {})), str(row[1]))
+
+
+@router.put("/broker", response_model=InvestingBrokerResponse)
+def update_broker(
+    payload: InvestingBrokerData,
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+):
+    data = payload.model_dump()
+    for d in data["dividends"]:  # USD columns are derived, never stored
+        d.pop("amount_usd", None)
+        d.pop("tax_usd", None)
+    row = conn.execute(
+        """
+        INSERT INTO investing_broker(user_id, data, updated_at)
+        VALUES (%s, %s, NOW())
+        ON CONFLICT (user_id)
+        DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
+        RETURNING updated_at
+        """,
+        (user.id, Json(data)),
+    ).fetchone()
+    conn.commit()
+    return _broker_response(InvestingBrokerData(**data), str(row[0]) if row else None)
