@@ -1,11 +1,11 @@
 # Olivia
 
-A personal dashboard. Its most developed area is **Investing**: a stock portfolio tracker with live quotes, allocation and rebalancing, funding history, trade activity, and a separate crypto workspace. Health, Habits and Finances sections are scaffolded.
+A personal dashboard. Its most developed area is **Investing**: net worth across every account, a stock portfolio tracker (live quotes, rebalancing, funding, trades, performance vs the S&P 500) and a crypto workspace. Health, Habits and Finances sections are scaffolded.
 
 - **Frontend:** Next.js 16 (App Router, Turbopack), React 19, Tailwind CSS 4, TypeScript (`front/`)
 - **Backend:** FastAPI, Pydantic, psycopg 3 with a Postgres connection pool (`back/`)
 - **Database:** Postgres (Neon). Tables are created automatically on startup.
-- **Market data:** Yahoo Finance (prices, day change), Stooq (price fallback), Finviz (beta, dividend yield, names and sectors), CoinGecko (crypto)
+- **Market data:** Yahoo Finance (prices, S&P 500 benchmark), Stooq (price fallback), Finviz (names, sectors, P/E, EPS, beta, dividend yield), CoinGecko (crypto), National Bank of Ukraine (official exchange rates), Frankfurter (historical FX for trades)
 
 ## Quick start
 
@@ -33,7 +33,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000, register an account, and go to **Investing → Stocks**.
+Open http://localhost:3000, register an account, and open **Investing** in the sidebar.
 
 The frontend calls the API on port 8000 of the same host the page was opened from, so it also works from another device on your LAN. To point it somewhere else, set `NEXT_PUBLIC_API_BASE` (e.g. in `front/.env.local`).
 
@@ -47,19 +47,38 @@ The frontend calls the API on port 8000 of the same host the page was opened fro
 | `CORS_ORIGINS` | no | Comma-separated allowed origins, or `*`. Defaults cover `localhost:3000/3001` and the LAN IP. |
 | `APP_NAME`, `APP_VERSION` | no | Shown in `/health` and the API docs. |
 
-## Features: Investing → Stocks
+## Features: Investing
+
+The **Investing** page (`/investing`) shows every investing page as a tile with a live figure. **Reorder** lets you drag tiles (or use arrows) to change the order of the sidebar and the Stocks tabs; you can also add custom pages there. Page names and links are defined once in `front/src/features/investing/nav.ts`.
+
+### Total (`/investing/total`)
+
+Net worth in one number, replacing a monthly spreadsheet:
+
+- **Accounts:** Stocks and Crypto are live from the app; bank accounts and cash are typed in any currency and converted at official NBU rates (a rate can be overridden). Debts owed to you add, debts you owe subtract.
+- **Mix vs goal:** stocks / savings / crypto share against editable goals (default 70 / 20 / 10), with how much the furthest-behind group needs.
+- **History:** **Record &lt;month&gt;** stores today's net worth with its breakdown. A monthly chart, month-over-month change and year-end totals; older months can be typed in.
+
+### Stocks
 
 | Tab | Route | What it does |
 |---|---|---|
-| **Overview** | `/investing/dashboard` | Portfolio value and today's change; total return measured against money actually deposited; realized P&L; dividend income estimate and beta. Also a heatmap (size = weight, color = today's move), today's movers, winners and losers, allocation by holding and by industry, concentration risk, rebalance-to-target suggestions, and capital history. |
-| **Portfolio** | `/investing/holdings` | The holdings table: View and Edit modes, sorting, search, filters (winners, losers, off target), and a totals row. Click a row to expand it: cost basis, buy/trim to target, and Yahoo/Finviz links. Also **Import XLSX** and **Autofill names & industry**. |
-| **Finance** | `/investing/finance` | Refills (deposits) and commissions; total and annualized (XIRR) return; current-year pace; yearly summary; deposits vs buys reconciliation, with an estimate of uninvested cash. |
-| **Allocation rules** | `/investing/picking` | Research buckets with buy zones and price goals, enriched with live prices. |
-| **Activities** | `/investing/activities` | Buy/sell log with currency conversion to USD and yearly totals. |
-| **Analytics** | `/investing/analytics` | Charts of value over time and yearly activity volume. |
-| **Notes** | `/investing/notes` | Free-form investing notes. |
+| **Overview** | `/investing/dashboard` | Portfolio value and today's change; total return against money actually deposited; realized P&L; dividend income and beta. Heatmap (size = weight, color = today's move), today's movers, winners and losers, allocation by holding and industry, concentration risk, rebalance-to-target suggestions, capital history. |
+| **Portfolio** | `/investing/holdings` | Holdings table with View/Edit modes, sorting, search, filters (winners, losers, off target) and totals. Expand a row for cost basis, buy/trim to target and Yahoo/Finviz links. **Import XLSX** and **Autofill names & industry**. |
+| **Finance** | `/investing/finance` | Deposits and all fees (refill + buy + sell commissions); net gain, annualized (XIRR) return, fees as % of deposits; current-year pace; yearly summary; deposits vs buys with an estimate of uninvested cash. |
+| **Allocation rules** | `/investing/picking` | Buckets (ETF / REIT / Fund, Value / Blue chips) with their target share and position limit checked against the portfolio. Each stock gets a **Strong buy / May buy / Wait** signal from your buy zones, upside to price goals, and **Autofill fundamentals** (P/E, EPS, beta, yield). |
+| **Activities** | `/investing/activities` | One trade log (newest first) with View/Edit modes, search, buy/sell and year filters, a summary of what's shown, a per-ticker breakdown and yearly totals. **Import XLSX** from a broker export. |
+| **Analytics** | `/investing/analytics` | Yearly return vs the S&P 500 (SPY, dividends reinvested), value vs money invested, a year-by-year table, risk & income by holding (beta contribution, dividend income) and trading results by year. |
+| **Notes** | `/investing/notes` | Investing rules with autosave, Write/Preview, and a panel of live numbers (ETF share, fees %, XIRR, largest position) to check the rules against. |
 
-Crypto has its own workspace at `/investing/crypto`: holdings, ledger, and rules.
+### Crypto (`/investing/crypto`)
+
+| Tab | What it does |
+|---|---|
+| **Overview** | Value and today's change, total return on funding, money lost to fees/spread; per coin: average buy, P&L and price vs your average; BTC/ETH split vs your rule with where the next deposit should go. |
+| **Portfolio** | Coins with View/Edit modes: price, day change, value, weight, average buy and P&L. |
+| **Funding & buys** | UAH → USD funding (rate per row, spent vs received) and BTC/ETH purchases (coins bought per row, totals and average prices). |
+| **Allocation rules** | BTC/ETH target split, with a fixed split and a "toward the rule" split for the next deposit. |
 
 ### Importing holdings from a spreadsheet
 
@@ -110,7 +129,7 @@ back/
 front/
   src/
     app/                 # Next.js routes (investing/*, login, c/[slug], …)
-    features/investing/  # charts, dashboard widgets, formatting and stats helpers
+    features/investing/  # charts, dashboard widgets, nav (page names/links), stats helpers
     state/               # React context stores (auth, categories, investing, crypto)
     lib/api.ts           # fetch wrapper (base URL, auth header, JSON / FormData)
 ```
@@ -123,15 +142,17 @@ All `/investing/*` and `/categories/*` endpoints need an `Authorization: Bearer 
 |---|---|
 | Auth | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
 | Categories | `GET/POST /categories`, `GET/POST /categories/{id}/subcategories`, `PUT …/reorder` |
-| Holdings | `GET/PUT /investing/holdings`, `POST /investing/holdings/import` (parses a file and returns the rows; doesn't save them) |
-| Market data | `GET /investing/quotes?tickers=`, `GET /investing/profiles?tickers=`, `GET/PUT /investing/metrics` |
-| Other sections | `GET/PUT` on `/investing/refills`, `/activities`, `/capital-entries`, `/picking`, `/notes`, `/crypto` |
+| Imports | `POST /investing/holdings/import`, `POST /investing/activities/import` (parse a file and return rows; nothing is saved) |
+| Market data | `GET /investing/quotes`, `/profiles`, `/fundamentals` (all `?tickers=`), `GET /investing/benchmark?symbol=SPY`, `GET /investing/rates`, `GET/PUT /investing/metrics` |
+| Sections | `GET/PUT` on `/investing/holdings`, `/refills`, `/activities`, `/capital-entries`, `/picking`, `/notes`, `/crypto`, `/total` |
 
 ## Market data notes
 
 - **Quotes** are fetched from Yahoo's v8 chart endpoint, all tickers at the same time. If Yahoo has no price, the app falls back to Stooq, then CoinGecko for crypto. Prices are cached briefly in memory.
 - **Beta and dividend yield** are averages weighted by each holding's share of the portfolio, using Finviz data. A ticker with no data is left out of the average rather than counted as 0. A stock that pays no dividend counts as 0% yield.
-- **Names and industries** (autofill) come from Finviz: sector for stocks, `ETF · <category>` for funds.
+- **Names, industries and fundamentals** come from Finviz: sector for stocks, `ETF · <category>` for funds, plus P/E, EPS, beta and yield. Lookups are cached (fundamentals 1 h, names 24 h; failures are retried after 5 min).
+- **Benchmark:** S&P 500 yearly total returns come from Yahoo's monthly adjusted closes for SPY (cached 6 h); the current year is year-to-date.
+- **Exchange rates:** the Total page uses official National Bank of Ukraine rates (cached 3 h). Trade imports convert fees/profits with Frankfurter rates for the trade date.
 - **The portfolio page doesn't wait for quotes.** Saved holdings show immediately and live prices are applied when they arrive, so a slow or unavailable data provider never hides your portfolio.
 - These are unofficial public sources. If a provider changes its page or API, the related numbers show `—` until the parser is updated in `back/app/investing/router.py`.
 
