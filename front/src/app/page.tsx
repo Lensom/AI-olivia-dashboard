@@ -95,7 +95,7 @@ export default function Home() {
           ) : null}
 
           {categories.map((cat) => {
-            const href = ["investing", "habits", "finances"].includes(cat.slug)
+            const href = ["investing", "cinematography", "library"].includes(cat.slug)
               ? `/${cat.slug}`
               : `/c/${cat.slug}`;
 

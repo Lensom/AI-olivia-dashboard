@@ -15,9 +15,9 @@ export function Header() {
           </div>
           <div>
             <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#8f8676]">
-              Olivia Finance
+              Personal dashboard
             </p>
-            <p className="text-sm font-semibold text-[#1f1c17]">Jarvis Dashboard</p>
+            <p className="text-sm font-semibold text-[#1f1c17]">Olivia</p>
           </div>
         </Link>
 

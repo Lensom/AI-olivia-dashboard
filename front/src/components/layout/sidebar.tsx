@@ -2,25 +2,84 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/state/auth-store";
+import { cinemaPageHref } from "@/features/cinema/nav";
+import { libraryPageHref } from "@/features/library/nav";
 import { investingNavItems, isBuiltInInvestingPage } from "@/features/investing/nav";
-import { useCategories } from "@/state/categories-store";
+import { useCategories, type Category, type Subcategory } from "@/state/categories-store";
+
+const OPEN_KEY = "olivia.sidebar.open.v1";
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function categoryHref(slug: string) {
+  return ["investing", "cinematography", "library"].includes(slug) ? `/${slug}` : `/c/${slug}`;
+}
+
+/** The category's own page first (so the title can toggle instead of navigate), then its pages. */
+function childLinks(cat: Category, subs: Subcategory[]): { key: string; name: string; href: string; exact?: boolean }[] {
+  if (cat.slug === "investing") {
+    // Built-in pages share names/order with the Stocks tabs; custom subcategories follow.
+    return [
+      { key: "home", name: "Investing home", href: "/investing", exact: true },
+      ...investingNavItems(subs).map((item) => ({ key: item.slug, name: item.label, href: item.href })),
+      ...subs
+        .filter((s) => !isBuiltInInvestingPage(s.slug))
+        .map((s) => ({ key: String(s.id), name: s.name, href: `/c/${cat.slug}/${s.slug}` })),
+    ];
+  }
+  const own = { key: "home", name: ["cinematography", "library"].includes(cat.slug) ? "Overview" : "All pages", href: categoryHref(cat.slug), exact: true };
+  return [
+    own,
+    ...subs.map((s) => ({
+      key: String(s.id),
+      name: s.name,
+      href:
+        cat.slug === "cinematography"
+          ? cinemaPageHref(s.slug)
+          : cat.slug === "library"
+            ? libraryPageHref(s.slug)
+            : `/c/${cat.slug}/${s.slug}`,
+    })),
+  ];
+}
+
+function readOpen(): Record<string, boolean> {
+  try {
+    return JSON.parse(window.localStorage.getItem(OPEN_KEY) ?? "{}") as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const { categories, isLoading, subcategoriesByCategoryId, refreshSubcategories } = useCategories();
+  // Categories you opened or closed yourself; the rest are open only while you're inside them.
+  // Read lazily: the categories (and so this state's effect on the markup) only render after login loads.
+  const [openState, setOpenState] = useState<Record<string, boolean>>(() => (typeof window === "undefined" ? {} : readOpen()));
 
   useEffect(() => {
     if (!user) return;
     for (const cat of categories) void refreshSubcategories(cat.id);
   }, [user, categories, refreshSubcategories]);
+
+  function toggle(slug: string, open: boolean) {
+    setOpenState((prev) => {
+      const next = { ...prev, [slug]: !open };
+      try {
+        window.localStorage.setItem(OPEN_KEY, JSON.stringify(next));
+      } catch {
+        // Remembering is a convenience; toggling still works.
+      }
+      return next;
+    });
+  }
 
   return (
     <aside className="hidden w-64 shrink-0 md:block">
@@ -48,53 +107,39 @@ export function Sidebar() {
               <p className="px-2 pt-2 text-xs text-[#8f8676]">Loading…</p>
             ) : (
               categories.map((cat) => {
-                const href = ["investing", "habits", "finances"].includes(cat.slug)
-                  ? `/${cat.slug}`
-                  : `/c/${cat.slug}`;
-
-                const active = isActive(pathname, href);
-                const subs = subcategoriesByCategoryId[cat.id] ?? [];
-                const showChildren = subs.length > 0;
+                const href = categoryHref(cat.slug);
+                const inside = isActive(pathname, href) || pathname.startsWith(`/c/${cat.slug}/`);
+                const links = childLinks(cat, subcategoriesByCategoryId[cat.id] ?? []);
+                const open = openState[cat.slug] ?? inside;
+                const panelId = `sidebar-${cat.slug}`;
 
                 return (
                   <div key={cat.id} className="space-y-1">
-                    <Link
-                      href={href}
+                    <button
+                      type="button"
+                      onClick={() => toggle(cat.slug, open)}
+                      aria-expanded={open}
+                      aria-controls={panelId}
                       className={[
-                        "flex items-center justify-between rounded-xl px-2.5 py-2 text-sm font-medium transition",
-                        active
-                          ? "bg-[#f3efe5] text-[#1f1c17]"
-                          : "text-[#6f675b] hover:bg-[#faf8f2] hover:text-[#1f1c17]",
+                        "flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left text-sm font-medium transition",
+                        inside ? "text-[#1f1c17]" : "text-[#6f675b] hover:bg-[#faf8f2] hover:text-[#1f1c17]",
+                        inside && !open ? "bg-[#f3efe5]" : "",
                       ].join(" ")}
                     >
                       <span className="truncate">{cat.name}</span>
-                      {showChildren ? (
-                        <span className="text-xs text-[#8f8676]">›</span>
-                      ) : null}
-                    </Link>
+                      <span aria-hidden className={`text-xs text-[#8f8676] transition-transform ${open ? "rotate-90" : ""}`}>
+                        ›
+                      </span>
+                    </button>
 
-                    {showChildren ? (
-                      <div className="ml-2 border-l border-black/5 pl-2">
-                        {(cat.slug === "investing"
-                          ? // Built-in pages share names/order with the Stocks tabs; custom subcategories follow.
-                            [
-                              ...investingNavItems(subs).map((item) => ({
-                                key: item.slug,
-                                name: item.label,
-                                href: item.href,
-                              })),
-                              ...subs
-                                .filter((s) => !isBuiltInInvestingPage(s.slug))
-                                .map((s) => ({ key: String(s.id), name: s.name, href: `/c/${cat.slug}/${s.slug}` })),
-                            ]
-                          : subs.map((s) => ({ key: String(s.id), name: s.name, href: `/c/${cat.slug}/${s.slug}` }))
-                        ).map((sub) => {
-                          const childHref = sub.href;
-                          const childActive = isActive(pathname, childHref);
+                    {open ? (
+                      <div id={panelId} className="ml-2 border-l border-black/5 pl-2">
+                        {links.map((sub) => {
+                          const childActive = sub.exact ? pathname === sub.href : isActive(pathname, sub.href);
                           return (
                             <Link
                               key={sub.key}
-                              href={childHref}
+                              href={sub.href}
                               className={[
                                 "block rounded-lg px-2 py-1.5 text-xs font-medium transition",
                                 childActive
@@ -113,13 +158,6 @@ export function Sidebar() {
               })
             )}
           </nav>
-        </div>
-
-        <div className="mt-3 rounded-2xl border border-black/5 bg-[#f1ece1] p-4 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
-          <p className="text-xs font-semibold text-[#1f1c17]">Sources (soon)</p>
-          <p className="mt-1 text-xs text-[#655d51]">
-            Google Sheets, Notion, files — in one place.
-          </p>
         </div>
       </div>
     </aside>

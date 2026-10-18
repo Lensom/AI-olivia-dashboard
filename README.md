@@ -1,6 +1,6 @@
 # Olivia
 
-A personal dashboard. Its most developed area is **Investing**: net worth across every account, a stock portfolio tracker (live quotes, rebalancing, funding, trades, performance vs the S&P 500) and a crypto workspace. Health, Habits and Finances sections are scaffolded.
+A personal dashboard. Its most developed area is **Investing**: net worth across every account, a stock portfolio tracker (live quotes, rebalancing, funding, trades, performance vs the S&P 500), a crypto workspace, **Cinematography** (your ratings of films, series, cartoons, anime and TV shows, with TMDB details, IMDb ratings and tops) and **Library** (books, comics, manga and magazines).
 
 - **Frontend:** Next.js 16 (App Router, Turbopack), React 19, Tailwind CSS 4, TypeScript (`front/`)
 - **Backend:** FastAPI, Pydantic, psycopg 3 with a Postgres connection pool (`back/`)
@@ -46,6 +46,8 @@ The frontend calls the API on port 8000 of the same host the page was opened fro
 | `AUTH_TOKEN_TTL_SECONDS` | no | How long a login lasts. Default `604800` (7 days). |
 | `CORS_ORIGINS` | no | Comma-separated allowed origins, or `*`. Defaults cover `localhost:3000/3001` and the LAN IP. |
 | `APP_NAME`, `APP_VERSION` | no | Shown in `/health` and the API docs. |
+| `GOOGLE_BOOKS_API_KEY` | no | Library: adds Google Books to search and matching, which lists Ukrainian editions far better than Open Library. Free in Google Cloud console → APIs → Books API. Without it, Library uses Open Library plus Wikidata. |
+| `TMDB_API_KEY` | no | Enables Cinematography search, posters and auto-filled genres / actors / studios. Free at themoviedb.org → Settings → API; a v3 API key or a v4 read access token both work. Without it, titles are added by hand. |
 
 ## Features: Investing
 
@@ -111,6 +113,31 @@ On **Activities**, click **Import XLSX** and choose a broker trade export with t
 - Rows that can't be read (bad date, unknown direction…) are listed by row number.
 - As with holdings, nothing is saved until you press **Save**.
 
+## Features: Cinematography
+
+Your ratings of films, series, cartoons, animated series, anime and TV shows, replacing the Notion table. The category is called **Cinematography**: create it on Home, and its pages appear automatically.
+
+- **Overview** (`/cinematography`): totals, average score, recommendations (highest score first), what you're watching now, titles watched per year, your score distribution, top genres and the actors you watch most.
+- **Films / Series / Cartoons / Animated series / Anime / TV shows** (`/cinematography/films`, `/series`, `/cartoons`, `/animated-series`, `/anime`, `/tv-shows`): a table (✓ recommended, Title, Genre, Status, Score, Year, Watched, Studio / distributor, Actors) or a poster grid. Every page except Films and Cartoons also has **Seasons** (watched up to season N out of those released, e.g. `4 / 5 +1 new`) and a **New seasons** filter. TV shows are reality, talk and game shows; Anime search puts Japanese animation first. You can search, filter by status, genre or recommended, and sort by score, year watched, release year, title or recently added.
+- **Tops** (`/cinematography/tops`): your own ranked lists (like the Notion page: Топ фільмів, Серії фільмів, Кращі злодеї…), with numbered slots that are either a title from your library (poster, your score, IMDb) or free text (a franchise, a character), plus a note. Edit to rename, add from a library search, drag or ↑↓ to reorder, or change the number of slots. **Recreate my Notion tops** fills them in from the old page. Below them, **Built from your ratings** has automatic tops by genre, actor, director, studio, decade or kind, and any of them can be copied into your lists.
+- **Add**: search TMDB and pick a result. Poster, genres, actors, studios, director, runtime / seasons, description and TMDB rating are filled in, and you add your score, status, year watched and the ✓. You can also add a title by hand.
+- **Import CSV / XLSX**: in Notion use ••• → Export → Markdown & CSV and upload the `.csv`. Recognised columns, in English or Ukrainian: Title / Назва, Genre / Жанр, Status / Статус (Переглянуто → Watched, and so on), Score / Оцінка, Year / Рік, View Year, Studio / Distributor, Actors / Актори, Season / Сезон (Notion's `1 - 6` means watched up to season 6), Notes, Type, and the checkbox column (even unnamed). Titles already in the list are skipped, and a preview shows what will be added.
+- **Fill from TMDB**: matches imported titles by name and year, and adds posters plus missing genres, actors and studios. Your score, status, ✓ and notes are never touched. Optionally it replaces your genres, actors and studios with TMDB's.
+- **IMDb rating**: the global IMDb rating and vote count for each title, in its own column and as a sort option. On Overview it's compared with your average. The IMDb ID comes from TMDB, and the rating from IMDb's free daily dataset (`title.ratings.tsv.gz`), cached in `back/.cache/` and refreshed once a day. Ratings update in the background when the list opens, so a title needs a TMDB link first (Add from search or Fill from TMDB). A wrong link can be fixed with **Wrong title? Re-match** in the edit window.
+- **Language**: TMDB data (titles, genres, descriptions) is in Ukrainian (`uk-UA`), with an English description when no Ukrainian one exists. Actor names come as TMDB stores them.
+- **Saving**: every change (add, edit, ✓, delete, import) saves immediately.
+
+## Features: Library
+
+Books, comics, manga and magazines, replacing the Notion reading table. The category is called **Library** (slug `library`), and its pages appear automatically.
+
+- **Overview** (`/library`): totals, average stars, read this year vs last year, pages read, what you're reading now, recommendations, recently finished, books finished per year, star distribution, top genres and the authors you read most.
+- **Books / Comics / Manga / Magazines** (`/library/books`, `/comics`, `/manga`, `/magazines`): a table (✓, Title, Genre, Status, Score ★1–5, Author, Finished, Pages or Volumes, Readers' rating) or a cover grid. Filters: status, genre, recommended, year finished; sorts: score, date finished, title, author, published, pages, recently added. Comics and Manga track **volumes read / out**.
+- **Add**: search by title or author, pick a result, and the cover, author, pages, year, publisher, description and readers' rating fill in. You can also add by hand.
+- **Import CSV / XLSX** (Notion: ••• → Export → Markdown & CSV): recognises Title, Genre (`Jenre`) / Жанр, Status (Прочитано → Read, and so on), Score (`⭐⭐⭐⭐`, 1–5 or a 10-point score), Author / Автор, Finish date (`March 2, 2025`, ISO, `02.03.2025`), Pages, Volumes, Notes, Type and the checkbox column.
+- **Fill covers & details**: matches by title and author on Open Library (plus Google Books with a key). Ukrainian titles are translated through Wikidata first ("Зелена миля" → *The Green Mile*). Your score, status, date, ✓ and notes are never changed. A title with no match can be found from its edit window with the English title; a wrong match can be fixed with **Wrong book? Re-match**.
+- **Tops** (`/library/tops`): the same board as Cinematography's (your ranked lists plus automatic tops by genre, author, year read, decade published or kind).
+
 ## Project structure
 
 ```
@@ -120,6 +147,8 @@ back/
     db.py                # connection pool + CREATE TABLE IF NOT EXISTS schema
     auth/                # register / login / me, token signing
     categories/          # sidebar categories and subcategories
+    cinema/              # /cinema endpoints: titles, TMDB search/details/match, Notion import
+    library/             # /library endpoints: books, Open Library / Google Books / Wikidata lookup, Notion import
     investing/
       router.py          # all /investing endpoints + market data fetchers
       schemas.py         # request/response models
@@ -130,7 +159,10 @@ front/
   src/
     app/                 # Next.js routes (investing/*, login, c/[slug], …)
     features/investing/  # charts, dashboard widgets, nav (page names/links), stats helpers
-    state/               # React context stores (auth, categories, investing, crypto)
+    features/cinema/     # Cinematography nav, types, dialogs, tags/poster UI
+    features/library/    # Library nav, types, dialogs, stars UI
+    features/shared/     # Tops board and bar charts shared by Cinematography and Library
+    state/               # React context stores (auth, categories, investing, crypto, broker, cinema, library)
     lib/api.ts           # fetch wrapper (base URL, auth header, JSON / FormData)
 ```
 
@@ -144,6 +176,8 @@ All `/investing/*` and `/categories/*` endpoints need an `Authorization: Bearer 
 | Categories | `GET/POST /categories`, `GET/POST /categories/{id}/subcategories`, `PUT …/reorder` |
 | Imports | `POST /investing/holdings/import`, `POST /investing/activities/import` (parse a file and return rows; nothing is saved) |
 | Market data | `GET /investing/quotes`, `/profiles`, `/fundamentals` (all `?tickers=`), `GET /investing/benchmark?symbol=SPY`, `GET /investing/rates`, `GET/PUT /investing/metrics` |
+| Cinematography | `GET/PUT /cinema`, `GET /cinema/search?q=&kind=`, `GET /cinema/details?media=&tmdb_id=`, `GET /cinema/match?title=&year=&kind=`, `POST /cinema/match-many`, `POST /cinema/imdb-ratings`, `POST /cinema/import` |
+| Library | `GET/PUT /library`, `GET /library/search?q=&kind=`, `GET /library/details?source=&source_id=`, `POST /library/match-many`, `POST /library/import` |
 | Sections | `GET/PUT` on `/investing/holdings`, `/refills`, `/activities`, `/capital-entries`, `/picking`, `/notes`, `/crypto`, `/total`, `/broker` (cash, dividends, attention thresholds) |
 
 ## Market data notes

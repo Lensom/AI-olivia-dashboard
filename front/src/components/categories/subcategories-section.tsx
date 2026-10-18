@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { cinemaPageHref } from "@/features/cinema/nav";
+import { libraryPageHref } from "@/features/library/nav";
 import { investingPageHref } from "@/features/investing/nav";
 import { useCategories } from "@/state/categories-store";
 
@@ -10,7 +12,10 @@ type SubcategoriesSectionProps = {
 };
 
 function hrefForSubcategory(categorySlug: string, subSlug: string) {
-  return categorySlug === "investing" ? investingPageHref(subSlug) : `/c/${categorySlug}/${subSlug}`;
+  if (categorySlug === "investing") return investingPageHref(subSlug);
+  if (categorySlug === "cinematography") return cinemaPageHref(subSlug);
+  if (categorySlug === "library") return libraryPageHref(subSlug);
+  return `/c/${categorySlug}/${subSlug}`;
 }
 
 export function SubcategoriesSection({ categorySlug }: SubcategoriesSectionProps) {

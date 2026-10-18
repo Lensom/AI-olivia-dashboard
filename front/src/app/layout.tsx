@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Olivia Stocks",
-  description: "Personal finance and investing dashboard",
+  title: "Olivia — Personal Dashboard",
+  description: "Net worth, stocks and crypto, plus your film, series and anime ratings — in one place.",
 };
 
 export default function RootLayout({

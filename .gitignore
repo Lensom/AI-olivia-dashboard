@@ -28,6 +28,7 @@ __pycache__/
 
 # Backend
 back/.venv/
+back/.cache/
 back/.env
 
 # Frontend

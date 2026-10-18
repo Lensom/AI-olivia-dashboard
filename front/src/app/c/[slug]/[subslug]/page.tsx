@@ -27,7 +27,7 @@ export default async function SubcategoryPage({ params }: PageProps) {
       </div>
 
       <Link
-        href={["investing", "habits", "finances"].includes(slug) ? `/${slug}` : `/c/${slug}`}
+        href={["investing", "cinematography", "library"].includes(slug) ? `/${slug}` : `/c/${slug}`}
         className="inline-flex rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-xs font-medium text-[#3b352d] hover:bg-[#faf8f2]"
       >
         Back

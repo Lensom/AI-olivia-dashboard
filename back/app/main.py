@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 import app.auth.router as auth_router_module
+import app.cinema.router as cinema_router_module
+import app.library.router as library_router_module
 from app.categories.router import router as categories_router
 from app.investing.router import router as investing_router
 from app.db import create_pool, init_db
@@ -16,6 +18,8 @@ class Settings(BaseSettings):
     database_url: str = ""
     auth_token_secret: str = "dev-secret-change-me"
     auth_token_ttl_seconds: int = 60 * 60 * 24 * 7  # 7 days
+    tmdb_api_key: str = ""  # Cinematography autofill; v3 API key or v4 read access token
+    google_books_api_key: str = ""  # Library: optional, better covers/details for Ukrainian editions
     cors_origins: str = (
         "http://localhost:3000,"
         "http://127.0.0.1:3000,"
@@ -66,6 +70,10 @@ app.dependency_overrides[auth_router_module.get_settings] = get_settings
 app.include_router(auth_router_module.router)
 app.include_router(categories_router)
 app.include_router(investing_router)
+app.dependency_overrides[cinema_router_module.get_tmdb_key] = lambda: settings.tmdb_api_key.strip()
+app.include_router(cinema_router_module.router)
+app.dependency_overrides[library_router_module.get_google_books_key] = lambda: settings.google_books_api_key.strip()
+app.include_router(library_router_module.router)
 
 
 @app.get("/health")
