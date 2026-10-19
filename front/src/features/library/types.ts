@@ -105,8 +105,8 @@ export function applyBookDetails(t: LibraryItem, d: LibraryDetails, replaceLists
   };
 }
 
-export const formatDate = (iso: string) => {
+export const formatDate = (iso: string, locale = "en-US") => {
   if (!iso) return "";
   const [y, m, d] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y, (m || 1) - 1, d || 1)).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return new Date(Date.UTC(y, (m || 1) - 1, d || 1)).toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 };

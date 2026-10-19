@@ -23,7 +23,7 @@ copy .env.example .env              # macOS/Linux: cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
-To check that it's running, open http://localhost:8000/health. Interactive API docs are at http://localhost:8000/docs.
+To check that it's running, open http://localhost:8000/api/health. Interactive API docs are at http://localhost:8000/docs.
 
 ### 2. Frontend: http://localhost:3000
 
@@ -138,6 +138,21 @@ Books, comics, manga and magazines, replacing the Notion reading table. The cate
 - **Fill covers & details**: matches by title and author on Open Library (plus Google Books with a key). Ukrainian titles are translated through Wikidata first ("Зелена миля" → *The Green Mile*). Your score, status, date, ✓ and notes are never changed. A title with no match can be found from its edit window with the English title; a wrong match can be fixed with **Wrong book? Re-match**.
 - **Tops** (`/library/tops`): the same board as Cinematography's (your ranked lists plus automatic tops by genre, author, year read, decade published or kind).
 
+## Features: Tasks
+
+A simple task board at `/tasks` (category **Tasks**, slug `tasks`): **To do, Hold, In progress, Completed**. Type a title and press Enter to add a task to To do. Drag cards between columns or within one to reorder; hover a card for ‹ › (move without dragging), ✎ (rename, or double-click the title) and ✕ (delete). **Clear N completed** removes finished tasks. Every change saves immediately.
+
+## Deploy (Vercel)
+
+`vercel.json` deploys the repo as one Vercel project with two services:
+
+- **front** (`front/`, Next.js): serves every path except `/api/*`.
+- **back** (`back/`, FastAPI, entrypoint `app.main:app`): serves `/api/*`. Vercel passes the full path through, so all API routes are mounted under `/api` (locally too: `http://localhost:8000/api/...`).
+
+The browser calls the API on the same domain (`/api`), so no CORS setup is needed in production. Locally, a page served on port 3000/3001 calls `http://<same host>:8000/api`. `NEXT_PUBLIC_API_BASE` overrides both.
+
+Set these environment variables in the Vercel project: `DATABASE_URL`, `AUTH_TOKEN_SECRET`, and optionally `TMDB_API_KEY` and `GOOGLE_BOOKS_API_KEY`. On Vercel, the IMDb ratings cache is written to `/tmp` (or `OLIVIA_CACHE_DIR`). Requests are limited to 4.5 MB, which matters only for imports. Run both services together locally with `vercel dev`.
+
 ## Project structure
 
 ```
@@ -148,6 +163,7 @@ back/
     auth/                # register / login / me, token signing
     categories/          # sidebar categories and subcategories
     cinema/              # /cinema endpoints: titles, TMDB search/details/match, Notion import
+    tasks/               # /tasks endpoints: the task board (GET/PUT)
     library/             # /library endpoints: books, Open Library / Google Books / Wikidata lookup, Notion import
     investing/
       router.py          # all /investing endpoints + market data fetchers
@@ -168,7 +184,7 @@ front/
 
 ## API overview
 
-All `/investing/*` and `/categories/*` endpoints need an `Authorization: Bearer <token>` header from `/auth/login`. Investing data is stored per user, mostly as one JSON document per section.
+All endpoints are under the `/api` prefix (e.g. `/api/investing/holdings`); the paths below omit it. All `/investing/*` and `/categories/*` endpoints need an `Authorization: Bearer <token>` header from `/auth/login`. Investing data is stored per user, mostly as one JSON document per section.
 
 | Area | Endpoints |
 |---|---|
@@ -178,6 +194,7 @@ All `/investing/*` and `/categories/*` endpoints need an `Authorization: Bearer 
 | Market data | `GET /investing/quotes`, `/profiles`, `/fundamentals` (all `?tickers=`), `GET /investing/benchmark?symbol=SPY`, `GET /investing/rates`, `GET/PUT /investing/metrics` |
 | Cinematography | `GET/PUT /cinema`, `GET /cinema/search?q=&kind=`, `GET /cinema/details?media=&tmdb_id=`, `GET /cinema/match?title=&year=&kind=`, `POST /cinema/match-many`, `POST /cinema/imdb-ratings`, `POST /cinema/import` |
 | Library | `GET/PUT /library`, `GET /library/search?q=&kind=`, `GET /library/details?source=&source_id=`, `POST /library/match-many`, `POST /library/import` |
+| Tasks | `GET/PUT /tasks` |
 | Sections | `GET/PUT` on `/investing/holdings`, `/refills`, `/activities`, `/capital-entries`, `/picking`, `/notes`, `/crypto`, `/total`, `/broker` (cash, dividends, attention thresholds) |
 
 ## Market data notes

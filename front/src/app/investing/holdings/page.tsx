@@ -10,6 +10,7 @@ import {
   investingPrimarySaveDisabled,
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
+import { useLocale, useT } from "@/lib/i18n";
 import { useInvesting, type InvestingHoldingsImportSummary } from "@/state/investing-store";
 
 function inputBaseClasses() {
@@ -126,6 +127,8 @@ export default function InvestingTablePage() {
     importHoldings,
     autofillHoldingProfiles,
   } = useInvesting();
+  const tr = useT();
+  const locale = useLocale();
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [expandedRowIds, setExpandedRowIds] = useState<Record<string, boolean>>({});
   const [sortBy, setSortBy] = useState<SortKey>("ticker");
@@ -170,19 +173,19 @@ export default function InvestingTablePage() {
     try {
       const { filled, notFound } = await autofillHoldingProfiles();
       if (filled.length === 0 && notFound.length === 0) {
-        setAutofillResult("Every holding already has a name and industry.");
+        setAutofillResult(tr("Every holding already has a name and industry."));
       } else {
         setAutofillResult(
           [
-            filled.length ? `Filled ${filled.join(", ")} — review and press Save.` : "",
-            notFound.length ? `No data for ${notFound.join(", ")}.` : "",
+            filled.length ? tr("Filled {list} — review and press Save.", { list: filled.join(", ") }) : "",
+            notFound.length ? tr("No data for {list}.", { list: notFound.join(", ") }) : "",
           ]
             .filter(Boolean)
             .join(" "),
         );
       }
     } catch (err) {
-      setAutofillResult(`Autofill failed: ${importErrorMessage(err)}`);
+      setAutofillResult(tr("Autofill failed: {v}", { v: tr(importErrorMessage(err)) }));
     } finally {
       setAutofilling(false);
     }
@@ -290,20 +293,20 @@ export default function InvestingTablePage() {
   return (
     <div className={investingPageStack}>
       <p className="text-sm text-[#655d51]">
-        Day % is today&apos;s session move from market data — use Refresh market.
+        {tr("Day % is today’s session move from market data — use Refresh market.")}
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2 text-xs text-[#6f675b]">
-          <span className={investingMetaBadge}>Total value {formatUsd(totals.totalValue)}</span>
-          <span className={investingMetaBadge}>Target sum {formatPercent(totals.totalTarget)}</span>
-          <span className={investingMetaBadge}>Current sum {formatPercent(totals.totalCurrent)}</span>
+          <span className={investingMetaBadge}>{tr("Total value {v}", { v: formatUsd(totals.totalValue) })}</span>
+          <span className={investingMetaBadge}>{tr("Target sum {v}", { v: formatPercent(totals.totalTarget) })}</span>
+          <span className={investingMetaBadge}>{tr("Current sum {v}", { v: formatPercent(totals.totalCurrent) })}</span>
           <span className={investingMetaBadge}>
-            Source {holdingsMeta.source}
-            {holdingsMeta.updatedAt ? ` · synced ${new Date(holdingsMeta.updatedAt).toLocaleString()}` : ""}
+            {tr("Source {v}", { v: holdingsMeta.source })}
+            {holdingsMeta.updatedAt ? ` · ${tr("synced {when}", { when: new Date(holdingsMeta.updatedAt).toLocaleString(locale) })}` : ""}
           </span>
-          <span className={investingMetaBadge}>Div Yield {isMetricsLoading ? "…" : metrics.divYieldPercent}</span>
-          <span className={investingMetaBadge}>Beta {isMetricsLoading ? "…" : metrics.beta}</span>
+          <span className={investingMetaBadge}>{tr("Div yield")} {isMetricsLoading ? "…" : metrics.divYieldPercent}</span>
+          <span className={investingMetaBadge}>{tr("Beta")} {isMetricsLoading ? "…" : metrics.beta}</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -315,7 +318,7 @@ export default function InvestingTablePage() {
               isMarketPricesLoading ? investingPrimarySaveDisabled : investingToolbarBtn,
             ].join(" ")}
           >
-            {isMarketPricesLoading ? "Refreshing…" : "Refresh market"}
+            {isMarketPricesLoading ? tr("Refreshing…") : tr("Refresh market")}
           </button>
           <button
             onClick={() => void refreshMetrics().catch(() => {})}
@@ -325,7 +328,7 @@ export default function InvestingTablePage() {
               isMetricsLoading ? investingPrimarySaveDisabled : investingToolbarBtn,
             ].join(" ")}
           >
-            {isMetricsLoading ? "Refreshing metrics…" : "Refresh metrics"}
+            {isMetricsLoading ? tr("Refreshing metrics…") : tr("Refresh metrics")}
           </button>
           <input
             ref={fileInputRef}
@@ -338,10 +341,10 @@ export default function InvestingTablePage() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
-            title="Columns: Ticker, Qty, Entry Price, Price, Value"
+            title={tr("Columns: Ticker, Qty, Entry Price, Price, Value")}
             className={["transition", isImporting ? investingPrimarySaveDisabled : investingToolbarBtn].join(" ")}
           >
-            {isImporting ? "Importing…" : "Import XLSX"}
+            {isImporting ? tr("Importing…") : tr("Import XLSX")}
           </button>
           <div className="flex rounded-full border border-black/10 bg-white p-1">
             <button
@@ -352,7 +355,7 @@ export default function InvestingTablePage() {
                 mode === "view" ? "bg-[#f3efe5] text-[#1f1c17]" : "text-[#6f675b] hover:bg-[#faf8f2]",
               ].join(" ")}
             >
-              View
+              {tr("View")}
             </button>
             <button
               type="button"
@@ -362,7 +365,7 @@ export default function InvestingTablePage() {
                 mode === "edit" ? "bg-[#f3efe5] text-[#1f1c17]" : "text-[#6f675b] hover:bg-[#faf8f2]",
               ].join(" ")}
             >
-              Edit
+              {tr("Edit")}
             </button>
           </div>
 
@@ -376,22 +379,22 @@ export default function InvestingTablePage() {
                   !isHoldingsDirty || isHoldingsSaving ? investingPrimarySaveDisabled : investingPrimarySaveActive,
                 ].join(" ")}
               >
-                {isHoldingsSaving ? "Saving…" : "Save"}
+                {isHoldingsSaving ? tr("Saving…") : tr("Save")}
               </button>
               <button onClick={addHolding} className={investingPrimarySaveActive}>
-                Add row
+                {tr("Add row")}
               </button>
               <button
                 type="button"
                 onClick={() => void handleAutofill()}
                 disabled={isAutofilling}
-                title="Fill empty names and industries from Finviz"
+                title={tr("Fill empty names and industries from Finviz")}
                 className={["transition", isAutofilling ? investingPrimarySaveDisabled : investingToolbarBtn].join(" ")}
               >
-                {isAutofilling ? "Looking up…" : "Autofill names & industry"}
+                {isAutofilling ? tr("Looking up…") : tr("Autofill names & industry")}
               </button>
               <button onClick={reset} className={investingToolbarBtn}>
-                Reset
+                {tr("Reset")}
               </button>
             </>
           ) : null}
@@ -401,11 +404,11 @@ export default function InvestingTablePage() {
       {isHoldingsDirty ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
           <span>
-            <span aria-hidden>●</span> Unsaved changes — press Save to store them in the database.
+            <span aria-hidden>●</span> {tr("Unsaved changes — press Save to store them in the database.")}
           </span>
           {mode === "view" ? (
             <button type="button" onClick={() => setMode("edit")} className={investingToolbarBtn}>
-              Go to Edit
+              {tr("Go to Edit")}
             </button>
           ) : null}
         </div>
@@ -415,7 +418,7 @@ export default function InvestingTablePage() {
         <div className="flex items-start justify-between gap-3 rounded-xl border border-black/10 bg-[#faf8f2] px-4 py-3 text-sm text-[#3b352d]">
           <p>{autofillResult}</p>
           <button type="button" onClick={() => setAutofillResult(null)} className="text-xs opacity-70 hover:opacity-100">
-            Dismiss
+            {tr("Dismiss")}
           </button>
         </div>
       ) : null}
@@ -432,26 +435,28 @@ export default function InvestingTablePage() {
           {importResult.ok ? (
             <div className="grid gap-0.5">
               <p className="font-medium">
-                Imported: {importResult.summary.updated.length} updated, {importResult.summary.added.length} added.
-                Review and press Save to store in the database.
+                {tr("Imported: {updated} updated, {added} added. Review and press Save to store in the database.", {
+                  updated: importResult.summary.updated.length,
+                  added: importResult.summary.added.length,
+                })}
               </p>
               {importResult.summary.added.length > 0 ? (
                 <p>
-                  New: {importResult.summary.added.join(", ")} — use Autofill names &amp; industry, then set targets.
+                  {tr("New: {list} — use Autofill names & industry, then set targets.", { list: importResult.summary.added.join(", ") })}
                 </p>
               ) : null}
               {importResult.summary.notInFile.length > 0 ? (
-                <p>Not in file (kept, delete if sold): {importResult.summary.notInFile.join(", ")}</p>
+                <p>{tr("Not in file (kept, delete if sold): {list}", { list: importResult.summary.notInFile.join(", ") })}</p>
               ) : null}
               {importResult.summary.skipped.length > 0 ? (
-                <p>Skipped (missing Qty or Entry Price): {importResult.summary.skipped.join(", ")}</p>
+                <p>{tr("Skipped (missing Qty or Entry Price): {list}", { list: importResult.summary.skipped.join(", ") })}</p>
               ) : null}
             </div>
           ) : (
-            <p>Import failed: {importResult.message}</p>
+            <p>{tr("Import failed: {v}", { v: tr(importResult.message) })}</p>
           )}
           <button type="button" onClick={() => setImportResult(null)} className="text-xs opacity-70 hover:opacity-100">
-            Dismiss
+            {tr("Dismiss")}
           </button>
         </div>
       ) : null}
@@ -461,11 +466,11 @@ export default function InvestingTablePage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search ticker, name, industry…"
-            aria-label="Search holdings"
+            placeholder={tr("Search ticker, name, industry…")}
+            aria-label={tr("Search holdings")}
             className="w-full max-w-xs rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20"
           />
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter holdings">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter holdings")}>
             {FILTERS.map((f) => (
               <button
                 key={f.key}
@@ -478,7 +483,7 @@ export default function InvestingTablePage() {
                     : "border border-black/10 bg-white text-[#3b352d] hover:bg-[#faf8f2]",
                 ].join(" ")}
               >
-                {f.label} <span className="opacity-60">{filterCounts[f.key]}</span>
+                {tr(f.label)} <span className="opacity-60">{filterCounts[f.key]}</span>
               </button>
             ))}
           </div>
@@ -493,17 +498,17 @@ export default function InvestingTablePage() {
                 <th className="w-[52px] px-2 py-2 font-medium" />
                 <th className="w-[88px] px-2 py-2 font-medium">
                   <button type="button" onClick={() => toggleSort("ticker")} className="inline-flex items-center gap-1">
-                    Ticker <span>{sortArrow("ticker")}</span>
+                    {tr("Ticker")} <span>{sortArrow("ticker")}</span>
                   </button>
                 </th>
-                <th className="w-[180px] px-2 py-2 text-left font-medium">Name</th>
+                <th className="w-[180px] px-2 py-2 text-left font-medium">{tr("Name")}</th>
                 <th className="w-[80px] px-2 py-2 text-left font-medium">
                   <button
                     type="button"
                     onClick={() => toggleSort("targetWeight")}
                     className="inline-flex items-center gap-1"
                   >
-                    Target <span>{sortArrow("targetWeight")}</span>
+                    {tr("Target")} <span>{sortArrow("targetWeight")}</span>
                   </button>
                 </th>
                 <th className="w-[84px] px-2 py-2 text-left font-medium">
@@ -512,12 +517,12 @@ export default function InvestingTablePage() {
                     onClick={() => toggleSort("currentWeight")}
                     className="inline-flex items-center gap-1"
                   >
-                    Current <span>{sortArrow("currentWeight")}</span>
+                    {tr("Current")} <span>{sortArrow("currentWeight")}</span>
                   </button>
                 </th>
                 <th className="w-[62px] px-2 py-2 text-left font-medium">
                   <button type="button" onClick={() => toggleSort("shares")} className="inline-flex items-center gap-1">
-                    Shares <span>{sortArrow("shares")}</span>
+                    {tr("Shares")} <span>{sortArrow("shares")}</span>
                   </button>
                 </th>
                 <th className="w-[90px] px-2 py-2 text-left font-medium">
@@ -526,7 +531,7 @@ export default function InvestingTablePage() {
                     onClick={() => toggleSort("avgBuyPrice")}
                     className="inline-flex items-center gap-1"
                   >
-                    Avg buy <span>{sortArrow("avgBuyPrice")}</span>
+                    {tr("Avg buy")} <span>{sortArrow("avgBuyPrice")}</span>
                   </button>
                 </th>
                 <th className="w-[90px] px-2 py-2 text-left font-medium">
@@ -535,7 +540,7 @@ export default function InvestingTablePage() {
                     onClick={() => toggleSort("marketPrice")}
                     className="inline-flex items-center gap-1"
                   >
-                    Market <span>{sortArrow("marketPrice")}</span>
+                    {tr("Market")} <span>{sortArrow("marketPrice")}</span>
                   </button>
                 </th>
                 <th className="w-[86px] px-2 py-2 text-left font-medium">
@@ -544,7 +549,7 @@ export default function InvestingTablePage() {
                     onClick={() => toggleSort("dayChangePercent")}
                     className="inline-flex items-center gap-1"
                   >
-                    Day <span>{sortArrow("dayChangePercent")}</span>
+                    {tr("Day")} <span>{sortArrow("dayChangePercent")}</span>
                   </button>
                 </th>
                 <th className="w-[100px] px-2 py-2 text-left font-medium">
@@ -553,15 +558,15 @@ export default function InvestingTablePage() {
                     onClick={() => toggleSort("marketValue")}
                     className="inline-flex items-center gap-1"
                   >
-                    Value <span>{sortArrow("marketValue")}</span>
+                    {tr("Value")} <span>{sortArrow("marketValue")}</span>
                   </button>
                 </th>
                 <th className="w-[116px] px-2 py-2 font-medium">
                   <button type="button" onClick={() => toggleSort("pnl")} className="inline-flex items-center gap-1">
-                    P&L <span>{sortArrow("pnl")}</span>
+                    {tr("P&L")} <span>{sortArrow("pnl")}</span>
                   </button>
                 </th>
-                {mode === "edit" ? <th className="w-[88px] px-2 py-2 font-medium">Actions</th> : null}
+                {mode === "edit" ? <th className="w-[88px] px-2 py-2 font-medium">{tr("Actions")}</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -569,8 +574,8 @@ export default function InvestingTablePage() {
                 <tr>
                   <td colSpan={mode === "edit" ? 12 : 11} className="px-4 py-8 text-center text-sm text-[#8f8676]">
                     {holdings.length === 0
-                      ? "No holdings yet — Add row in Edit mode, or Import XLSX."
-                      : "No holdings match this search or filter."}
+                      ? tr("No holdings yet — Add row in Edit mode, or Import XLSX.")
+                      : tr("No holdings match this search or filter.")}
                   </td>
                 </tr>
               ) : null}
@@ -610,7 +615,7 @@ export default function InvestingTablePage() {
                               value={h.name}
                               onChange={(e) => updateHolding(h.id, { name: e.target.value })}
                               className={inputBaseClasses()}
-                              placeholder="Company name"
+                              placeholder={tr("Company name")}
                             />
                           </td>
                           <td className="px-2 py-2 text-left">
@@ -663,7 +668,7 @@ export default function InvestingTablePage() {
                           </td>
                           <td className="px-2 py-2 text-left">
                             <div
-                              title="Session change from quotes (Yahoo). Refresh market to update."
+                              title={tr("Session change from quotes (Yahoo). Refresh market to update.")}
                               className={[
                                 "w-full rounded-lg border border-black/10 bg-[#faf8f2] px-2 py-1.5 text-sm font-semibold tabular-nums",
                                 dayChangeCellClass(h.dayChangePercent),
@@ -694,7 +699,7 @@ export default function InvestingTablePage() {
                           </td>
                           <td className="px-2 py-2">
                             <button onClick={() => deleteHolding(h.id)} className={investingToolbarBtn} type="button">
-                              Delete
+                              {tr("Delete")}
                             </button>
                           </td>
                         </>
@@ -722,9 +727,9 @@ export default function InvestingTablePage() {
                             {s.target > 0 && Math.abs(s.drift) >= 1 ? (
                               <span
                                 className="block text-[11px] text-[#8f8676]"
-                                title="Current − target, percentage points"
+                                title={tr("Current − target, percentage points")}
                               >
-                                {s.drift > 0 ? "▲" : "▼"} {Math.abs(s.drift).toFixed(1)} pp
+                                {s.drift > 0 ? "▲" : "▼"} {Math.abs(s.drift).toFixed(1)} {tr("pp")}
                               </span>
                             ) : null}
                           </td>
@@ -739,7 +744,7 @@ export default function InvestingTablePage() {
                           </td>
                           <td
                             className="whitespace-nowrap px-2 py-2 text-left text-sm tabular-nums"
-                            title="Session change from quotes. Refresh market to update."
+                            title={tr("Session change from quotes. Refresh market to update.")}
                           >
                             <span className={`font-semibold ${dayChangeCellClass(h.dayChangePercent)}`}>
                               {h.dayChangePercent ?? "—"}
@@ -764,7 +769,7 @@ export default function InvestingTablePage() {
                           {mode === "edit" ? (
                             <div className="grid gap-2 md:grid-cols-2">
                               <label className="text-xs text-[#6f675b]">
-                                Industry
+                                {tr("Industry")}
                                 <input
                                   value={h.industry}
                                   onChange={(e) => updateHolding(h.id, { industry: e.target.value })}
@@ -776,53 +781,53 @@ export default function InvestingTablePage() {
                           ) : (
                             <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
                               <div>
-                                <p className="text-[11px] text-[#8f8676]">Cost basis</p>
+                                <p className="text-[11px] text-[#8f8676]">{tr("Cost basis")}</p>
                                 <p className="font-semibold text-[#1f1c17]">{formatUsd(s.cost)}</p>
                                 <p className="text-[11px] text-[#8f8676]">
                                   {h.shares} × {formatUsd(parseUsd(h.avgBuyPrice))}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-[11px] text-[#8f8676]">Price vs avg buy</p>
+                                <p className="text-[11px] text-[#8f8676]">{tr("Price vs avg buy")}</p>
                                 <p className={`font-semibold ${toneClass(s.priceVsAvgPct)}`}>
                                   {signedPct(s.priceVsAvgPct)}
                                 </p>
                                 <p className="text-[11px] text-[#8f8676]">
-                                  {formatUsd(parseUsd(h.marketPrice))} now
+                                  {tr("{v} now", { v: formatUsd(parseUsd(h.marketPrice)) })}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-[11px] text-[#8f8676]">Weight vs target</p>
+                                <p className="text-[11px] text-[#8f8676]">{tr("Weight vs target")}</p>
                                 <p className="font-semibold text-[#1f1c17]">
                                   {formatPercent(parsePercent(h.currentWeight))}{" "}
                                   <span className="font-normal text-[#8f8676]">
-                                    / {s.target > 0 ? formatPercent(s.target) : "no target"}
+                                    / {s.target > 0 ? formatPercent(s.target) : tr("no target")}
                                   </span>
                                 </p>
                                 <p className="text-[11px]">
                                   {s.target <= 0 ? (
-                                    <span className="text-[#8f8676]">Set a target in Edit</span>
+                                    <span className="text-[#8f8676]">{tr("Set a target in Edit")}</span>
                                   ) : Math.abs(s.drift) < 1 ? (
-                                    <span className="text-[#8f8676]">On target — hold</span>
+                                    <span className="text-[#8f8676]">{tr("On target — hold")}</span>
                                   ) : s.rebalanceUsd > 0 ? (
                                     <span className="text-emerald-700">
-                                      Buy {formatUsd(s.rebalanceUsd)} ≈ {s.rebalanceShares.toFixed(1)} sh
+                                      {tr("Buy {v}", { v: formatUsd(s.rebalanceUsd) })} ≈ {s.rebalanceShares.toFixed(1)} {tr("sh")}
                                     </span>
                                   ) : (
                                     <span className="text-rose-700">
-                                      Trim {formatUsd(-s.rebalanceUsd)} ≈ {(-s.rebalanceShares).toFixed(1)} sh
+                                      {tr("Trim {v}", { v: formatUsd(-s.rebalanceUsd) })} ≈ {(-s.rebalanceShares).toFixed(1)} {tr("sh")}
                                     </span>
                                   )}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-[11px] text-[#8f8676]">Industry</p>
+                                <p className="text-[11px] text-[#8f8676]">{tr("Industry")}</p>
                                 <p className="text-[#1f1c17]">
-                                  {h.industry && h.industry !== "—" ? h.industry : "Unclassified"}
+                                  {h.industry && h.industry !== "—" ? h.industry : tr("Unclassified")}
                                 </p>
                               </div>
                               <div>
-                                <p className="text-[11px] text-[#8f8676]">Research</p>
+                                <p className="text-[11px] text-[#8f8676]">{tr("Research")}</p>
                                 <p className="flex gap-3">
                                   <a
                                     href={`https://finance.yahoo.com/quote/${encodeURIComponent(h.ticker)}`}
@@ -855,13 +860,13 @@ export default function InvestingTablePage() {
               <tfoot>
                 <tr className="border-t-2 border-black/15 bg-[#f6f3ea] text-sm font-semibold text-[#1f1c17]">
                   <td className="px-2 py-2.5" />
-                  <td className="px-2 py-2.5">Total</td>
+                  <td className="px-2 py-2.5">{tr("Total")}</td>
                   <td className="px-2 py-2.5 text-xs font-normal text-[#6f675b]">
-                    {holdings.length} positions · cost {formatUsd(totals.totalCost)}
+                    {tr("{n} positions · cost {v}", { n: holdings.length, v: formatUsd(totals.totalCost) })}
                   </td>
                   <td
                     className={`px-2 py-2.5 ${Math.abs(totals.totalTarget - 100) > 0.5 && totals.totalTarget > 0 ? "text-amber-700" : ""}`}
-                    title={Math.abs(totals.totalTarget - 100) > 0.5 ? "Targets should add up to 100%" : undefined}
+                    title={Math.abs(totals.totalTarget - 100) > 0.5 ? tr("Targets should add up to 100%") : undefined}
                   >
                     {formatPercent(totals.totalTarget)}
                   </td>

@@ -1,6 +1,7 @@
 "use client";
 
 import { formatVotes, newSeasons, statusMeta, tagColor, type CinemaStatus } from "@/features/cinema/types";
+import { useLocale, useT } from "@/lib/i18n";
 
 export function Tags({ items, max = 99, className = "" }: { items: string[]; max?: number; className?: string }) {
   if (!items.length) return <span className="text-[#b5ad9f]">—</span>;
@@ -22,11 +23,12 @@ export function Tags({ items, max = 99, className = "" }: { items: string[]; max
 }
 
 export function StatusPill({ status }: { status: CinemaStatus }) {
+  const tr = useT();
   const s = statusMeta(status);
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium ${s.pill}`}>
       <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-      {s.label}
+      {tr(s.label)}
     </span>
   );
 }
@@ -46,6 +48,8 @@ export function ScoreBadge({ score, size = "sm" }: { score: number | null; size?
 
 /** Global IMDb rating with vote count; links to the title on IMDb. */
 export function ImdbRating({ rating, votes, imdbId }: { rating: number | null; votes: number | null; imdbId: string }) {
+  const tr = useT();
+  const locale = useLocale();
   if (rating == null) return <span className="text-[#b5ad9f]">—</span>;
   const body = (
     <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
@@ -55,7 +59,7 @@ export function ImdbRating({ rating, votes, imdbId }: { rating: number | null; v
     </span>
   );
   return imdbId ? (
-    <a href={`https://www.imdb.com/title/${imdbId}/`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="hover:opacity-80" title={`${rating} from ${votes?.toLocaleString("en-US") ?? "?"} votes — open on IMDb`}>
+    <a href={`https://www.imdb.com/title/${imdbId}/`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="hover:opacity-80" title={tr("{rating} from {votes} votes — open on IMDb", { rating, votes: votes?.toLocaleString(locale) ?? "?" })}>
       {body}
     </a>
   ) : (
@@ -65,13 +69,14 @@ export function ImdbRating({ rating, votes, imdbId }: { rating: number | null; v
 
 /** Seasons watched out of those released, e.g. "4 / 5", with a "+1 new" note when you're behind. */
 export function SeasonsWatched({ watched, total }: { watched: number | null; total: number | null }) {
+  const tr = useT();
   if (watched == null) return <span className="text-[#b5ad9f]">{total ? `— / ${total}` : "—"}</span>;
   const behind = newSeasons({ seasons: total, watched_seasons: watched });
   return (
-    <span className="whitespace-nowrap tabular-nums" title={total ? `Watched seasons 1–${watched} of ${total}` : `Watched seasons 1–${watched}`}>
+    <span className="whitespace-nowrap tabular-nums" title={total ? tr("Watched seasons 1–{watched} of {total}", { watched, total }) : tr("Watched seasons 1–{watched}", { watched })}>
       <span className="font-semibold text-[#1f1c17]">{watched}</span>
       {total ? <span className="text-[#8f8676]"> / {total}</span> : null}
-      {behind ? <span className="ml-1.5 rounded bg-sky-50 px-1 text-[10px] font-medium text-sky-800">+{behind} new</span> : null}
+      {behind ? <span className="ml-1.5 rounded bg-sky-50 px-1 text-[10px] font-medium text-sky-800">{tr("+{n} new", { n: behind })}</span> : null}
     </span>
   );
 }
@@ -92,6 +97,7 @@ export function Poster({ src, title, className = "" }: { src: string; title: str
 }
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+  const tr = useT();
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-10"
@@ -108,7 +114,7 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
       <div className={`w-full ${wide ? "max-w-3xl" : "max-w-xl"} rounded-2xl border border-black/5 bg-white p-5 shadow-[0_20px_60px_rgba(18,16,13,0.18)]`}>
         <div className="mb-4 flex items-start justify-between gap-3">
           <h2 className="text-lg font-semibold text-[#1f1c17]">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-full px-2 text-lg leading-none text-[#8f8676] hover:text-[#1f1c17]">
+          <button type="button" onClick={onClose} aria-label={tr("Close")} className="rounded-full px-2 text-lg leading-none text-[#8f8676] hover:text-[#1f1c17]">
             ×
           </button>
         </div>

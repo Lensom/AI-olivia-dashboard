@@ -12,7 +12,7 @@ from app.auth.security import create_token, hash_password, verify_password, veri
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")  # routes are mounted under /api in main.py
 
 
 def get_conn() -> Connection:

@@ -9,6 +9,7 @@ import app.cinema.router as cinema_router_module
 import app.library.router as library_router_module
 from app.categories.router import router as categories_router
 from app.investing.router import router as investing_router
+from app.tasks.router import router as tasks_router
 from app.db import create_pool, init_db
 
 
@@ -35,6 +36,10 @@ class Settings(BaseSettings):
 settings = Settings()
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
+
+# Every route lives under /api: on Vercel the frontend and the API share one domain, and the
+# "/api/(.*)" rewrite passes the full path through, so local dev uses the same prefix.
+API_PREFIX = "/api"
 
 if not settings.database_url:
     raise RuntimeError("DATABASE_URL is required (Neon Postgres connection string).")
@@ -67,15 +72,16 @@ def get_settings():
 
 app.dependency_overrides[auth_router_module.get_conn] = get_conn
 app.dependency_overrides[auth_router_module.get_settings] = get_settings
-app.include_router(auth_router_module.router)
-app.include_router(categories_router)
-app.include_router(investing_router)
+app.include_router(auth_router_module.router, prefix=API_PREFIX)
+app.include_router(categories_router, prefix=API_PREFIX)
+app.include_router(investing_router, prefix=API_PREFIX)
 app.dependency_overrides[cinema_router_module.get_tmdb_key] = lambda: settings.tmdb_api_key.strip()
-app.include_router(cinema_router_module.router)
+app.include_router(cinema_router_module.router, prefix=API_PREFIX)
 app.dependency_overrides[library_router_module.get_google_books_key] = lambda: settings.google_books_api_key.strip()
-app.include_router(library_router_module.router)
+app.include_router(library_router_module.router, prefix=API_PREFIX)
+app.include_router(tasks_router, prefix=API_PREFIX)
 
 
-@app.get("/health")
+@app.get(f"{API_PREFIX}/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": settings.app_name}

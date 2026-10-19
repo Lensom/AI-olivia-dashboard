@@ -1,10 +1,14 @@
+/** Ports the Next.js dev server runs on; there the API is a separate uvicorn process on :8000. */
+const LOCAL_DEV_PORTS = new Set(["3000", "3001"]);
+
 function getDefaultApiBase(): string {
-  // If frontend is opened via a LAN IP (or another device),
-  // 127.0.0.1 would point to the *client* machine. Use current hostname instead.
   if (typeof window !== "undefined") {
-    return `http://${window.location.hostname}:8000`;
+    // Local dev: same host as the page (works from a LAN IP or another device too), port 8000.
+    if (LOCAL_DEV_PORTS.has(window.location.port)) return `http://${window.location.hostname}:8000/api`;
+    // Deployed (Vercel): the API is served from the same domain under /api.
+    return "/api";
   }
-  return "http://127.0.0.1:8000";
+  return "http://127.0.0.1:8000/api";
 }
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? getDefaultApiBase();

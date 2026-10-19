@@ -9,6 +9,7 @@ import { feeBreakdown, xirrFromRefills } from "@/features/investing/funding-stat
 import { accountUsd, totalSums, type TotalAccount } from "@/features/investing/total-stats";
 import { investingPrimarySaveActive, investingToolbarBtn } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { DEFAULT_RULES, useBroker, type AttentionRules } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
@@ -40,6 +41,8 @@ const RULE_FIELDS: { key: keyof AttentionRules; label: string; suffix: string }[
 /** What needs your attention across Investing: broken rules, buy opportunities, and missing monthly steps. */
 export function AttentionStrip() {
   const { token } = useAuth();
+  const t = useT();
+  const locale = useLocale();
   const { holdings, pickingRows, refills, activitiesSummary, operatingExpensesUsd } = useInvesting();
   const { cash, cashUsd, dividends, rules, saveRules, isLoaded } = useBroker();
   const [total, setTotal] = useState<TotalDoc | null | undefined>(undefined); // undefined = loading
@@ -105,7 +108,7 @@ export function AttentionStrip() {
               }
             : null,
         monthRecorded: total.months.some((m) => m.month === month),
-        monthLabel: new Date(nowMs).toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+        monthLabel: new Date(nowMs).toLocaleDateString(locale, { month: "long", year: "numeric" }),
       };
     }
 
@@ -119,8 +122,8 @@ export function AttentionStrip() {
       feesPct: topped > 0 ? (fees / topped) * 100 : null,
       xirrPct: xirr == null ? null : xirr * 100,
       total: totalInput,
-    });
-  }, [holdings, refills, activitiesSummary, operatingExpensesUsd, cashUsd, cash, dividends, pickingRows, rules, total, rates, cryptoValue, nowMs]);
+    }, t);
+  }, [holdings, refills, activitiesSummary, operatingExpensesUsd, cashUsd, cash, dividends, pickingRows, rules, total, rates, cryptoValue, nowMs, t, locale]);
 
   const loading = !isLoaded || total === undefined || holdings.length === 0;
   const visible = showAll ? items : items.slice(0, 6);
@@ -144,11 +147,10 @@ export function AttentionStrip() {
     <section className="rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-[#1f1c17]">
-          Needs attention{" "}
+          {t("Needs attention")}{" "}
           {!loading ? (
             <span className="font-normal text-[#8f8676]">
-              · {counts.warn} rule{counts.warn === 1 ? "" : "s"} · {counts.opportunity} opportunit{counts.opportunity === 1 ? "y" : "ies"} ·{" "}
-              {counts.todo} to do
+              · {t("{n} rules", { n: counts.warn })} · {t("{n} opportunities", { n: counts.opportunity })} · {t("{n} to do", { n: counts.todo })}
             </span>
           ) : null}
         </h2>
@@ -160,7 +162,7 @@ export function AttentionStrip() {
           }}
           className="text-xs text-[#6f675b] underline decoration-black/15 underline-offset-2 hover:text-[#1f1c17]"
         >
-          {editing ? "Close thresholds" : "Thresholds"}
+          {editing ? t("Close thresholds") : t("Thresholds")}
         </button>
       </div>
 
@@ -169,7 +171,7 @@ export function AttentionStrip() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {RULE_FIELDS.map((f) => (
               <label key={f.key} className="text-[11px] text-[#6f675b]">
-                {f.label}
+                {t(f.label)}
                 <span className="mt-1 flex items-center gap-1">
                   <input
                     value={String(draft[f.key])}
@@ -184,19 +186,19 @@ export function AttentionStrip() {
           </div>
           <div className="mt-3 flex items-center gap-2">
             <button type="button" onClick={() => void onSaveRules()} disabled={saving} className={investingPrimarySaveActive}>
-              {saving ? "Saving…" : "Save thresholds"}
+              {saving ? t("Saving…") : t("Save thresholds")}
             </button>
             <button type="button" onClick={() => setDraft(DEFAULT_RULES)} className={investingToolbarBtn}>
-              Reset to defaults
+              {t("Reset to defaults")}
             </button>
           </div>
         </div>
       ) : null}
 
       {loading ? (
-        <p className="mt-3 text-sm text-[#8f8676]">Checking your rules…</p>
+        <p className="mt-3 text-sm text-[#8f8676]">{t("Checking your rules…")}</p>
       ) : items.length === 0 ? (
-        <p className="mt-3 text-sm text-emerald-800">✓ All clear — every rule is within its limit and this month is recorded.</p>
+        <p className="mt-3 text-sm text-emerald-800">✓ {t("All clear — every rule is within its limit and this month is recorded.")}</p>
       ) : (
         <ul className="mt-3 grid grid-cols-1 gap-2 lg:grid-cols-2">
           {visible.map((i) => {
@@ -208,7 +210,7 @@ export function AttentionStrip() {
                     {k.icon}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="sr-only">{k.label}: </span>
+                    <span className="sr-only">{t(k.label)}: </span>
                     <span className="font-medium">{i.title}</span>
                     {i.detail ? <span className="block text-xs opacity-80">{i.detail}</span> : null}
                   </span>
@@ -223,7 +225,7 @@ export function AttentionStrip() {
       )}
       {!loading && items.length > 6 ? (
         <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-2 text-xs text-[#6f675b] underline decoration-black/15 underline-offset-2">
-          {showAll ? "Show fewer" : `Show all ${items.length}`}
+          {showAll ? t("Show fewer") : t("Show all {n}", { n: items.length })}
         </button>
       ) : null}
     </section>

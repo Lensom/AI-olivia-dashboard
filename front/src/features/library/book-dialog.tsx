@@ -8,6 +8,7 @@ import { libraryKindMeta } from "@/features/library/nav";
 import { applyBookDetails, hasVolumes, READ_STATUSES, type LibraryDetails, type LibraryItem } from "@/features/library/types";
 import { investingPrimarySaveActive, investingToolbarBtn } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 
 const intOrNull = (s: string, max = 100000) => {
@@ -25,6 +26,8 @@ type Props = {
 
 export function BookDialog({ initial, isNew, onSave, onDelete, onClose }: Props) {
   const { token } = useAuth();
+  const tr = useT();
+  const locale = useLocale();
   const [t, setT] = useState(initial);
   // Lists and numbers are edited as text so they can be typed freely.
   const [text, setText] = useState({
@@ -115,8 +118,8 @@ export function BookDialog({ initial, isNew, onSave, onDelete, onClose }: Props)
   const meta = libraryKindMeta(t.kind);
   const facts = [
     t.publisher,
-    t.pages ? `${t.pages} pages` : "",
-    t.source_rating ? `Readers ★ ${t.source_rating.toFixed(1)}${t.source_votes ? ` (${t.source_votes.toLocaleString("en-US")})` : ""}` : "",
+    t.pages ? tr("{n} pages", { n: t.pages }) : "",
+    t.source_rating ? `${tr("Readers")} ★ ${t.source_rating.toFixed(1)}${t.source_votes ? ` (${t.source_votes.toLocaleString(locale)})` : ""}` : "",
     t.isbn ? `ISBN ${t.isbn}` : "",
   ].filter(Boolean);
   const sourceUrl =
@@ -127,12 +130,12 @@ export function BookDialog({ initial, isNew, onSave, onDelete, onClose }: Props)
         : "";
 
   return (
-    <Modal title={isNew ? `Add ${meta.singular}` : "Edit"} onClose={onClose} wide>
+    <Modal title={isNew ? tr(meta.add) : tr("Edit")} onClose={onClose} wide>
       <div className="flex flex-col gap-5 sm:flex-row">
         <div className="shrink-0 sm:w-36">
           <Poster src={t.cover} title={t.title} className="aspect-[2/3] w-28 text-lg sm:w-36" />
           <button type="button" onClick={() => void lookup(false)} disabled={busy !== null || !t.title.trim()} className={`mt-2 w-full ${investingToolbarBtn}`}>
-            {busy === "lookup" ? "Looking up…" : t.source_id ? "Refresh details" : "Find cover & details"}
+            {busy === "lookup" ? tr("Looking up…") : t.source_id ? tr("Refresh details") : tr("Find cover & details")}
           </button>
           {t.source_id ? (
             <button
@@ -141,31 +144,31 @@ export function BookDialog({ initial, isNew, onSave, onDelete, onClose }: Props)
               disabled={busy !== null}
               className="mt-1 block w-full text-center text-[11px] text-[#6f675b] underline decoration-black/15 underline-offset-2"
             >
-              Wrong book? Re-match
+              {tr("Wrong book? Re-match")}
             </button>
           ) : null}
           {sourceUrl ? (
             <a href={sourceUrl} target="_blank" rel="noreferrer" className="mt-1 block text-center text-[11px] text-[#6f675b] underline decoration-black/15 underline-offset-2">
-              Open on {t.source === "google" ? "Google Books" : "Open Library"} ↗
+              {tr("Open on {where} ↗", { where: t.source === "google" ? "Google Books" : "Open Library" })}
             </a>
           ) : null}
         </div>
 
         <div className="min-w-0 flex-1 space-y-3">
           <label className={fieldLabel}>
-            Title
+            {tr("Title")}
             <input value={t.title} onChange={(e) => set("title", e.target.value)} className={fieldInput} autoFocus={isNew && !t.title} />
           </label>
-          {t.original_title && t.original_title !== t.title ? <p className="-mt-1 text-xs text-[#8f8676]">Catalogue title: {t.original_title}</p> : null}
+          {t.original_title && t.original_title !== t.title ? <p className="-mt-1 text-xs text-[#8f8676]">{tr("Catalogue title: {v}", { v: t.original_title })}</p> : null}
           <label className={fieldLabel}>
-            Author <span className="font-normal text-[#a39a89]">comma-separated</span>
+            {tr("Author")} <span className="font-normal text-[#a39a89]">{tr("comma-separated")}</span>
             <input value={text.authors} onChange={(e) => setField("authors", e.target.value)} className={fieldInput} />
           </label>
           {facts.length ? <p className="text-xs text-[#6f675b]">{facts.join(" · ")}</p> : null}
           {t.description ? <p className="line-clamp-4 text-xs leading-relaxed text-[#655d51]">{t.description}</p> : null}
 
           <div>
-            <span className={fieldLabel}>Status</span>
+            <span className={fieldLabel}>{tr("Status")}</span>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {READ_STATUSES.map((s) => (
                 <button
@@ -178,95 +181,101 @@ export function BookDialog({ initial, isNew, onSave, onDelete, onClose }: Props)
                   }`}
                 >
                   <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                  {s.label}
+                  {tr(s.label)}
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <span className={fieldLabel}>Your score</span>
+            <span className={fieldLabel}>{tr("Your score")}</span>
             <div className="mt-1 flex items-center gap-0.5">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
                   key={n}
                   type="button"
                   onClick={() => set("score", t.score === n ? null : n)}
-                  aria-label={`${n} star${n > 1 ? "s" : ""}`}
+                  aria-label={tr("{n} stars", { n })}
                   aria-pressed={t.score === n}
                   className={`text-2xl leading-none transition hover:scale-110 ${t.score != null && n <= t.score ? "text-[#eda100]" : "text-[#e2dccf]"}`}
                 >
                   ★
                 </button>
               ))}
-              <span className="ml-2 text-xs text-[#6f675b]">{t.score != null ? `${t.score} / 5` : "not graded"}</span>
+              <span className="ml-2 text-xs text-[#6f675b]">{t.score != null ? `${t.score} / 5` : tr("not graded")}</span>
             </div>
           </div>
 
           <label className="flex items-center gap-2 text-sm text-[#2f2922]">
             <input type="checkbox" checked={t.recommended} onChange={(e) => set("recommended", e.target.checked)} className="h-4 w-4 accent-[#2a78d6]" />
-            I recommend it
+            {tr("I recommend it")}
           </label>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <label className={fieldLabel}>
-              Finished
+              {tr("Finished")}
               <input type="date" value={t.finish_date} onChange={(e) => set("finish_date", e.target.value)} className={fieldInput} />
             </label>
             <label className={fieldLabel}>
-              Published
+              {tr("Published")}
               <input value={text.year} onChange={(e) => setField("year", e.target.value)} inputMode="numeric" className={fieldInput} />
             </label>
             <label className={fieldLabel}>
-              Pages
+              {tr("Pages")}
               <input value={text.pages} onChange={(e) => setField("pages", e.target.value)} inputMode="numeric" className={fieldInput} />
             </label>
           </div>
           {hasVolumes(t.kind) ? (
             <div className="grid grid-cols-2 gap-3">
               <label className={fieldLabel}>
-                Volumes read <span className="font-normal text-[#a39a89]">up to volume</span>
+                {tr("Volumes read")} <span className="font-normal text-[#a39a89]">{tr("up to volume")}</span>
                 <input value={text.volumes_read} onChange={(e) => setField("volumes_read", e.target.value)} inputMode="numeric" className={fieldInput} />
               </label>
               <label className={fieldLabel}>
-                Volumes out
+                {tr("Volumes out")}
                 <input value={text.volumes_total} onChange={(e) => setField("volumes_total", e.target.value)} inputMode="numeric" className={fieldInput} />
               </label>
             </div>
           ) : null}
           <label className={fieldLabel}>
-            Genres <span className="font-normal text-[#a39a89]">comma-separated</span>
+            {tr("Genres")} <span className="font-normal text-[#a39a89]">{tr("comma-separated")}</span>
             <input value={text.genres} onChange={(e) => setField("genres", e.target.value)} className={fieldInput} />
           </label>
           <label className={fieldLabel}>
-            Notes
-            <textarea value={t.notes} onChange={(e) => set("notes", e.target.value)} rows={2} className={fieldInput} placeholder="Favourite quote, who to give it to…" />
+            {tr("Notes")}
+            <textarea
+              value={t.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              rows={2}
+              className={fieldInput}
+              placeholder={tr("Favourite quote, who to give it to…")}
+            />
           </label>
         </div>
       </div>
 
-      {error ? <p className="mt-3 text-xs text-rose-700">{error}</p> : null}
+      {error ? <p className="mt-3 text-xs text-rose-700">{tr(error)}</p> : null}
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => void save()} disabled={busy !== null} className={investingPrimarySaveActive}>
-          {busy === "save" ? "Saving…" : isNew ? "Add to library" : "Save"}
+          {busy === "save" ? tr("Saving…") : isNew ? tr("Add to library") : tr("Save")}
         </button>
         <button type="button" onClick={onClose} className={investingToolbarBtn}>
-          Cancel
+          {tr("Cancel")}
         </button>
         {onDelete ? (
           confirmDelete ? (
             <span className="ml-auto flex items-center gap-2 text-xs text-rose-800">
-              Delete “{t.title}”?
+              {tr("Delete “{title}”?", { title: t.title })}
               <button type="button" onClick={() => void remove()} disabled={busy !== null} className="rounded-full bg-rose-700 px-3 py-1 font-medium text-white hover:bg-rose-800">
-                {busy === "delete" ? "Deleting…" : "Delete"}
+                {busy === "delete" ? tr("Deleting…") : tr("Delete")}
               </button>
               <button type="button" onClick={() => setConfirmDelete(false)} className="underline">
-                Keep
+                {tr("Keep")}
               </button>
             </span>
           ) : (
             <button type="button" onClick={() => setConfirmDelete(true)} className="ml-auto text-xs text-rose-700 underline decoration-rose-200 underline-offset-2">
-              Delete
+              {tr("Delete")}
             </button>
           )
         ) : null}

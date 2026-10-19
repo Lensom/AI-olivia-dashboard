@@ -6,6 +6,7 @@ import { CINEMA_KINDS, cinemaKindMeta } from "@/features/cinema/nav";
 import type { CinemaTitle } from "@/features/cinema/types";
 import { Poster, ScoreBadge } from "@/features/cinema/ui";
 import { HBars, VBars } from "@/features/shared/bar-charts";
+import { useT } from "@/lib/i18n";
 import { useCinema } from "@/state/cinema-store";
 
 const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
@@ -22,7 +23,8 @@ function countBy(list: CinemaTitle[], keys: (t: CinemaTitle) => (string | number
 }
 
 function PosterRow({ list, empty }: { list: CinemaTitle[]; empty: string }) {
-  if (!list.length) return <p className="text-xs text-[#8f8676]">{empty}</p>;
+  const tr = useT();
+  if (!list.length) return <p className="text-xs text-[#8f8676]">{tr(empty)}</p>;
   return (
     <ul className="flex gap-3 overflow-x-auto pb-1">
       {list.map((t) => (
@@ -33,7 +35,7 @@ function PosterRow({ list, empty }: { list: CinemaTitle[]; empty: string }) {
               <span className="absolute left-1 top-1"><ScoreBadge score={t.score} /></span>
             </span>
             <span className="mt-1 block truncate text-xs font-medium text-[#1f1c17]">{t.title}</span>
-            <span className="block truncate text-[11px] text-[#8f8676]">{[cinemaKindMeta(t.kind).label, t.year].filter(Boolean).join(" · ")}</span>
+            <span className="block truncate text-[11px] text-[#8f8676]">{[tr(cinemaKindMeta(t.kind).label), t.year].filter(Boolean).join(" · ")}</span>
           </Link>
         </li>
       ))}
@@ -43,6 +45,7 @@ function PosterRow({ list, empty }: { list: CinemaTitle[]; empty: string }) {
 
 export default function CinematographyOverview() {
   const { items, isLoaded, loadError } = useCinema();
+  const tr = useT();
   const [thisYear] = useState(() => new Date().getFullYear());
 
   const s = useMemo(() => {
@@ -79,14 +82,18 @@ export default function CinematographyOverview() {
     };
   }, [items, thisYear]);
 
-  if (loadError) return <p className="rounded-xl bg-rose-50 px-4 py-2.5 text-sm text-rose-800">{loadError}</p>;
-  if (!isLoaded) return <p className="text-sm text-[#8f8676]">Loading…</p>;
+  if (loadError) return <p className="rounded-xl bg-rose-50 px-4 py-2.5 text-sm text-rose-800">{tr(loadError)}</p>;
+  if (!isLoaded) return <p className="text-sm text-[#8f8676]">{tr("Loading…")}</p>;
 
   const stats = [
-    { label: "Titles", value: String(items.length), sub: `${s.watched.length} watched · ${s.planned} planned` },
-    { label: "Average score", value: s.avg != null ? s.avg.toFixed(1) : "—", sub: s.vsImdb ? `IMDb ${s.vsImdb.imdb.toFixed(1)} on the same ${s.vsImdb.n} titles` : "your grades, out of 10" },
-    { label: "Recommended", value: String(s.recommended.length), sub: "ticked as worth watching" },
-    { label: `Watched in ${thisYear}`, value: String(s.thisYear), sub: s.hours ? `~${s.hours} h of films in total` : "by year watched" },
+    { label: tr("Titles"), value: String(items.length), sub: tr("{watched} watched · {planned} planned", { watched: s.watched.length, planned: s.planned }) },
+    {
+      label: tr("Average score"),
+      value: s.avg != null ? s.avg.toFixed(1) : "—",
+      sub: s.vsImdb ? tr("IMDb {v} on the same {n} titles", { v: s.vsImdb.imdb.toFixed(1), n: s.vsImdb.n }) : tr("your grades, out of 10"),
+    },
+    { label: tr("Recommended"), value: String(s.recommended.length), sub: tr("ticked as worth watching") },
+    { label: tr("Watched in {year}", { year: thisYear }), value: String(s.thisYear), sub: s.hours ? tr("~{n} h of films in total", { n: s.hours }) : tr("by year watched") },
   ];
 
   return (
@@ -109,17 +116,19 @@ export default function CinematographyOverview() {
           return (
             <Link key={k.kind} href={`/cinematography/${k.slug}`} className={`${card} group block transition hover:-translate-y-0.5 hover:bg-white`}>
               <div className="flex items-baseline justify-between gap-2">
-                <h2 className="text-base font-semibold text-[#1f1c17]">{k.label}</h2>
-                <span className="text-xs text-[#8f8676] group-hover:text-[#1f1c17]">Open →</span>
+                <h2 className="text-base font-semibold text-[#1f1c17]">{tr(k.label)}</h2>
+                <span className="text-xs text-[#8f8676] group-hover:text-[#1f1c17]">{tr("Open →")}</span>
               </div>
               <p className="mt-0.5 text-xs text-[#6f675b]">
-                {list.length ? `${list.length} titles${avg != null ? ` · avg ${avg.toFixed(1)}` : ""}` : k.description}
+                {list.length
+                  ? tr("{n} titles", { n: list.length }) + (avg != null ? ` · ${tr("avg {v}", { v: avg.toFixed(1) })}` : "")
+                  : tr(k.description)}
               </p>
               <div className="mt-3 flex h-[72px] gap-1.5">
                 {posters.length ? (
                   posters.map((t) => <Poster key={t.id} src={t.poster} title={t.title} className="h-[72px] w-12" />)
                 ) : (
-                  <span className="self-center text-xs text-[#a39a89]">{list.length ? "No posters yet" : "Nothing added yet"}</span>
+                  <span className="self-center text-xs text-[#a39a89]">{list.length ? tr("No posters yet") : tr("Nothing added yet")}</span>
                 )}
               </div>
             </Link>
@@ -129,40 +138,40 @@ export default function CinematographyOverview() {
 
       <section className={card}>
         <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold text-[#1f1c17]">Your recommendations</h2>
-          <span className="text-xs text-[#8f8676]">highest score first</span>
+          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Your recommendations")}</h2>
+          <span className="text-xs text-[#8f8676]">{tr("highest score first")}</span>
         </div>
         <PosterRow list={s.recommended.slice(0, 20)} empty="Tick the ✓ box on a title to recommend it." />
       </section>
 
       {s.watching.length ? (
         <section className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">Watching now</h2>
+          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Watching now")}</h2>
           <PosterRow list={s.watching} empty="" />
         </section>
       ) : null}
 
       <section className="grid grid-cols-1 gap-3 lg:grid-cols-2 [&>*]:min-w-0">
         <div className={card}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">Watched per year</h2>
-          <p className="mb-5 text-xs text-[#6f675b]">Titles by the year you watched them</p>
-          <VBars rows={s.yearRows} unit="titles" empty="Add “year you watched it” to see this." />
+          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Watched per year")}</h2>
+          <p className="mb-5 text-xs text-[#6f675b]">{tr("Titles by the year you watched them")}</p>
+          <VBars rows={s.yearRows} unit="{n} titles" empty="Add “year you watched it” to see this." />
         </div>
         <div className={card}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">How you score</h2>
-          <p className="mb-5 text-xs text-[#6f675b]">{s.scored} graded titles by score, 1–10</p>
-          <VBars rows={s.scored ? s.scoreRows : []} unit="titles" empty="Grade a title to see this." />
+          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("How you score")}</h2>
+          <p className="mb-5 text-xs text-[#6f675b]">{tr("{n} graded titles by score, 1–10", { n: s.scored })}</p>
+          <VBars rows={s.scored ? s.scoreRows : []} unit="{n} titles" empty="Grade a title to see this." />
         </div>
         <div className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">Top genres</h2>
-          {s.genreRows.length ? <HBars rows={s.genreRows} total={items.length} unit="titles" /> : <p className="text-xs text-[#8f8676]">No genres yet.</p>}
+          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Top genres")}</h2>
+          {s.genreRows.length ? <HBars rows={s.genreRows} total={items.length} unit="{n} titles" /> : <p className="text-xs text-[#8f8676]">{tr("No genres yet.")}</p>}
         </div>
         <div className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">Actors you watch most</h2>
+          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Actors you watch most")}</h2>
           {s.actorRows.length ? (
-            <HBars rows={s.actorRows} total={s.watched.length} unit="watched titles" />
+            <HBars rows={s.actorRows} total={s.watched.length} unit="{n} watched titles" />
           ) : (
-            <p className="text-xs text-[#8f8676]">Shows once an actor appears in two or more watched titles.</p>
+            <p className="text-xs text-[#8f8676]">{tr("Shows once an actor appears in two or more watched titles.")}</p>
           )}
         </div>
       </section>

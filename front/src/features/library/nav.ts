@@ -1,11 +1,20 @@
 import type { LibraryKind } from "@/features/library/types";
 
 /** Library pages: names and order shared by the sidebar, tabs and the backend defaults. */
-export const LIBRARY_KINDS: { kind: LibraryKind; slug: string; label: string; singular: string; description: string }[] = [
-  { kind: "book", slug: "books", label: "Books", singular: "book", description: "Fiction and non-fiction" },
-  { kind: "comic", slug: "comics", label: "Comics", singular: "comic", description: "Comics and graphic novels" },
-  { kind: "manga", slug: "manga", label: "Manga", singular: "manga", description: "Manga and manhwa" },
-  { kind: "magazine", slug: "magazines", label: "Magazines", singular: "magazine", description: "Magazines and issues" },
+export const LIBRARY_KINDS: {
+  kind: LibraryKind;
+  slug: string;
+  label: string;
+  singular: string;
+  description: string;
+  /** Interface text keys: "Add book", "{n} books" (translated with plurals). */
+  add: string;
+  count: string;
+}[] = [
+  { kind: "book", slug: "books", label: "Books", singular: "book", description: "Fiction and non-fiction", add: "Add book", count: "{n} books" },
+  { kind: "comic", slug: "comics", label: "Comics", singular: "comic", description: "Comics and graphic novels", add: "Add comic", count: "{n} comics" },
+  { kind: "manga", slug: "manga", label: "Manga", singular: "manga", description: "Manga and manhwa", add: "Add manga", count: "{n} manga" },
+  { kind: "magazine", slug: "magazines", label: "Magazines", singular: "magazine", description: "Magazines and issues", add: "Add magazine", count: "{n} magazines" },
 ];
 
 export const LIBRARY_EXTRA_PAGES = [{ slug: "tops", label: "Tops" }];

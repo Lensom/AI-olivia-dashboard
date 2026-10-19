@@ -1,6 +1,7 @@
 import { formatUsd, parsePercent, parseUsd } from "@/features/investing/format";
 import type { InvestingHolding } from "@/features/investing/types";
 import type { AttentionRules } from "@/state/broker-store";
+import type { T } from "@/lib/i18n";
 import type { InvestingPickingRow } from "@/state/investing-store";
 
 export type AttentionKind = "warn" | "opportunity" | "todo";
@@ -33,7 +34,7 @@ const num = (s: string | undefined) => {
 };
 
 /** Every check that's currently failing, most important first: rule breaks, then opportunities, then to-dos. */
-export function attentionItems(x: AttentionInput): AttentionItem[] {
+export function attentionItems(x: AttentionInput, t: T): AttentionItem[] {
   const out: AttentionItem[] = [];
   const r = x.rules;
   const holdingsValue = x.holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0);
@@ -42,8 +43,8 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
     out.push({
       id: "fees",
       kind: "warn",
-      title: `Fees are ${x.feesPct.toFixed(2)}% of deposits — your limit is ${r.max_fees_pct}%`,
-      detail: "Refill, buy and sell commissions together.",
+      title: t("Fees are {v}% of deposits — your limit is {max}%", { v: x.feesPct.toFixed(2), max: r.max_fees_pct }),
+      detail: t("Refill, buy and sell commissions together."),
       href: "/investing/finance",
     });
   }
@@ -52,7 +53,7 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
     out.push({
       id: "return",
       kind: "warn",
-      title: `Annualized return is ${x.xirrPct.toFixed(1)}% — below your ${r.min_annual_return_pct}% minimum`,
+      title: t("Annualized return is {v}% — below your {min}% minimum", { v: x.xirrPct.toFixed(1), min: r.min_annual_return_pct }),
       href: "/investing/finance",
     });
   }
@@ -66,7 +67,7 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
       out.push({
         id: "etf",
         kind: "warn",
-        title: `ETF share is ${etfPct.toFixed(1)}% — your range is ${r.etf_min_pct}–${r.etf_max_pct}%`,
+        title: t("ETF share is {v}% — your range is {min}–{max}%", { v: etfPct.toFixed(1), min: r.etf_min_pct, max: r.etf_max_pct }),
         href: "/investing/holdings",
       });
     }
@@ -77,7 +78,7 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
       out.push({
         id: "position",
         kind: "warn",
-        title: `${largest.ticker} is ${largestPct.toFixed(1)}% of the portfolio — above your ${r.max_position_pct}% cap`,
+        title: t("{ticker} is {v}% of the portfolio — above your {max}% cap", { ticker: largest.ticker, v: largestPct.toFixed(1), max: r.max_position_pct }),
         href: "/investing/dashboard",
       });
     }
@@ -89,8 +90,8 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
     out.push({
       id: "targets",
       kind: "warn",
-      title: `Targets add up to ${targetSum.toFixed(1)}%, not 100%`,
-      detail: "Rebalance suggestions are off until they do.",
+      title: t("Targets add up to {v}%, not 100%", { v: targetSum.toFixed(1) }),
+      detail: t("Rebalance suggestions are off until they do."),
       href: "/investing/holdings",
     });
   }
@@ -102,7 +103,7 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
     out.push({
       id: "drift",
       kind: "warn",
-      title: `${drifted.length} holding${drifted.length > 1 ? "s" : ""} off target by ≥ ${r.drift_pp} pp`,
+      title: t("{n} holdings off target by ≥ {pp} pp", { n: drifted.length, pp: r.drift_pp }),
       detail: drifted
         .slice(0, 4)
         .map((h) => `${h.t} ${h.d > 0 ? "+" : ""}${h.d.toFixed(1)}`)
@@ -119,7 +120,12 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
         out.push({
           id: `mix-${key}`,
           kind: "warn",
-          title: `${label} is ${now.toFixed(1)}% of your net worth — ${Math.abs(now - goal).toFixed(1)} pp ${now < goal ? "under" : "over"} its ${goal}% goal`,
+          title: t(now < goal ? "{group} is {v}% of your net worth — {pp} pp under its {goal}% goal" : "{group} is {v}% of your net worth — {pp} pp over its {goal}% goal", {
+            group: t(label),
+            v: now.toFixed(1),
+            pp: Math.abs(now - goal).toFixed(1),
+            goal,
+          }),
           href: "/investing/total",
         });
       }
@@ -131,8 +137,8 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
     out.push({
       id: "cash",
       kind: "opportunity",
-      title: `${formatUsd(x.cashUsd)} is sitting uninvested (${((x.cashUsd / accountValue) * 100).toFixed(1)}% of the account)`,
-      detail: `More than your ${r.max_cash_pct}% cash limit — time to buy?`,
+      title: t("{v} is sitting uninvested ({pct}% of the account)", { v: formatUsd(x.cashUsd), pct: ((x.cashUsd / accountValue) * 100).toFixed(1) }),
+      detail: t("More than your {max}% cash limit — time to buy?", { max: r.max_cash_pct }),
       href: "/investing/picking",
     });
   }
@@ -146,7 +152,7 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
       out.push({
         id: `zone-${p.id}`,
         kind: "opportunity",
-        title: `${p.ticker} is in your strong-buy zone`,
+        title: t("{ticker} is in your strong-buy zone", { ticker: p.ticker }),
         detail: `${formatUsd(px)} ≤ ${formatUsd(strong)}`,
         href: "/investing/picking",
       });
@@ -154,7 +160,7 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
       out.push({
         id: `zone-${p.id}`,
         kind: "opportunity",
-        title: `${p.ticker} is in your may-buy zone`,
+        title: t("{ticker} is in your may-buy zone", { ticker: p.ticker }),
         detail: `${formatUsd(px)} ≤ ${formatUsd(may)}`,
         href: "/investing/picking",
       });
@@ -162,21 +168,21 @@ export function attentionItems(x: AttentionInput): AttentionItem[] {
   }
 
   if (x.total == null) {
-    out.push({ id: "total-setup", kind: "todo", title: "Save your Total page to start tracking net worth", href: "/investing/total" });
+    out.push({ id: "total-setup", kind: "todo", title: t("Save your Total page to start tracking net worth"), href: "/investing/total" });
   } else if (!x.total.monthRecorded) {
-    out.push({ id: "total-month", kind: "todo", title: `Record ${x.total.monthLabel} on Total`, href: "/investing/total" });
+    out.push({ id: "total-month", kind: "todo", title: t("Record {month} on Total", { month: x.total.monthLabel }), href: "/investing/total" });
   }
   if (!x.hasCashEntry) {
     out.push({
       id: "cash-setup",
       kind: "todo",
-      title: "Enter your broker cash balance",
-      detail: "Until then, returns ignore uninvested cash.",
+      title: t("Enter your broker cash balance"),
+      detail: t("Until then, returns ignore uninvested cash."),
       href: "/investing/finance",
     });
   }
   if (!x.hasDividends) {
-    out.push({ id: "dividends-setup", kind: "todo", title: "Record dividends you've received", href: "/investing/finance" });
+    out.push({ id: "dividends-setup", kind: "todo", title: t("Record dividends you've received"), href: "/investing/finance" });
   }
 
   const order: Record<AttentionKind, number> = { warn: 0, opportunity: 1, todo: 2 };

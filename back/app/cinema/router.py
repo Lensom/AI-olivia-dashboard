@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 from threading import Lock
 import gzip
+import os
 from typing import Annotated, Literal
 import json
 import re
@@ -93,7 +94,9 @@ def _tmdb_get(key: str, path: str, params: dict[str, object]) -> dict:
 
 # Global IMDb ratings come from IMDb's free daily dataset (non-commercial use), cached on disk for a day.
 _IMDB_RATINGS_URL = "https://datasets.imdbws.com/title.ratings.tsv.gz"
-_IMDB_FILE = Path(__file__).resolve().parents[2] / ".cache" / "imdb_title_ratings.tsv.gz"
+# Serverless functions (Vercel) can only write to /tmp; locally the cache sits in back/.cache.
+_CACHE_DIR = Path(os.environ.get("OLIVIA_CACHE_DIR") or ("/tmp/olivia" if os.environ.get("VERCEL") else Path(__file__).resolve().parents[2] / ".cache"))
+_IMDB_FILE = _CACHE_DIR / "imdb_title_ratings.tsv.gz"
 _IMDB_TTL = 24 * 60 * 60
 _imdb_lock = Lock()
 _imdb_ratings: dict[str, tuple[float, int]] = {}  # only the ids asked for so far

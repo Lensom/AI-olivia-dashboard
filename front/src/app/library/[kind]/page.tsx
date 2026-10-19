@@ -25,6 +25,7 @@ import {
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useLibrary } from "@/state/library-store";
 
@@ -75,6 +76,8 @@ export default function LibraryKindPage() {
   const meta = libraryKindBySlug(params.kind);
   const { token } = useAuth();
   const { items, googleEnabled, isLoaded, loadError, update } = useLibrary();
+  const tr = useT();
+  const locale = useLocale();
 
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<LibraryStatus | "all">("all");
@@ -121,7 +124,7 @@ export default function LibraryKindPage() {
   if (!meta) {
     return (
       <p className="text-sm text-[#655d51]">
-        Unknown page. <Link href="/library" className="underline">Back to Library</Link>
+        {tr("Unknown page.")} <Link href="/library" className="underline">{tr("Back to Library")}</Link>
       </p>
     );
   }
@@ -139,7 +142,7 @@ export default function LibraryKindPage() {
     try {
       await update((list) => list.map((x) => (x.id === t.id ? { ...x, recommended: !x.recommended } : x)));
     } catch (e) {
-      setNotice({ tone: "error", text: errorText(e, "Could not save.") });
+      setNotice({ tone: "error", text: tr(errorText(e, "Could not save.")) });
     }
   }
 
@@ -158,7 +161,7 @@ export default function LibraryKindPage() {
       }
       setPreview({ fresh, duplicates, skipped: res.skipped, fileName: file.name });
     } catch (e) {
-      setNotice({ tone: "error", text: errorText(e, "Import failed.") });
+      setNotice({ tone: "error", text: tr(errorText(e, "Import failed.")) });
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -170,10 +173,10 @@ export default function LibraryKindPage() {
     try {
       await update((list) => [...preview.fresh, ...list]);
       const n = preview.fresh.length;
-      setNotice({ tone: "ok", text: `Added ${n} title${n === 1 ? "" : "s"}. Use “Fill covers & details” to add covers, pages and descriptions.` });
+      setNotice({ tone: "ok", text: tr("Added {n} titles.", { n }) + " " + tr("Use “Fill covers & details” to add covers, pages and descriptions.") });
       setPreview(null);
     } catch (e) {
-      setNotice({ tone: "error", text: errorText(e, "Could not save the import.") });
+      setNotice({ tone: "error", text: tr(errorText(e, "Could not save the import.")) });
     }
   }
 
@@ -192,7 +195,7 @@ export default function LibraryKindPage() {
         });
         res.forEach((d, j) => d && found.set(chunk[j].id, d));
       } catch (e) {
-        setNotice({ tone: "error", text: errorText(e, "Lookup failed.") });
+        setNotice({ tone: "error", text: tr(errorText(e, "Lookup failed.")) });
         failed = true;
         break;
       }
@@ -204,13 +207,15 @@ export default function LibraryKindPage() {
         const missed = targets.length - found.size;
         setNotice({
           tone: "ok",
-          text: `Filled ${found.size} title${found.size === 1 ? "" : "s"}.${
-            missed ? ` ${missed} had no match — catalogues rarely list Ukrainian editions: open them and use “Find cover & details” with the English title.` : ""
-          }`,
+          text:
+            tr("Filled {n} titles.", { n: found.size }) +
+            (missed
+              ? " " + tr("{n} had no match — catalogues rarely list Ukrainian editions: open them and use “Find cover & details” with the English title.", { n: missed })
+              : ""),
         });
       }
     } catch (e) {
-      setNotice({ tone: "error", text: errorText(e, "Could not save.") });
+      setNotice({ tone: "error", text: tr(errorText(e, "Could not save.")) });
     }
     setFill((f) => ({ ...f, running: false, open: false }));
   }
@@ -225,14 +230,14 @@ export default function LibraryKindPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className={investingMetaBadge}>
-            {mine.length} {mine.length === 1 ? meta.singular : meta.label.toLowerCase()}
+            {tr(meta.count, { n: mine.length })}
           </span>
-          {avg != null ? <span className={investingMetaBadge}>Average ★ {avg.toFixed(1)}</span> : null}
-          <span className={investingMetaBadge}>{mine.filter((t) => t.recommended).length} recommended</span>
+          {avg != null ? <span className={investingMetaBadge}>{tr("Average ★ {v}", { v: avg.toFixed(1) })}</span> : null}
+          <span className={investingMetaBadge}>{tr("{n} recommended", { n: mine.filter((t) => t.recommended).length })}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => fileRef.current?.click()} disabled={importing} className={investingToolbarBtn}>
-            {importing ? "Reading…" : "Import CSV / XLSX"}
+            {importing ? tr("Reading…") : tr("Import CSV / XLSX")}
           </button>
           <input
             ref={fileRef}
@@ -246,20 +251,21 @@ export default function LibraryKindPage() {
           />
           {mine.length ? (
             <button type="button" onClick={() => setFill((f) => ({ ...f, open: !f.open }))} className={investingToolbarBtn}>
-              Fill covers &amp; details{unmatched ? ` (${unmatched})` : ""}
+              {tr("Fill covers & details")}
+              {unmatched ? ` (${unmatched})` : ""}
             </button>
           ) : null}
           <button type="button" onClick={() => setDialog({ mode: "add" })} className={investingPrimarySaveActive}>
-            + Add {meta.singular}
+            + {tr(meta.add)}
           </button>
         </div>
       </div>
 
-      {loadError ? <p className="rounded-xl bg-rose-50 px-4 py-2.5 text-sm text-rose-800">{loadError}</p> : null}
+      {loadError ? <p className="rounded-xl bg-rose-50 px-4 py-2.5 text-sm text-rose-800">{tr(loadError)}</p> : null}
       {notice ? (
         <p className={`flex items-start justify-between gap-3 rounded-xl px-4 py-2.5 text-sm ${notice.tone === "ok" ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-800"}`}>
           <span>{notice.text}</span>
-          <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="opacity-60 hover:opacity-100">
+          <button type="button" onClick={() => setNotice(null)} aria-label={tr("Dismiss")} className="opacity-60 hover:opacity-100">
             ×
           </button>
         </p>
@@ -268,12 +274,15 @@ export default function LibraryKindPage() {
       {preview ? (
         <div className="rounded-2xl border border-black/5 bg-[#faf8f2] p-4">
           <p className="text-sm font-medium text-[#1f1c17]">
-            {preview.fileName}: {preview.fresh.length} new {preview.fresh.length === 1 ? "title" : "titles"}
+            {preview.fileName}: {tr("{n} new titles", { n: preview.fresh.length })}
           </p>
           <p className="mt-0.5 text-xs text-[#6f675b]">
-            {[preview.duplicates ? `${preview.duplicates} already in your library (skipped)` : "", preview.skipped ? `${preview.skipped} rows without a title` : ""]
+            {[
+              preview.duplicates ? tr("{n} already in your library (skipped)", { n: preview.duplicates }) : "",
+              preview.skipped ? tr("{n} rows without a title", { n: preview.skipped }) : "",
+            ]
               .filter(Boolean)
-              .join(" · ") || "Nothing to skip."}
+              .join(" · ") || tr("Nothing to skip.")}
           </p>
           {preview.fresh.length ? (
             <p className="mt-2 line-clamp-2 text-xs text-[#8f8676]">
@@ -283,10 +292,10 @@ export default function LibraryKindPage() {
           ) : null}
           <div className="mt-3 flex gap-2">
             <button type="button" onClick={() => void confirmImport()} disabled={!preview.fresh.length} className={investingPrimarySaveActive}>
-              Add {preview.fresh.length}
+              {tr("Add {n}", { n: preview.fresh.length })}
             </button>
             <button type="button" onClick={() => setPreview(null)} className={investingToolbarBtn}>
-              Cancel
+              {tr("Cancel")}
             </button>
           </div>
         </div>
@@ -294,10 +303,12 @@ export default function LibraryKindPage() {
 
       {fill.open ? (
         <div className="rounded-2xl border border-black/5 bg-[#faf8f2] p-4">
-          <p className="text-sm font-medium text-[#1f1c17]">Fill covers, pages, year and descriptions</p>
+          <p className="text-sm font-medium text-[#1f1c17]">{tr("Fill covers, pages, year and descriptions")}</p>
           <p className="mt-0.5 text-xs text-[#6f675b]">
-            Matched by title and author on {googleEnabled ? "Google Books and Open Library" : "Open Library"}. Your score, status, date, ✓ and notes are never changed.
-            {googleEnabled ? "" : " Ukrainian titles rarely match there; adding GOOGLE_BOOKS_API_KEY to back/.env helps a lot."}
+            {tr("Matched by title and author on {where}. Your score, status, date, ✓ and notes are never changed.", {
+              where: googleEnabled ? "Google Books + Open Library" : "Open Library",
+            })}
+            {googleEnabled ? "" : " " + tr("Ukrainian titles rarely match there; adding GOOGLE_BOOKS_API_KEY to back/.env helps a lot.")}
           </p>
           <label className="mt-2 flex items-center gap-2 text-xs text-[#3b352d]">
             <input
@@ -307,15 +318,17 @@ export default function LibraryKindPage() {
               disabled={fill.running}
               className="accent-[#2a78d6]"
             />
-            Also refresh titles already matched, and replace my authors and genres with the catalogue&apos;s
+            {tr("Also refresh titles already matched, and replace my authors and genres with the catalogue’s")}
           </label>
           <div className="mt-3 flex items-center gap-2">
             <button type="button" onClick={() => void runFill()} disabled={fill.running} className={investingPrimarySaveActive}>
-              {fill.running ? `Matching ${fill.done} / ${fill.total}…` : `Fill ${fill.replace ? mine.length : unmatched} titles`}
+              {fill.running
+                ? tr("Matching {done} / {total}…", { done: fill.done, total: fill.total })
+                : tr("Fill {n} titles", { n: fill.replace ? mine.length : unmatched })}
             </button>
             {!fill.running ? (
               <button type="button" onClick={() => setFill((f) => ({ ...f, open: false }))} className={investingToolbarBtn}>
-                Cancel
+                {tr("Cancel")}
               </button>
             ) : null}
           </div>
@@ -326,23 +339,23 @@ export default function LibraryKindPage() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search title, author, genre…"
+          placeholder={tr("Search title, author, genre…")}
           className="w-full rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-xs outline-none focus:border-black/25 sm:w-60"
         />
         <button type="button" onClick={() => setStatus("all")} className={chip(status === "all")}>
-          All {mine.length}
+          {tr("All")} {mine.length}
         </button>
         {READ_STATUSES.filter((s) => statusCounts[s.value]).map((s) => (
           <button key={s.value} type="button" onClick={() => setStatus(s.value)} className={chip(status === s.value)}>
-            {s.label} {statusCounts[s.value]}
+            {tr(s.label)} {statusCounts[s.value]}
           </button>
         ))}
         <button type="button" onClick={() => setOnlyRecommended((v) => !v)} className={chip(onlyRecommended)} aria-pressed={onlyRecommended}>
-          ✓ Recommended
+          ✓ {tr("Recommended")}
         </button>
         {genres.length ? (
-          <select value={genre} onChange={(e) => setGenre(e.target.value)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label="Genre">
-            <option value="">All genres</option>
+          <select value={genre} onChange={(e) => setGenre(e.target.value)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label={tr("Genre")}>
+            <option value="">{tr("All genres")}</option>
             {genres.map(([g, n]) => (
               <option key={g} value={g}>
                 {g} ({n})
@@ -351,20 +364,20 @@ export default function LibraryKindPage() {
           </select>
         ) : null}
         {years.length ? (
-          <select value={finishedYear} onChange={(e) => setFinishedYear(e.target.value)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label="Year finished">
-            <option value="">Any year</option>
+          <select value={finishedYear} onChange={(e) => setFinishedYear(e.target.value)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label={tr("Year finished")}>
+            <option value="">{tr("Any year")}</option>
             {years.map((y) => (
               <option key={y} value={y}>
-                Finished in {y}
+                {tr("Finished in {year}", { year: y })}
               </option>
             ))}
           </select>
         ) : null}
         <span className="ml-auto flex items-center gap-2">
-          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label="Sort by">
+          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label={tr("Sort by")}>
             {SORTS.map((s) => (
               <option key={s.value} value={s.value}>
-                Sort: {s.label}
+                {tr("Sort: {v}", { v: tr(s.label) })}
               </option>
             ))}
           </select>
@@ -377,7 +390,7 @@ export default function LibraryKindPage() {
                 aria-pressed={view === v}
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${view === v ? "bg-[#1f1c17] text-[#f8f4eb]" : "text-[#6f675b]"}`}
               >
-                {v === "table" ? "Table" : "Covers"}
+                {v === "table" ? tr("Table") : tr("Covers")}
               </button>
             ))}
           </span>
@@ -385,33 +398,34 @@ export default function LibraryKindPage() {
       </div>
 
       {!isLoaded ? (
-        <p className="text-sm text-[#8f8676]">Loading…</p>
+        <p className="text-sm text-[#8f8676]">{tr("Loading…")}</p>
       ) : !mine.length ? (
         <div className="rounded-2xl border border-dashed border-black/10 bg-white/70 px-6 py-10 text-center">
-          <p className="text-sm font-medium text-[#1f1c17]">No {meta.label.toLowerCase()} yet</p>
+          <p className="text-sm font-medium text-[#1f1c17]">{tr("Nothing here yet")}</p>
           <p className="mx-auto mt-1 max-w-md text-xs text-[#6f675b]">
-            Add one from the search, or import your Notion table: ••• → Export → Markdown &amp; CSV, then upload the .csv here. Title, Genre (Jenre), Status,
-            Score (⭐), Author, Finish date and the checkbox are recognised.
+            {tr("Add one from the search, or import your Notion table: ••• → Export → Markdown & CSV, then upload the .csv here. Title, Genre (Jenre), Status, Score (⭐), Author, Finish date and the checkbox are recognised.")}
           </p>
         </div>
       ) : !visible.length ? (
-        <p className="text-sm text-[#8f8676]">Nothing matches these filters.</p>
+        <p className="text-sm text-[#8f8676]">{tr("Nothing matches these filters.")}</p>
       ) : view === "table" ? (
         <div className={investingTableScrollWrap}>
           <table className="w-full min-w-[1000px] text-left text-sm">
             <thead className="bg-[#faf8f2] text-[11px] uppercase tracking-wide text-[#8f8676]">
               <tr>
-                <th className="w-10 px-3 py-2 font-medium" title="I recommend it">
-                  <span className="sr-only">Recommended</span>✓
+                <th className="w-10 px-3 py-2 font-medium" title={tr("I recommend it")}>
+                  <span className="sr-only">{tr("Recommended")}</span>✓
                 </th>
-                <th className="px-3 py-2 font-medium">Title</th>
-                <th className="px-3 py-2 font-medium">Genre</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Score</th>
-                <th className="px-3 py-2 font-medium">Author</th>
-                <th className="px-3 py-2 font-medium">Finished</th>
-                {volumes ? <th className="px-3 py-2 font-medium">Volumes</th> : <th className="px-3 py-2 font-medium">Pages</th>}
-                <th className="px-3 py-2 font-medium" title="Readers' average on the catalogue">Readers</th>
+                <th className="px-3 py-2 font-medium">{tr("Title")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Genre")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Status")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Score")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Author")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Finished")}</th>
+                <th className="px-3 py-2 font-medium">{volumes ? tr("Volumes") : tr("Pages")}</th>
+                <th className="px-3 py-2 font-medium" title={tr("Readers’ average on the catalogue")}>
+                  {tr("Readers")}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/5 bg-white">
@@ -422,7 +436,7 @@ export default function LibraryKindPage() {
                       type="checkbox"
                       checked={t.recommended}
                       onChange={() => void toggleRecommended(t)}
-                      aria-label={`Recommend ${t.title}`}
+                      aria-label={tr("Recommend {title}", { title: t.title })}
                       className="h-4 w-4 cursor-pointer accent-[#2a78d6]"
                     />
                   </td>
@@ -445,7 +459,7 @@ export default function LibraryKindPage() {
                     <Stars score={t.score} />
                   </td>
                   <td className="max-w-[180px] px-3 py-2.5 text-[#2f2922]">{t.authors.join(", ") || <span className="text-[#b5ad9f]">—</span>}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-[#3b352d]">{formatDate(t.finish_date) || "—"}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-[#3b352d]">{formatDate(t.finish_date, locale) || "—"}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 tabular-nums text-[#3b352d]">
                     {volumes
                       ? t.volumes_read != null
@@ -469,7 +483,7 @@ export default function LibraryKindPage() {
                 <span className="relative block">
                   <Poster src={t.cover} title={t.title} className="aspect-[2/3] w-full text-2xl shadow-sm transition group-hover:-translate-y-0.5 group-hover:shadow-md" />
                   {t.recommended ? (
-                    <span className="absolute right-1.5 top-1.5 rounded-md bg-[#2a78d6] px-1.5 py-0.5 text-[11px] font-semibold text-white">✓ Rec.</span>
+                    <span className="absolute right-1.5 top-1.5 rounded-md bg-[#2a78d6] px-1.5 py-0.5 text-[11px] font-semibold text-white">✓ {tr("Rec.")}</span>
                   ) : null}
                 </span>
                 <span className="mt-1.5 block truncate text-sm font-medium text-[#1f1c17]">{t.title}</span>

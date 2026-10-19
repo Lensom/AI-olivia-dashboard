@@ -7,6 +7,7 @@ import { libraryKindMeta } from "@/features/library/nav";
 import { applyBookDetails, blankItem, type LibraryDetails, type LibraryItem, type LibraryKind } from "@/features/library/types";
 import { investingToolbarBtn } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 
 const EXAMPLES: Record<LibraryKind, string> = {
@@ -27,6 +28,7 @@ type Props = {
 
 export function AddBookDialog({ kind, googleEnabled, existing, onPick, onOpenExisting, onClose }: Props) {
   const { token } = useAuth();
+  const tr = useT();
   const meta = libraryKindMeta(kind);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<LibraryDetails[]>([]);
@@ -76,12 +78,14 @@ export function AddBookDialog({ kind, googleEnabled, existing, onPick, onOpenExi
   const shown = q.trim().length >= 2 ? results : [];
 
   return (
-    <Modal title={`Add ${meta.singular}`} onClose={onClose}>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search by title or author — e.g. ${EXAMPLES[kind]}`} className={fieldInput} autoFocus />
+    <Modal title={tr(meta.add)} onClose={onClose}>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Search by title or author — e.g. {example}", { example: EXAMPLES[kind] })} className={fieldInput} autoFocus />
       <p className="mt-1.5 text-[11px] text-[#8f8676]">
-        {googleEnabled ? "Searching Google Books and Open Library." : "Searching Open Library — it rarely lists Ukrainian editions, so try the English title."}
+        {googleEnabled
+          ? tr("Searching Google Books and Open Library.")
+          : tr("Searching Open Library — it rarely lists Ukrainian editions, so try the English title.")}
       </p>
-      {error ? <p className="mt-2 text-xs text-rose-700">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-rose-700">{tr(error)}</p> : null}
 
       <ul className="mt-3 max-h-[55vh] space-y-1 overflow-y-auto">
         {shown.map((r) => {
@@ -101,24 +105,24 @@ export function AddBookDialog({ kind, googleEnabled, existing, onPick, onOpenExi
                   </span>
                   <span className="block text-xs text-[#6f675b]">{r.authors.join(", ")}</span>
                   <span className="mt-0.5 block text-[11px] text-[#8f8676]">
-                    {[r.pages ? `${r.pages} pages` : "", r.genres.slice(0, 2).join(", "), r.language.toUpperCase()].filter(Boolean).join(" · ")}
+                    {[r.pages ? tr("{n} pages", { n: r.pages }) : "", r.genres.slice(0, 2).join(", "), r.language.toUpperCase()].filter(Boolean).join(" · ")}
                   </span>
                 </span>
                 <span className="shrink-0 text-right text-[11px] text-[#8f8676]">
-                  {dup ? <span className="block font-medium text-emerald-700">✓ In your library</span> : null}
-                  {picking === r.source_id ? "Loading…" : r.source_rating ? `★ ${r.source_rating.toFixed(1)}` : null}
+                  {dup ? <span className="block font-medium text-emerald-700">✓ {tr("In your library")}</span> : null}
+                  {picking === r.source_id ? tr("Loading…") : r.source_rating ? `★ ${r.source_rating.toFixed(1)}` : null}
                 </span>
               </button>
             </li>
           );
         })}
-        {q.trim().length >= 2 && !searching && !shown.length && !error ? <li className="px-2 py-3 text-sm text-[#8f8676]">Nothing found. Try the English title or the author.</li> : null}
-        {searching && !shown.length ? <li className="px-2 py-3 text-sm text-[#8f8676]">Searching…</li> : null}
+        {q.trim().length >= 2 && !searching && !shown.length && !error ? <li className="px-2 py-3 text-sm text-[#8f8676]">{tr("Nothing found. Try the English title or the author.")}</li> : null}
+        {searching && !shown.length ? <li className="px-2 py-3 text-sm text-[#8f8676]">{tr("Searching…")}</li> : null}
       </ul>
 
       <div className="mt-3 border-t border-black/5 pt-3">
         <button type="button" onClick={() => onPick(blankItem(kind, q.trim()))} className={investingToolbarBtn}>
-          {q.trim() ? `Add “${q.trim()}” by hand` : "Add by hand"}
+          {q.trim() ? tr("Add “{title}” by hand", { title: q.trim() }) : tr("Add by hand")}
         </button>
       </div>
     </Modal>

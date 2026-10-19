@@ -12,6 +12,7 @@ import {
   investingTabPillIdle,
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
+import { useT } from "@/lib/i18n";
 import { useCategories } from "@/state/categories-store";
 
 function stockTabActive(pathname: string, href: string): boolean {
@@ -24,6 +25,7 @@ function stockTabActive(pathname: string, href: string): boolean {
 export default function InvestingLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { categories, subcategoriesByCategoryId } = useCategories();
+  const t = useT();
   // Same names and order as the sidebar. Crypto and Total are separate workspaces, not Stocks tabs.
   const stockTabs = useMemo(() => {
     const investing = categories.find((c) => c.slug === "investing");
@@ -44,24 +46,23 @@ export default function InvestingLayout({ children }: { children: React.ReactNod
       <div className={investingPageStack}>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">Investing</p>
-            <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">Stocks</h1>
+            <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">{t("Investing")}</p>
+            <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">{t("Stocks")}</h1>
             <p className="mt-1.5 max-w-2xl text-sm text-[#655d51]">
-              Equities: live quotes, target weights, trade history, refills, and research buckets — same tab pattern
-              as Crypto.
+              {t("Equities: live quotes, target weights, trade history, refills, and research buckets — same tab pattern as Crypto.")}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/investing/crypto" className={investingToolbarBtn}>
-              Crypto
+              {t("Crypto")}
             </Link>
             <Link href="/investing" className={investingToolbarBtn}>
-              Investing home
+              {t("Investing home")}
             </Link>
           </div>
         </div>
 
-        <nav className={investingTabNavWrap} aria-label="Stocks workspace">
+        <nav className={investingTabNavWrap} aria-label={t("Stocks workspace")}>
           {stockTabs.map((tab) => {
             const active = stockTabActive(pathname, tab.href);
             return (
@@ -70,7 +71,7 @@ export default function InvestingLayout({ children }: { children: React.ReactNod
                 href={tab.href}
                 className={active ? investingTabPillActive : investingTabPillIdle}
               >
-                {tab.label}
+                {t(tab.label)}
               </Link>
             );
           })}

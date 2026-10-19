@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useT } from "@/lib/i18n";
 
 type Slice = {
   label: string;
@@ -59,6 +60,7 @@ export function DonutChart({
   const cy = size / 2;
   const r = (size / 2) * 0.72;
   const totalPercent = total > 0 ? "100%" : "0%";
+  const tr = useT();
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
 
   function setHover(label: string | null) {
@@ -97,7 +99,7 @@ export function DonutChart({
           textAnchor="middle"
           className="fill-[#1f1c17] text-[11px] font-semibold"
         >
-          {hoveredLabel ?? "Total"}
+          {hoveredLabel ?? tr("Total")}
         </text>
         <text
           x={cx}
@@ -115,9 +117,7 @@ export function DonutChart({
       </svg>
 
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">
-          {title}
-        </p>
+        <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">{tr(title)}</p>
         <ul className="mt-2 space-y-1.5">
           {normalized.map((s) => (
             <li

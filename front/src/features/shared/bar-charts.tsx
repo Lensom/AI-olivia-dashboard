@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n";
 
 const BAR = "#2a78d6";
 
-/** Single-series horizontal bars with the value printed at the end; hover shows the exact share. */
+/**
+ * Single-series horizontal bars with the value printed at the end; hover shows the exact share.
+ * `unit` is an interface key with the count, e.g. "{n} titles".
+ */
 export function HBars({ rows, total, unit }: { rows: [string, number][]; total: number; unit: string }) {
+  const t = useT();
   const max = Math.max(1, ...rows.map((r) => r[1]));
   return (
     <ul className="space-y-1.5">
       {rows.map(([label, n]) => (
-        <li key={label} className="group grid grid-cols-[minmax(0,9rem)_1fr_2.5rem] items-center gap-2 text-xs" title={`${label}: ${n} ${unit} (${Math.round((n / total) * 100)}%)`}>
+        <li key={label} className="group grid grid-cols-[minmax(0,9rem)_1fr_2.5rem] items-center gap-2 text-xs" title={`${label}: ${t(unit, { n })} (${Math.round((n / total) * 100)}%)`}>
           <span className="truncate text-[#3b352d]">{label}</span>
           <span className="h-3 rounded-r bg-[#f3efe5]">
             <span className="block h-full rounded-r transition-opacity group-hover:opacity-80" style={{ width: `${(n / max) * 100}%`, background: BAR }} />
@@ -24,8 +29,9 @@ export function HBars({ rows, total, unit }: { rows: [string, number][]; total: 
 
 /** Single-series vertical bars (one per year or score), every bar hoverable, values labelled on hover and at the peak. */
 export function VBars({ rows, unit, empty }: { rows: [string, number][]; unit: string; empty: string }) {
+  const t = useT();
   const [hover, setHover] = useState<number | null>(null);
-  if (!rows.length) return <p className="text-xs text-[#8f8676]">{empty}</p>;
+  if (!rows.length) return <p className="text-xs text-[#8f8676]">{t(empty)}</p>;
   const max = Math.max(1, ...rows.map((r) => r[1]));
   const peak = rows.findIndex((r) => r[1] === max);
   return (
@@ -36,7 +42,7 @@ export function VBars({ rows, unit, empty }: { rows: [string, number][]; unit: s
             key={label}
             className="relative flex h-full flex-1 cursor-default flex-col justify-end"
             onMouseEnter={() => setHover(i)}
-            aria-label={`${label}: ${n} ${unit}`}
+            aria-label={`${label}: ${t(unit, { n })}`}
           >
             {hover === i || (hover == null && i === peak) ? (
               <span className="absolute inset-x-0 -top-0.5 z-10 -translate-y-full text-center text-[11px] font-medium tabular-nums text-[#1f1c17]">
@@ -57,7 +63,7 @@ export function VBars({ rows, unit, empty }: { rows: [string, number][]; unit: s
           </span>
         ))}
       </div>
-      <p className="mt-1 h-4 text-[11px] text-[#6f675b]">{hover != null ? `${rows[hover][0]}: ${rows[hover][1]} ${unit}` : ""}</p>
+      <p className="mt-1 h-4 text-[11px] text-[#6f675b]">{hover != null ? `${rows[hover][0]}: ${t(unit, { n: rows[hover][1] })}` : ""}</p>
     </div>
   );
 }

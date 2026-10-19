@@ -24,6 +24,7 @@ import {
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useCinema } from "@/state/cinema-store";
 
@@ -58,6 +59,7 @@ export default function CinemaKindPage() {
   const meta = cinemaKindBySlug(params.kind);
   const { token } = useAuth();
   const { items, tmdbEnabled, isLoaded, loadError, update } = useCinema();
+  const tr = useT();
 
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<CinemaStatus | "all">("all");
@@ -112,7 +114,7 @@ export default function CinemaKindPage() {
   if (!meta) {
     return (
       <p className="text-sm text-[#655d51]">
-        Unknown page. <Link href="/cinematography" className="underline">Back to Cinematography</Link>
+        {tr("Unknown page.")} <Link href="/cinematography" className="underline">{tr("Back to Cinematography")}</Link>
       </p>
     );
   }
@@ -128,7 +130,7 @@ export default function CinemaKindPage() {
     try {
       await update((list) => list.map((x) => (x.id === t.id ? { ...x, recommended: !x.recommended } : x)));
     } catch (e) {
-      setNotice({ tone: "error", text: errorText(e, "Could not save.") });
+      setNotice({ tone: "error", text: tr(errorText(e, "Could not save.")) });
     }
   }
 
@@ -151,7 +153,7 @@ export default function CinemaKindPage() {
       }
       setPreview({ fresh, duplicates, skipped: res.skipped, fileName: file.name });
     } catch (e) {
-      setNotice({ tone: "error", text: errorText(e, "Import failed.") });
+      setNotice({ tone: "error", text: tr(errorText(e, "Import failed.")) });
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -165,11 +167,11 @@ export default function CinemaKindPage() {
       const n = preview.fresh.length;
       setNotice({
         tone: "ok",
-        text: `Added ${n} title${n === 1 ? "" : "s"}.${tmdbEnabled ? " Use “Fill from TMDB” to add posters and details." : ""}`,
+        text: tr("Added {n} titles.", { n }) + (tmdbEnabled ? " " + tr("Use “Fill from TMDB” to add posters and details.") : ""),
       });
       setPreview(null);
     } catch (e) {
-      setNotice({ tone: "error", text: errorText(e, "Could not save the import.") });
+      setNotice({ tone: "error", text: tr(errorText(e, "Could not save the import.")) });
     }
   }
 
@@ -188,7 +190,7 @@ export default function CinemaKindPage() {
         });
         res.forEach((d, j) => d && found.set(chunk[j].id, d));
       } catch (e) {
-        setNotice({ tone: "error", text: errorText(e, "TMDB lookup failed.") });
+        setNotice({ tone: "error", text: tr(errorText(e, "TMDB lookup failed.")) });
         failed = true;
         break;
       }
@@ -202,11 +204,13 @@ export default function CinemaKindPage() {
         const missed = targets.length - found.size;
         setNotice({
           tone: "ok",
-          text: `Filled ${found.size} title${found.size === 1 ? "" : "s"} from TMDB.${missed ? ` ${missed} had no match — open them and fix the title or year.` : ""}`,
+          text:
+            tr("Filled {n} titles from TMDB.", { n: found.size }) +
+            (missed ? " " + tr("{n} had no match — open them and fix the title or year.", { n: missed }) : ""),
         });
       }
     } catch (e) {
-      setNotice({ tone: "error", text: errorText(e, "Could not save.") });
+      setNotice({ tone: "error", text: tr(errorText(e, "Could not save.")) });
     }
     setFill((f) => ({ ...f, running: false, open: false }));
   }
@@ -221,14 +225,14 @@ export default function CinemaKindPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className={investingMetaBadge}>
-            {mine.length} {mine.length === 1 ? meta.singular : meta.label.toLowerCase()}
+            {tr(meta.count, { n: mine.length })}
           </span>
-          {avg != null ? <span className={investingMetaBadge}>Average score {avg.toFixed(1)}</span> : null}
-          <span className={investingMetaBadge}>{mine.filter((t) => t.recommended).length} recommended</span>
+          {avg != null ? <span className={investingMetaBadge}>{tr("Average score {v}", { v: avg.toFixed(1) })}</span> : null}
+          <span className={investingMetaBadge}>{tr("{n} recommended", { n: mine.filter((t) => t.recommended).length })}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => fileRef.current?.click()} disabled={importing} className={investingToolbarBtn}>
-            {importing ? "Reading…" : "Import CSV / XLSX"}
+            {importing ? tr("Reading…") : tr("Import CSV / XLSX")}
           </button>
           <input
             ref={fileRef}
@@ -242,22 +246,22 @@ export default function CinemaKindPage() {
           />
           {tmdbEnabled && mine.length ? (
             <button type="button" onClick={() => setFill((f) => ({ ...f, open: !f.open }))} className={investingToolbarBtn}>
-              Fill from TMDB{missingTmdb ? ` (${missingTmdb})` : ""}
+              {tr("Fill from TMDB")}
+              {missingTmdb ? ` (${missingTmdb})` : ""}
             </button>
           ) : null}
           <button type="button" onClick={() => setDialog({ mode: "add" })} className={investingPrimarySaveActive}>
-            + Add {meta.singular}
+            + {tr(meta.add)}
           </button>
         </div>
       </div>
 
       {!tmdbEnabled && isLoaded && !loadError ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
-          Posters, search and auto-filled genres / actors / studios come from TMDB. Get a free key at themoviedb.org → Settings → API,
-          put <code className="font-mono">TMDB_API_KEY=…</code> in <code className="font-mono">back/.env</code> and restart the backend.
+          {tr("Posters, search and auto-filled genres / actors / studios come from TMDB. Get a free key at themoviedb.org → Settings → API, put TMDB_API_KEY=… in back/.env and restart the backend.")}
         </p>
       ) : null}
-      {loadError ? <p className="rounded-xl bg-rose-50 px-4 py-2.5 text-sm text-rose-800">{loadError}</p> : null}
+      {loadError ? <p className="rounded-xl bg-rose-50 px-4 py-2.5 text-sm text-rose-800">{tr(loadError)}</p> : null}
       {notice ? (
         <p
           className={`flex items-start justify-between gap-3 rounded-xl px-4 py-2.5 text-sm ${
@@ -265,7 +269,7 @@ export default function CinemaKindPage() {
           }`}
         >
           <span>{notice.text}</span>
-          <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="opacity-60 hover:opacity-100">
+          <button type="button" onClick={() => setNotice(null)} aria-label={tr("Dismiss")} className="opacity-60 hover:opacity-100">
             ×
           </button>
         </p>
@@ -274,25 +278,25 @@ export default function CinemaKindPage() {
       {preview ? (
         <div className="rounded-2xl border border-black/5 bg-[#faf8f2] p-4">
           <p className="text-sm font-medium text-[#1f1c17]">
-            {preview.fileName}: {preview.fresh.length} new {preview.fresh.length === 1 ? "title" : "titles"}
+            {preview.fileName}: {tr("{n} new titles", { n: preview.fresh.length })}
           </p>
           <p className="mt-0.5 text-xs text-[#6f675b]">
             {[
-              preview.duplicates ? `${preview.duplicates} already in your list (skipped)` : "",
-              preview.skipped ? `${preview.skipped} rows without a title` : "",
+              preview.duplicates ? tr("{n} already in your list (skipped)", { n: preview.duplicates }) : "",
+              preview.skipped ? tr("{n} rows without a title", { n: preview.skipped }) : "",
             ]
               .filter(Boolean)
-              .join(" · ") || "Nothing to skip."}
+              .join(" · ") || tr("Nothing to skip.")}
           </p>
           {preview.fresh.length ? (
             <p className="mt-2 line-clamp-2 text-xs text-[#8f8676]">{preview.fresh.slice(0, 12).map((t) => t.title).join(" · ")}{preview.fresh.length > 12 ? " …" : ""}</p>
           ) : null}
           <div className="mt-3 flex gap-2">
             <button type="button" onClick={() => void confirmImport()} disabled={!preview.fresh.length} className={investingPrimarySaveActive}>
-              Add {preview.fresh.length}
+              {tr("Add {n}", { n: preview.fresh.length })}
             </button>
             <button type="button" onClick={() => setPreview(null)} className={investingToolbarBtn}>
-              Cancel
+              {tr("Cancel")}
             </button>
           </div>
         </div>
@@ -300,9 +304,9 @@ export default function CinemaKindPage() {
 
       {fill.open ? (
         <div className="rounded-2xl border border-black/5 bg-[#faf8f2] p-4">
-          <p className="text-sm font-medium text-[#1f1c17]">Fill posters, genres, actors and studios from TMDB</p>
+          <p className="text-sm font-medium text-[#1f1c17]">{tr("Fill posters, genres, actors and studios from TMDB")}</p>
           <p className="mt-0.5 text-xs text-[#6f675b]">
-            Titles are matched by name and release year. Your score, status, recommendation and notes are never changed.
+            {tr("Titles are matched by name and release year. Your score, status, recommendation and notes are never changed.")}
           </p>
           <label className="mt-2 flex items-center gap-2 text-xs text-[#3b352d]">
             <input
@@ -312,15 +316,17 @@ export default function CinemaKindPage() {
               disabled={fill.running}
               className="accent-[#2a78d6]"
             />
-            Also refresh titles already matched, and replace my genres, actors and studios with TMDB&apos;s
+            {tr("Also refresh titles already matched, and replace my genres, actors and studios with TMDB’s")}
           </label>
           <div className="mt-3 flex items-center gap-2">
             <button type="button" onClick={() => void runFill()} disabled={fill.running} className={investingPrimarySaveActive}>
-              {fill.running ? `Matching ${fill.done} / ${fill.total}…` : `Fill ${fill.replace ? mine.length : missingTmdb} titles`}
+              {fill.running
+                ? tr("Matching {done} / {total}…", { done: fill.done, total: fill.total })
+                : tr("Fill {n} titles", { n: fill.replace ? mine.length : missingTmdb })}
             </button>
             {!fill.running ? (
               <button type="button" onClick={() => setFill((f) => ({ ...f, open: false }))} className={investingToolbarBtn}>
-                Cancel
+                {tr("Cancel")}
               </button>
             ) : null}
           </div>
@@ -331,28 +337,28 @@ export default function CinemaKindPage() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search title, actor, studio…"
+          placeholder={tr("Search title, actor, studio…")}
           className="w-full rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-xs outline-none focus:border-black/25 sm:w-60"
         />
         <button type="button" onClick={() => setStatus("all")} className={chip(status === "all")}>
-          All {mine.length}
+          {tr("All")} {mine.length}
         </button>
         {STATUSES.filter((s) => statusCounts[s.value]).map((s) => (
           <button key={s.value} type="button" onClick={() => setStatus(s.value)} className={chip(status === s.value)}>
-            {s.label} {statusCounts[s.value]}
+            {tr(s.label)} {statusCounts[s.value]}
           </button>
         ))}
         <button type="button" onClick={() => setOnlyRecommended((v) => !v)} className={chip(onlyRecommended)} aria-pressed={onlyRecommended}>
-          ✓ Recommended
+          ✓ {tr("Recommended")}
         </button>
         {behindCount ? (
           <button type="button" onClick={() => setOnlyNewSeasons((v) => !v)} className={chip(onlyNewSeasons)} aria-pressed={onlyNewSeasons}>
-            New seasons {behindCount}
+            {tr("New seasons")} {behindCount}
           </button>
         ) : null}
         {genres.length ? (
-          <select value={genre} onChange={(e) => setGenre(e.target.value)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]">
-            <option value="">All genres</option>
+          <select value={genre} onChange={(e) => setGenre(e.target.value)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label={tr("Genre")}>
+            <option value="">{tr("All genres")}</option>
             {genres.map(([g, n]) => (
               <option key={g} value={g}>
                 {g} ({n})
@@ -361,10 +367,10 @@ export default function CinemaKindPage() {
           </select>
         ) : null}
         <span className="ml-auto flex items-center gap-2">
-          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label="Sort by">
+          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label={tr("Sort by")}>
             {SORTS.map((s) => (
               <option key={s.value} value={s.value}>
-                Sort: {s.label}
+                {tr("Sort: {v}", { v: tr(s.label) })}
               </option>
             ))}
           </select>
@@ -377,7 +383,7 @@ export default function CinemaKindPage() {
                 aria-pressed={view === v}
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${view === v ? "bg-[#1f1c17] text-[#f8f4eb]" : "text-[#6f675b]"}`}
               >
-                {v === "table" ? "Table" : "Posters"}
+                {v === "table" ? tr("Table") : tr("Posters")}
               </button>
             ))}
           </span>
@@ -385,36 +391,38 @@ export default function CinemaKindPage() {
       </div>
 
       {!isLoaded ? (
-        <p className="text-sm text-[#8f8676]">Loading…</p>
+        <p className="text-sm text-[#8f8676]">{tr("Loading…")}</p>
       ) : !mine.length ? (
         <div className="rounded-2xl border border-dashed border-black/10 bg-white/70 px-6 py-10 text-center">
-          <p className="text-sm font-medium text-[#1f1c17]">No {meta.label.toLowerCase()} yet</p>
+          <p className="text-sm font-medium text-[#1f1c17]">{tr("Nothing here yet")}</p>
           <p className="mx-auto mt-1 max-w-md text-xs text-[#6f675b]">
-            Add one from the TMDB search, or import your Notion table: in Notion use ••• → Export → Markdown &amp; CSV, then
-            upload the .csv here. Columns like Title, Genre, Status, Score, Year, View Year, Studio / Distributor, Actors and the
-            checkbox are recognised (English or Ukrainian).
+            {tr("Add one from the TMDB search, or import your Notion table: in Notion use ••• → Export → Markdown & CSV, then upload the .csv here. Columns like Title, Genre, Status, Score, Year, View Year, Studio / Distributor, Actors and the checkbox are recognised (English or Ukrainian).")}
           </p>
         </div>
       ) : !visible.length ? (
-        <p className="text-sm text-[#8f8676]">Nothing matches these filters.</p>
+        <p className="text-sm text-[#8f8676]">{tr("Nothing matches these filters.")}</p>
       ) : view === "table" ? (
         <div className={investingTableScrollWrap}>
           <table className="w-full min-w-[1060px] text-left text-sm">
             <thead className="bg-[#faf8f2] text-[11px] uppercase tracking-wide text-[#8f8676]">
               <tr>
-                <th className="w-10 px-3 py-2 font-medium" title="I recommend it">
-                  <span className="sr-only">Recommended</span>✓
+                <th className="w-10 px-3 py-2 font-medium" title={tr("I recommend it")}>
+                  <span className="sr-only">{tr("Recommended")}</span>✓
                 </th>
-                <th className="px-3 py-2 font-medium">Title</th>
-                <th className="px-3 py-2 font-medium">Genre</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                {series ? <th className="px-3 py-2 font-medium" title="Watched up to season / seasons released">Seasons</th> : null}
-                <th className="px-3 py-2 font-medium">Score</th>
+                <th className="px-3 py-2 font-medium">{tr("Title")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Genre")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Status")}</th>
+                {series ? (
+                  <th className="px-3 py-2 font-medium" title={tr("Watched up to season / seasons released")}>
+                    {tr("Seasons")}
+                  </th>
+                ) : null}
+                <th className="px-3 py-2 font-medium">{tr("Score")}</th>
                 <th className="px-3 py-2 font-medium">IMDb</th>
-                <th className="px-3 py-2 font-medium">Year</th>
-                <th className="px-3 py-2 font-medium">Watched</th>
-                <th className="px-3 py-2 font-medium">Studio / distributor</th>
-                <th className="px-3 py-2 font-medium">Actors</th>
+                <th className="px-3 py-2 font-medium">{tr("Year")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Year watched")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Studio / distributor")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Actors")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/5 bg-white">
@@ -425,7 +433,7 @@ export default function CinemaKindPage() {
                       type="checkbox"
                       checked={t.recommended}
                       onChange={() => void toggleRecommended(t)}
-                      aria-label={`Recommend ${t.title}`}
+                      aria-label={tr("Recommend {title}", { title: t.title })}
                       className="h-4 w-4 cursor-pointer accent-[#2a78d6]"
                     />
                   </td>
@@ -464,13 +472,13 @@ export default function CinemaKindPage() {
                   <Poster src={t.poster} title={t.title} className="aspect-[2/3] w-full text-2xl shadow-sm transition group-hover:-translate-y-0.5 group-hover:shadow-md" />
                   <span className="absolute left-1.5 top-1.5"><ScoreBadge score={t.score} /></span>
                   {t.recommended ? (
-                    <span className="absolute right-1.5 top-1.5 rounded-md bg-[#2a78d6] px-1.5 py-0.5 text-[11px] font-semibold text-white">✓ Rec.</span>
+                    <span className="absolute right-1.5 top-1.5 rounded-md bg-[#2a78d6] px-1.5 py-0.5 text-[11px] font-semibold text-white">✓ {tr("Rec.")}</span>
                   ) : null}
                 </span>
                 <span className="mt-1.5 block truncate text-sm font-medium text-[#1f1c17]">{t.title}</span>
                 <span className="block truncate text-xs text-[#8f8676]">
                   {[t.year, series && t.watched_seasons ? `S${t.watched_seasons}${t.seasons ? `/${t.seasons}` : ""}` : "", t.genres.slice(0, 2).join(", ")].filter(Boolean).join(" · ")}
-                  {t.status !== "watched" ? ` · ${STATUSES.find((s) => s.value === t.status)?.label}` : ""}
+                  {t.status !== "watched" ? ` · ${tr(STATUSES.find((s) => s.value === t.status)?.label ?? "")}` : ""}
                 </span>
                 {t.imdb_rating != null ? (
                   <span className="mt-0.5 block text-xs">

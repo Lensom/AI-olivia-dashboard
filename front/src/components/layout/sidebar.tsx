@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { cinemaPageHref } from "@/features/cinema/nav";
 import { libraryPageHref } from "@/features/library/nav";
@@ -10,6 +11,8 @@ import { investingNavItems, isBuiltInInvestingPage } from "@/features/investing/
 import { useCategories, type Category, type Subcategory } from "@/state/categories-store";
 
 const OPEN_KEY = "olivia.sidebar.open.v1";
+/** Categories that are a single page (no subpages to toggle). */
+const SINGLE_PAGE = new Set(["tasks"]);
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -17,7 +20,7 @@ function isActive(pathname: string, href: string) {
 }
 
 function categoryHref(slug: string) {
-  return ["investing", "cinematography", "library"].includes(slug) ? `/${slug}` : `/c/${slug}`;
+  return ["investing", "cinematography", "library", "tasks"].includes(slug) ? `/${slug}` : `/c/${slug}`;
 }
 
 /** The category's own page first (so the title can toggle instead of navigate), then its pages. */
@@ -58,6 +61,7 @@ function readOpen(): Record<string, boolean> {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const t = useT();
   const { user } = useAuth();
   const { categories, isLoading, subcategoriesByCategoryId, refreshSubcategories } = useCategories();
   // Categories you opened or closed yourself; the rest are open only while you're inside them.
@@ -86,7 +90,7 @@ export function Sidebar() {
       <div className="sticky top-[60px]">
         <div className="rounded-2xl border border-black/5 bg-white/70 p-3 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
           <p className="px-2 pb-2 text-[10px] font-medium uppercase tracking-[0.18em] text-[#8f8676]">
-            Categories
+            {t("Categories")}
           </p>
           <nav className="space-y-1">
             <Link
@@ -98,13 +102,13 @@ export function Sidebar() {
                   : "text-[#6f675b] hover:bg-[#faf8f2] hover:text-[#1f1c17]",
               ].join(" ")}
             >
-              <span>Home</span>
+              <span>{t("Home")}</span>
             </Link>
 
             {!user ? (
-              <p className="px-2 pt-2 text-xs text-[#8f8676]">Login to see your categories</p>
+              <p className="px-2 pt-2 text-xs text-[#8f8676]">{t("Login to see your categories")}</p>
             ) : isLoading ? (
-              <p className="px-2 pt-2 text-xs text-[#8f8676]">Loading…</p>
+              <p className="px-2 pt-2 text-xs text-[#8f8676]">{t("Loading…")}</p>
             ) : (
               categories.map((cat) => {
                 const href = categoryHref(cat.slug);
@@ -112,6 +116,22 @@ export function Sidebar() {
                 const links = childLinks(cat, subcategoriesByCategoryId[cat.id] ?? []);
                 const open = openState[cat.slug] ?? inside;
                 const panelId = `sidebar-${cat.slug}`;
+
+                if (SINGLE_PAGE.has(cat.slug)) {
+                  // One page, nothing to show or hide: a plain link.
+                  return (
+                    <Link
+                      key={cat.id}
+                      href={href}
+                      className={[
+                        "flex items-center justify-between rounded-xl px-2.5 py-2 text-sm font-medium transition",
+                        inside ? "bg-[#f3efe5] text-[#1f1c17]" : "text-[#6f675b] hover:bg-[#faf8f2] hover:text-[#1f1c17]",
+                      ].join(" ")}
+                    >
+                      <span className="truncate">{t(cat.name)}</span>
+                    </Link>
+                  );
+                }
 
                 return (
                   <div key={cat.id} className="space-y-1">
@@ -126,7 +146,7 @@ export function Sidebar() {
                         inside && !open ? "bg-[#f3efe5]" : "",
                       ].join(" ")}
                     >
-                      <span className="truncate">{cat.name}</span>
+                      <span className="truncate">{t(cat.name)}</span>
                       <span aria-hidden className={`text-xs text-[#8f8676] transition-transform ${open ? "rotate-90" : ""}`}>
                         ›
                       </span>
@@ -147,7 +167,7 @@ export function Sidebar() {
                                   : "text-[#7f7668] hover:bg-[#faf8f2] hover:text-[#1f1c17]",
                               ].join(" ")}
                             >
-                              {sub.name}
+                              {t(sub.name)}
                             </Link>
                           );
                         })}

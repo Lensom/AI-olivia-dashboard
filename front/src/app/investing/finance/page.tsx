@@ -23,6 +23,7 @@ import {
 import { InvestingSubsectionHeader } from "@/features/investing/ui/investing-subsection-header";
 import { BrokerCashAndDividends } from "@/features/investing/broker-section";
 import { useBroker } from "@/state/broker-store";
+import { useLocale, useT } from "@/lib/i18n";
 import { useInvesting } from "@/state/investing-store";
 
 function inputBaseClasses() {
@@ -84,11 +85,12 @@ function StatCard({
   hint?: string;
   tone?: string;
 }) {
+  const t = useT();
   return (
     <article className="rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-      <p className="text-xs text-[#7f7668]">{label}</p>
+      <p className="text-xs text-[#7f7668]">{t(label)}</p>
       <p className={`mt-1.5 text-lg font-semibold tabular-nums ${tone ?? "text-[#1f1c17]"}`}>{value}</p>
-      {hint ? <p className="mt-1 text-[11px] text-[#8f8676]">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-[11px] text-[#8f8676]">{t(hint)}</p> : null}
     </article>
   );
 }
@@ -111,6 +113,8 @@ export default function InvestingFinancePage() {
     refreshRefills,
   } = useInvesting();
   const { cashUsd } = useBroker();
+  const tr = useT();
+  const locale = useLocale();
 
   const holdingsValue = useMemo(() => holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0), [holdings]);
   // Broker cash belongs to the account's value; dividends paid land in it, so they aren't added again.
@@ -186,21 +190,19 @@ export default function InvestingFinancePage() {
   return (
     <div className={investingPageStack}>
       <p className="text-sm text-[#655d51]">
-        Account refills (deposits), commissions, and performance vs. current portfolio value. Purchases and sales:{" "}
+        {tr("Account refills (deposits), commissions, and performance vs. current portfolio value. Purchases and sales:")}{" "}
         <Link
           href="/investing/activities"
           className="font-medium text-[#3b352d] underline decoration-black/15 underline-offset-2 hover:text-[#1f1c17]"
         >
-          Activities
+          {tr("Activities")}
         </Link>
         .
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
         <span className={investingMetaBadge}>
-          {refillsMeta.updatedAt
-            ? `Synced ${new Date(refillsMeta.updatedAt).toLocaleString()}`
-            : "Not synced"}
+          {refillsMeta.updatedAt ? tr("Synced {when}", { when: new Date(refillsMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
         </span>
         <button
           type="button"
@@ -208,10 +210,10 @@ export default function InvestingFinancePage() {
           disabled={isRefillsLoading}
           className={`${investingToolbarBtn} disabled:cursor-not-allowed disabled:opacity-50`}
         >
-          {isRefillsLoading ? "Loading…" : "Reload"}
+          {isRefillsLoading ? tr("Loading…") : tr("Reload")}
         </button>
         <button type="button" onClick={addRefill} className={investingToolbarBtn}>
-          Add refill
+          {tr("Add refill")}
         </button>
         <button
           type="button"
@@ -224,7 +226,7 @@ export default function InvestingFinancePage() {
               : investingPrimarySaveActive,
           ].join(" ")}
         >
-          {isRefillsSaving ? "Saving…" : "Save"}
+          {isRefillsSaving ? tr("Saving…") : tr("Save")}
         </button>
       </div>
 
@@ -234,14 +236,18 @@ export default function InvestingFinancePage() {
           value={formatUsd(operatingExpenses)}
           hint={
             fees.isOverride
-              ? `Manual override is active (calculated: ${formatUsd(fees.computed)}).`
-              : `Refills ${formatUsd(fees.refill)} · Buys ${formatUsd(fees.buy)} · Sells ${formatUsd(fees.sell)}`
+              ? tr("Manual override is active (calculated: {v}).", { v: formatUsd(fees.computed) })
+              : tr("Refills {r} · Buys {b} · Sells {s}", { r: formatUsd(fees.refill), b: formatUsd(fees.buy), s: formatUsd(fees.sell) })
           }
         />
         <StatCard
           label="Current value"
           value={formatUsd(currentValue)}
-          hint={cashUsd > 0 ? `Holdings ${formatUsd(holdingsValue)} + broker cash ${formatUsd(cashUsd)}` : "Live from holdings quotes (no broker cash entered)."}
+          hint={
+            cashUsd > 0
+              ? tr("Holdings {h} + broker cash {c}", { h: formatUsd(holdingsValue), c: formatUsd(cashUsd) })
+              : "Live from holdings quotes (no broker cash entered)."
+          }
         />
         <StatCard label="Total topped" value={formatUsd(totalInvested)} hint="Sum of Invest column." />
         <StatCard
@@ -276,43 +282,43 @@ export default function InvestingFinancePage() {
 
       <section className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl border border-black/5 bg-white/90 px-5 py-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
         <p className="w-full text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676] sm:w-auto">
-          {pace.year} pace
+          {tr("{year} pace", { year: pace.year })}
         </p>
         <div>
-          <p className="text-[11px] text-[#8f8676]">Topped YTD</p>
+          <p className="text-[11px] text-[#8f8676]">{tr("Topped YTD")}</p>
           <p className="text-base font-semibold tabular-nums text-[#1f1c17]">{formatUsd(pace.ytd)}</p>
           <p className="text-[11px] text-[#8f8676]">
-            {pace.count} refills
+            {tr("{n} refills", { n: pace.count })}
             {ytdVsLastPct == null ? null : (
               <>
                 {" · "}
-                <span className={toneClass(ytdVsLastPct)}>{signedPct(ytdVsLastPct, 0)}</span> vs same period{" "}
-                {pace.year - 1}
+                <span className={toneClass(ytdVsLastPct)}>{signedPct(ytdVsLastPct, 0)}</span>{" "}
+                {tr("vs same period {year}", { year: pace.year - 1 })}
               </>
             )}
           </p>
         </div>
         <div>
-          <p className="text-[11px] text-[#8f8676]">Avg per month</p>
+          <p className="text-[11px] text-[#8f8676]">{tr("Avg per month")}</p>
           <p className="text-base font-semibold tabular-nums text-[#1f1c17]">{formatUsd(pace.avgPerMonth)}</p>
-          <p className="text-[11px] text-[#8f8676]">This year so far</p>
+          <p className="text-[11px] text-[#8f8676]">{tr("This year so far")}</p>
         </div>
         <div>
-          <p className="text-[11px] text-[#8f8676]">Projected {pace.year}</p>
+          <p className="text-[11px] text-[#8f8676]">{tr("Projected {year}", { year: pace.year })}</p>
           <p className="text-base font-semibold tabular-nums text-[#1f1c17]">{formatUsd(pace.projected)}</p>
-          <p className="text-[11px] text-[#8f8676]">At the current pace</p>
+          <p className="text-[11px] text-[#8f8676]">{tr("At the current pace")}</p>
         </div>
         <div>
-          <p className="text-[11px] text-[#8f8676]">Last refill</p>
+          <p className="text-[11px] text-[#8f8676]">{tr("Last refill")}</p>
           <p className="text-base font-semibold tabular-nums text-[#1f1c17]">
             {daysSinceLastRefill == null
               ? "—"
               : daysSinceLastRefill === 0
-                ? "Today"
-                : `${daysSinceLastRefill} days ago`}
+                ? tr("Today")
+                : tr("{n} days ago", { n: daysSinceLastRefill })}
           </p>
           <p className="text-[11px] text-[#8f8676]">
-            {pace.lastRefillMs == null ? "" : new Date(pace.lastRefillMs).toLocaleDateString()}
+            {pace.lastRefillMs == null ? "" : new Date(pace.lastRefillMs).toLocaleDateString(locale)}
           </p>
         </div>
       </section>
@@ -328,25 +334,25 @@ export default function InvestingFinancePage() {
         {isYearlyOpen ? (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
             <article className="rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-              <h3 className="text-sm font-semibold text-[#1f1c17]">Yearly summary</h3>
-              <p className="mt-1 text-xs text-[#655d51]">Invest amounts aggregated by calendar year.</p>
+              <h3 className="text-sm font-semibold text-[#1f1c17]">{tr("Yearly summary")}</h3>
+              <p className="mt-1 text-xs text-[#655d51]">{tr("Invest amounts aggregated by calendar year.")}</p>
               <div className={`${investingTableScrollWrap} mt-4`}>
                 <table className="w-full border-collapse text-left text-sm">
                   <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                     <tr>
-                      <th className="px-3 py-2 font-medium">Year</th>
-                      <th className="px-3 py-2 font-medium">Sum of invest</th>
-                      <th className="px-3 py-2 text-right font-medium">Refills</th>
-                      <th className="px-3 py-2 text-right font-medium">Commission</th>
-                      <th className="px-3 py-2 text-right font-medium">Cumulative</th>
-                      <th className="px-3 py-2 text-right font-medium">YoY</th>
+                      <th className="px-3 py-2 font-medium">{tr("Year")}</th>
+                      <th className="px-3 py-2 font-medium">{tr("Sum of invest")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Refills")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Commission")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Cumulative")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("YoY")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {yearlyTable.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-3 py-4 text-center text-xs text-[#8f8676]">
-                          No dated refills yet.
+                          {tr("No dated refills yet.")}
                         </td>
                       </tr>
                     ) : (
@@ -371,15 +377,14 @@ export default function InvestingFinancePage() {
                 </table>
               </div>
               <div className="mt-4 rounded-xl border border-black/5 bg-[#faf8f2] p-3">
-                <label className="block text-xs font-medium text-[#6f675b]">Operating expenses override, $</label>
+                <label className="block text-xs font-medium text-[#6f675b]">{tr("Operating expenses override, $")}</label>
                 <p className="mt-0.5 text-[11px] text-[#8f8676]">
-                  Leave empty to use all fees: refill commissions plus buy and sell commissions from Activities. Set a
-                  total only to match another source (e.g. a broker statement).
+                  {tr("Leave empty to use all fees: refill commissions plus buy and sell commissions from Activities. Set a total only to match another source (e.g. a broker statement).")}
                 </p>
                 <input
                   value={operatingExpensesUsd}
                   onChange={(e) => setOperatingExpensesUsd(e.target.value)}
-                  placeholder={`Leave empty to use ${fees.computed.toFixed(2)} (refills + buys + sells)`}
+                  placeholder={tr("Leave empty to use {v} (refills + buys + sells)", { v: fees.computed.toFixed(2) })}
                   className={`${inputBaseClasses()} mt-2`}
                 />
               </div>
@@ -391,32 +396,28 @@ export default function InvestingFinancePage() {
               xAxisLabel="Year"
             />
             <article className="rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)] lg:col-span-2">
-              <h3 className="text-sm font-semibold text-[#1f1c17]">Deposits vs buys</h3>
+              <h3 className="text-sm font-semibold text-[#1f1c17]">{tr("Deposits vs buys")}</h3>
               <p className="mt-1 text-xs text-[#655d51]">
-                Where topped-up money went each year (buys and sales from{" "}
-                <Link href="/investing/activities" className="underline decoration-black/15 underline-offset-2">
-                  Activities
-                </Link>
-                , in USD). Unspent = running topped − bought + sold − trade fees: cash not yet in positions.
+                {tr("Where topped-up money went each year (buys and sales from Activities, in USD). Unspent = running topped − bought + sold − trade fees: cash not yet in positions.")}
               </p>
               <div className={`${investingTableScrollWrap} mt-4`}>
                 <table className="w-full min-w-[640px] border-collapse text-left text-sm tabular-nums">
                   <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                     <tr>
-                      <th className="px-3 py-2 font-medium">Year</th>
-                      <th className="px-3 py-2 text-right font-medium">Topped</th>
-                      <th className="px-3 py-2 text-right font-medium">Bought</th>
-                      <th className="px-3 py-2 text-right font-medium">Sold</th>
-                      <th className="px-3 py-2 text-right font-medium">Trade fees</th>
-                      <th className="px-3 py-2 text-right font-medium">Net cash</th>
-                      <th className="px-3 py-2 text-right font-medium">Unspent (est.)</th>
+                      <th className="px-3 py-2 font-medium">{tr("Year")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Topped")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Bought")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Sold")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Trade fees")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Net cash")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Unspent (est.)")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {flowRows.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-3 py-4 text-center text-xs text-[#8f8676]">
-                          No refills or activities yet.
+                          {tr("No refills or activities yet.")}
                         </td>
                       </tr>
                     ) : (
@@ -444,7 +445,7 @@ export default function InvestingFinancePage() {
               </div>
               {flowRows.length > 0 && flowRows[flowRows.length - 1]!.unspent < 0 ? (
                 <p className="mt-2 text-[11px] text-[#8f8676]">
-                  ⚠ Negative unspent means buys exceed recorded refills — a refill or sale may be missing.
+                  ⚠ {tr("Negative unspent means buys exceed recorded refills — a refill or sale may be missing.")}
                 </p>
               ) : null}
             </article>
@@ -462,9 +463,9 @@ export default function InvestingFinancePage() {
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-[#655d51]">
-                Date (DD.MM.YYYY or YYYY-MM-DD), invest amount, commission in USD.
+                {tr("Date (DD.MM.YYYY or YYYY-MM-DD), invest amount, commission in USD.")}
               </p>
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter refills by year">
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter refills by year")}>
                 {(["all", ...yearlyTable.map((y) => y.year).reverse()] as const).map((y) => (
                   <button
                     key={y}
@@ -477,7 +478,7 @@ export default function InvestingFinancePage() {
                         : "border border-black/10 bg-white text-[#3b352d] hover:bg-[#faf8f2]",
                     ].join(" ")}
                   >
-                    {y === "all" ? "All" : y}
+                    {y === "all" ? tr("All") : y}
                   </button>
                 ))}
               </div>
@@ -486,11 +487,11 @@ export default function InvestingFinancePage() {
               <table className="w-full min-w-[720px] border-collapse text-left text-sm">
                 <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                   <tr>
-                    <th className="px-2 py-2 font-medium">Date</th>
-                    <th className="px-2 py-2 font-medium">Invest</th>
-                    <th className="px-2 py-2 font-medium">Commission, $</th>
-                    <th className="px-2 py-2 text-right font-medium">Cumulative</th>
-                    <th className="px-2 py-2 font-medium">Actions</th>
+                    <th className="px-2 py-2 font-medium">{tr("Date")}</th>
+                    <th className="px-2 py-2 font-medium">{tr("Invest")}</th>
+                    <th className="px-2 py-2 font-medium">{tr("Commission, $")}</th>
+                    <th className="px-2 py-2 text-right font-medium">{tr("Cumulative")}</th>
+                    <th className="px-2 py-2 font-medium">{tr("Actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -527,14 +528,14 @@ export default function InvestingFinancePage() {
                           onClick={() => deleteRefill(row.id)}
                           className={investingToolbarBtn}
                         >
-                          Delete
+                          {tr("Delete")}
                         </button>
                       </td>
                     </tr>
                   ))}
                   <tr className="border-t-2 border-black/15 bg-[#f6f3ea] font-medium">
                     <td className="px-2 py-2 text-[#1f1c17]">
-                      {refillYearFilter === "all" ? "Total" : `Total ${refillYearFilter}`}
+                      {refillYearFilter === "all" ? tr("Total") : tr("Total {year}", { year: refillYearFilter })}
                     </td>
                     <td className="px-2 py-2 tabular-nums text-[#1f1c17]">{fmt2(filteredTotals.invest)}</td>
                     <td className="px-2 py-2 tabular-nums text-[#1f1c17]">{fmt2(filteredTotals.commission)}</td>

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { dividendsLast12mUsd } from "@/features/investing/broker-section";
+import { useLocale, useT } from "@/lib/i18n";
 import { useBroker } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
 import { formatInvestingAxisDate, formatUsd, parseInvestingDateMs, parsePercent, parseUsd } from "@/features/investing/format";
@@ -53,6 +54,8 @@ export default function InvestingDashboardPage() {
     isCapitalEntriesSaving,
   } = useInvesting();
   const { cashUsd, dividends } = useBroker();
+  const t = useT();
+  const locale = useLocale();
   const [nowMs] = useState(() => Date.now());
   const [isEditingEntries, setEditingEntries] = useState(false);
   const [metricsDraft, setMetricsDraft] = useState<null | { divYieldPercent: string; beta: string }>(null);
@@ -85,8 +88,8 @@ export default function InvestingDashboardPage() {
     // Color follows the ticker (alphabetical slot among those shown), not its rank.
     const slotOf = new Map([...top].map((p) => p.ticker).sort().map((t, i) => [t, i] as const));
     const slices = top.map((p) => ({ label: p.ticker, value: p.weight, color: CATEGORICAL[slotOf.get(p.ticker)!]! }));
-    return other > 0 ? [...slices, { label: "Other", value: other, color: OTHER_COLOR }] : slices;
-  }, [positions]);
+    return other > 0 ? [...slices, { label: t("Other"), value: other, color: OTHER_COLOR }] : slices;
+  }, [positions, t]);
 
   const capitalSeries = useMemo(
     () =>
@@ -113,9 +116,7 @@ export default function InvestingDashboardPage() {
   if (positions.length === 0) {
     return (
       <div className={`${dashCard} text-sm text-[#655d51]`}>
-        {isHoldingsLoading
-          ? "Loading portfolio…"
-          : "No holdings yet — add them or import an XLSX on the Portfolio tab."}
+        {isHoldingsLoading ? t("Loading portfolio…") : t("No holdings yet — add them or import an XLSX on the Portfolio tab.")}
       </div>
     );
   }
@@ -124,8 +125,8 @@ export default function InvestingDashboardPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6f675b]">
         <span>
-          {totals.hasQuotes ? "Live prices" : "Last saved prices"}
-          {holdingsMeta.updatedAt ? ` · portfolio saved ${new Date(holdingsMeta.updatedAt).toLocaleString()}` : ""}
+          {totals.hasQuotes ? t("Live prices") : t("Last saved prices")}
+          {holdingsMeta.updatedAt ? ` · ${t("portfolio saved {when}", { when: new Date(holdingsMeta.updatedAt).toLocaleString(locale) })}` : ""}
         </span>
         <button
           type="button"
@@ -133,7 +134,7 @@ export default function InvestingDashboardPage() {
           disabled={isMarketPricesLoading}
           className={isMarketPricesLoading ? investingPrimarySaveDisabled : investingToolbarBtn}
         >
-          {isMarketPricesLoading ? "Refreshing…" : "Refresh market"}
+          {isMarketPricesLoading ? t("Refreshing…") : t("Refresh market")}
         </button>
       </div>
 
@@ -146,10 +147,10 @@ export default function InvestingDashboardPage() {
           sub={
             totals.hasQuotes ? (
               <span className={toneClass(totals.dayUsd)}>
-                {signedUsd(totals.dayUsd)} ({signedPct(totals.dayPct)}) today
+                {t("{v} today", { v: `${signedUsd(totals.dayUsd)} (${signedPct(totals.dayPct)})` })}
               </span>
             ) : (
-              "Today's change appears after quotes load"
+              t("Today's change appears after quotes load")
             )
           }
         />
@@ -163,9 +164,10 @@ export default function InvestingDashboardPage() {
                 <span className={`font-semibold ${toneClass(accountValue - topped)}`}>
                   {signedPct(((accountValue - topped) / topped) * 100, 1)}
                 </span>{" "}
-                on {formatUsd(topped)} topped{cashUsd > 0 ? ` · incl. ${formatUsd(cashUsd)} cash` : ""}
+                {t("on {v} topped", { v: formatUsd(topped) })}
+                {cashUsd > 0 ? ` · ${t("incl. {v} cash", { v: formatUsd(cashUsd) })}` : ""}
                 <span className="mt-0.5 block text-[#8f8676]">
-                  Positions vs cost: {signedUsd(totals.pnl)} ({signedPct(totals.pnlPct, 1)})
+                  {t("Positions vs cost: {v}", { v: `${signedUsd(totals.pnl)} (${signedPct(totals.pnlPct, 1)})` })}
                 </span>
               </>
             }
@@ -178,8 +180,8 @@ export default function InvestingDashboardPage() {
             valueTone={toneClass(totals.pnl)}
             sub={
               <>
-                <span className={`font-semibold ${toneClass(totals.pnlPct)}`}>{signedPct(totals.pnlPct, 1)}</span> on{" "}
-                {formatUsd(totals.cost)} cost · add refills on Finance
+                <span className={`font-semibold ${toneClass(totals.pnlPct)}`}>{signedPct(totals.pnlPct, 1)}</span>{" "}
+                {t("on {v} cost · add refills on Finance", { v: formatUsd(totals.cost) })}
               </>
             }
           />
@@ -191,10 +193,10 @@ export default function InvestingDashboardPage() {
           sub={
             totals.hasQuotes ? (
               <>
-                ▲ {totals.up} up · ▼ {totals.down} down
+                ▲ {t("{n} up", { n: totals.up })} · ▼ {t("{n} down", { n: totals.down })}
               </>
             ) : (
-              "Waiting for quotes"
+              t("Waiting for quotes")
             )
           }
         />
@@ -202,7 +204,7 @@ export default function InvestingDashboardPage() {
           label="Realized P&L (sales)"
           value={signedUsd(realized.pnl)}
           valueTone={toneClass(realized.pnl)}
-          sub={`Fees paid ${formatUsd(realized.fees)}`}
+          sub={t("Fees paid {v}", { v: formatUsd(realized.fees) })}
         />
       </section>
 
@@ -211,7 +213,7 @@ export default function InvestingDashboardPage() {
         {metricsDraft ? (
           <>
             <label className="text-xs text-[#7f7668]">
-              Div yield
+              {t("Div yield")}
               <input
                 value={metricsDraft.divYieldPercent}
                 onChange={(e) => setMetricsDraft({ ...metricsDraft, divYieldPercent: e.target.value })}
@@ -220,7 +222,7 @@ export default function InvestingDashboardPage() {
               />
             </label>
             <label className="text-xs text-[#7f7668]">
-              Beta
+              {t("Beta")}
               <input
                 value={metricsDraft.beta}
                 onChange={(e) => setMetricsDraft({ ...metricsDraft, beta: e.target.value })}
@@ -230,10 +232,10 @@ export default function InvestingDashboardPage() {
             </label>
             <div className="ml-auto flex gap-2">
               <button type="button" onClick={() => void saveMetrics()} className={investingPrimarySaveActive}>
-                Save
+                {t("Save")}
               </button>
               <button type="button" onClick={() => setMetricsDraft(null)} className={investingToolbarBtn}>
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           </>
@@ -241,14 +243,14 @@ export default function InvestingDashboardPage() {
           <>
             {[
               ["Div yield", isMetricsLoading ? "…" : metrics.divYieldPercent],
-              ["Dividends, last 12 months", dividends.length ? formatUsd(dividends12m) : "Not recorded"],
+              ["Dividends, last 12 months", dividends.length ? formatUsd(dividends12m) : t("Not recorded")],
               ["Est. annual dividends", annualIncome == null ? "—" : formatUsd(annualIncome)],
               ["Est. monthly", annualIncome == null ? "—" : formatUsd(annualIncome / 12)],
               ["Beta", isMetricsLoading ? "…" : metrics.beta],
-              ["Positions", `${positions.length} · ${totals.inProfit} in profit · ${totals.inLoss} in loss`],
+              ["Positions", t("{n} · {up} in profit · {down} in loss", { n: positions.length, up: totals.inProfit, down: totals.inLoss })],
             ].map(([label, value]) => (
               <div key={label}>
-                <p className="text-[11px] text-[#8f8676]">{label}</p>
+                <p className="text-[11px] text-[#8f8676]">{t(label)}</p>
                 <p className="text-sm font-semibold tabular-nums text-[#1f1c17]">{value}</p>
               </div>
             ))}
@@ -257,7 +259,7 @@ export default function InvestingDashboardPage() {
               onClick={() => setMetricsDraft({ divYieldPercent: metrics.divYieldPercent, beta: metrics.beta })}
               className={`${investingToolbarBtn} ml-auto`}
             >
-              Edit
+              {t("Edit")}
             </button>
           </>
         )}
@@ -289,7 +291,7 @@ export default function InvestingDashboardPage() {
             <DonutChart title="By holding" slices={allocationSlices} size={180} />
           </div>
           <div className="mt-5 border-t border-black/5 pt-4">
-            <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">By industry</p>
+            <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">{t("By industry")}</p>
             <SectorBars positions={positions} />
           </div>
         </article>
@@ -327,18 +329,18 @@ export default function InvestingDashboardPage() {
                         : investingPrimarySaveActive
                     }
                   >
-                    {isCapitalEntriesSaving ? "Saving…" : "Save"}
+                    {isCapitalEntriesSaving ? t("Saving…") : t("Save")}
                   </button>
                   <button type="button" onClick={addCapitalEntry} className={investingToolbarBtn}>
-                    Add row
+                    {t("Add row")}
                   </button>
                   <button type="button" onClick={() => setEditingEntries(false)} className={investingToolbarBtn}>
-                    Done
+                    {t("Done")}
                   </button>
                 </div>
               ) : (
                 <button type="button" onClick={() => setEditingEntries(true)} className={investingToolbarBtn}>
-                  Edit table
+                  {t("Edit table")}
                 </button>
               )
             }
@@ -347,12 +349,12 @@ export default function InvestingDashboardPage() {
             <table className="w-full border-collapse text-left">
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
-                  <th className="px-3 py-2.5 font-medium">Date</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Invested sum</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Total value</th>
+                  <th className="px-3 py-2.5 font-medium">{t("Date")}</th>
+                  <th className="px-3 py-2.5 text-right font-medium">{t("Invested sum")}</th>
+                  <th className="px-3 py-2.5 text-right font-medium">{t("Total value")}</th>
                   <th className="px-3 py-2.5 text-right font-medium">%</th>
-                  <th className="px-3 py-2.5 text-right font-medium">1Y</th>
-                  {isEditingEntries ? <th className="px-3 py-2.5 text-right font-medium">Actions</th> : null}
+                  <th className="px-3 py-2.5 text-right font-medium">{t("1Y")}</th>
+                  {isEditingEntries ? <th className="px-3 py-2.5 text-right font-medium">{t("Actions")}</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -396,7 +398,7 @@ export default function InvestingDashboardPage() {
                     {isEditingEntries ? (
                       <td className="px-3 py-2.5 text-right">
                         <button type="button" onClick={() => deleteCapitalEntry(d.id)} className={investingToolbarBtn}>
-                          Delete
+                          {t("Delete")}
                         </button>
                       </td>
                     ) : null}

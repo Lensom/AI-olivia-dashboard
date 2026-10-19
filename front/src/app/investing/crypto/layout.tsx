@@ -10,6 +10,7 @@ import {
   investingTabPillIdle,
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
+import { useT } from "@/lib/i18n";
 import { CryptoProvider } from "@/state/crypto-store";
 
 const TABS = [
@@ -21,6 +22,7 @@ const TABS = [
 
 export default function CryptoLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const t = useT();
 
   return (
     <CryptoProvider>
@@ -28,19 +30,18 @@ export default function CryptoLayout({ children }: { children: React.ReactNode }
         <div className={investingPageStack}>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">Investing</p>
-              <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">Crypto</h1>
+              <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">{t("Investing")}</p>
+              <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">{t("Crypto")}</h1>
               <p className="mt-1.5 max-w-2xl text-sm text-[#655d51]">
-                Coins you hold, what they cost, UAH→USD funding and the BTC / ETH split for new deposits. Prices from
-                Yahoo Finance, with CoinGecko as a fallback.
+                {t("Coins you hold, what they cost, UAH→USD funding and the BTC / ETH split for new deposits. Prices from Yahoo Finance, with CoinGecko as a fallback.")}
               </p>
             </div>
             <Link href="/investing" className={investingToolbarBtn}>
-              Back to Investing
+              {t("Back to Investing")}
             </Link>
           </div>
 
-          <nav className={investingTabNavWrap} aria-label="Crypto workspace">
+          <nav className={investingTabNavWrap} aria-label={t("Crypto workspace")}>
             {TABS.map((tab) => {
               const active = "exact" in tab && tab.exact ? pathname === tab.href : pathname.startsWith(tab.href);
               return (
@@ -49,7 +50,7 @@ export default function CryptoLayout({ children }: { children: React.ReactNode }
                   href={tab.href}
                   className={active ? investingTabPillActive : investingTabPillIdle}
                 >
-                  {tab.label}
+                  {t(tab.label)}
                 </Link>
               );
             })}

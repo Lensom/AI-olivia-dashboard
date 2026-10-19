@@ -14,6 +14,7 @@ import {
 import { fieldInput, fieldLabel, Modal, Poster } from "@/features/cinema/ui";
 import { investingPrimarySaveActive, investingToolbarBtn } from "@/features/investing/ui/investing-classes";
 import { apiFetch, type ApiError } from "@/lib/api";
+import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 
 const yearOrNull = (s: string) => {
@@ -47,6 +48,8 @@ type Props = {
 
 export function TitleDialog({ initial, isNew, tmdbEnabled, onSave, onDelete, onClose }: Props) {
   const { token } = useAuth();
+  const tr = useT();
+  const locale = useLocale();
   const [t, setT] = useState(initial);
   // Lists are edited as comma-separated text so commas can be typed freely.
   const [lists, setLists] = useState({
@@ -132,21 +135,23 @@ export function TitleDialog({ initial, isNew, tmdbEnabled, onSave, onDelete, onC
 
   const meta = cinemaKindMeta(t.kind);
   const facts = [
-    t.directors.length ? `${t.tmdb_media === "tv" ? "Created by" : "Directed by"} ${t.directors.join(", ")}` : "",
-    t.runtime ? `${t.runtime} min${t.tmdb_media === "tv" ? " / episode" : ""}` : "",
-    t.seasons ? `${t.seasons} season${t.seasons > 1 ? "s" : ""}` : "",
-    t.imdb_rating ? `IMDb ${t.imdb_rating.toFixed(1)}${t.imdb_votes ? ` (${t.imdb_votes.toLocaleString("en-US")} votes)` : ""}` : "",
+    t.directors.length ? tr(t.tmdb_media === "tv" ? "Created by {who}" : "Directed by {who}", { who: t.directors.join(", ") }) : "",
+    t.runtime ? tr(t.tmdb_media === "tv" ? "{n} min / episode" : "{n} min", { n: t.runtime }) : "",
+    t.seasons ? tr("{n} seasons", { n: t.seasons }) : "",
+    t.imdb_rating
+      ? `IMDb ${t.imdb_rating.toFixed(1)}${t.imdb_votes ? ` (${tr("{n} votes", { n: t.imdb_votes }).replace(String(t.imdb_votes), t.imdb_votes.toLocaleString(locale))})` : ""}`
+      : "",
     t.tmdb_rating ? `TMDB ${t.tmdb_rating}` : "",
   ].filter(Boolean);
 
   return (
-    <Modal title={isNew ? `Add ${meta.singular}` : "Edit"} onClose={onClose} wide>
+    <Modal title={isNew ? tr(meta.add) : tr("Edit")} onClose={onClose} wide>
       <div className="flex flex-col gap-5 sm:flex-row">
         <div className="shrink-0 sm:w-36">
           <Poster src={t.poster} title={t.title} className="aspect-[2/3] w-28 text-lg sm:w-36" />
           {tmdbEnabled ? (
             <button type="button" onClick={() => void refreshFromTmdb()} disabled={busy !== null || !t.title.trim()} className={`mt-2 w-full ${investingToolbarBtn}`}>
-              {busy === "tmdb" ? "Looking up…" : t.tmdb_id ? "Refresh from TMDB" : "Find on TMDB"}
+              {busy === "tmdb" ? tr("Looking up…") : t.tmdb_id ? tr("Refresh from TMDB") : tr("Find on TMDB")}
             </button>
           ) : null}
           {t.tmdb_id && t.tmdb_media ? (
@@ -156,7 +161,7 @@ export function TitleDialog({ initial, isNew, tmdbEnabled, onSave, onDelete, onC
               rel="noreferrer"
               className="mt-2 block text-center text-[11px] text-[#6f675b] underline decoration-black/15 underline-offset-2"
             >
-              Open on TMDB ↗
+              {tr("Open on TMDB ↗")}
             </a>
           ) : null}
           {tmdbEnabled && t.tmdb_id ? (
@@ -165,9 +170,9 @@ export function TitleDialog({ initial, isNew, tmdbEnabled, onSave, onDelete, onC
               onClick={() => void refreshFromTmdb(true)}
               disabled={busy !== null}
               className="mt-1 block w-full text-center text-[11px] text-[#6f675b] underline decoration-black/15 underline-offset-2"
-              title="Search TMDB again by this title and release year"
+              title={tr("Search TMDB again by this title and release year")}
             >
-              Wrong title? Re-match
+              {tr("Wrong title? Re-match")}
             </button>
           ) : null}
           {t.imdb_id ? (
@@ -177,24 +182,24 @@ export function TitleDialog({ initial, isNew, tmdbEnabled, onSave, onDelete, onC
               rel="noreferrer"
               className="mt-1 block text-center text-[11px] text-[#6f675b] underline decoration-black/15 underline-offset-2"
             >
-              Open on IMDb ↗
+              {tr("Open on IMDb ↗")}
             </a>
           ) : null}
         </div>
 
         <div className="min-w-0 flex-1 space-y-3">
           <label className={fieldLabel}>
-            Title
+            {tr("Title")}
             <input value={t.title} onChange={(e) => set("title", e.target.value)} className={fieldInput} autoFocus={isNew && !t.title} />
           </label>
           {t.original_title && t.original_title !== t.title ? (
-            <p className="-mt-1 text-xs text-[#8f8676]">Original: {t.original_title}</p>
+            <p className="-mt-1 text-xs text-[#8f8676]">{tr("Original: {v}", { v: t.original_title })}</p>
           ) : null}
           {facts.length ? <p className="text-xs text-[#6f675b]">{facts.join(" · ")}</p> : null}
           {t.overview ? <p className="line-clamp-4 text-xs leading-relaxed text-[#655d51]">{t.overview}</p> : null}
 
           <div>
-            <span className={fieldLabel}>Status</span>
+            <span className={fieldLabel}>{tr("Status")}</span>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {STATUSES.map((s) => (
                 <button
@@ -207,14 +212,14 @@ export function TitleDialog({ initial, isNew, tmdbEnabled, onSave, onDelete, onC
                   }`}
                 >
                   <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                  {s.label}
+                  {tr(s.label)}
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <span className={fieldLabel}>Your score</span>
+            <span className={fieldLabel}>{tr("Your score")}</span>
             <div className="mt-1 flex flex-wrap gap-1">
               {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                 <button
@@ -235,73 +240,83 @@ export function TitleDialog({ initial, isNew, tmdbEnabled, onSave, onDelete, onC
 
           <label className="flex items-center gap-2 text-sm text-[#2f2922]">
             <input type="checkbox" checked={t.recommended} onChange={(e) => set("recommended", e.target.checked)} className="h-4 w-4 accent-[#2a78d6]" />
-            I recommend it
+            {tr("I recommend it")}
           </label>
 
           <div className="grid grid-cols-2 gap-3">
             <label className={fieldLabel}>
-              Release year
+              {tr("Release year")}
               <input value={years.year} onChange={(e) => setYears((y) => ({ ...y, year: e.target.value }))} inputMode="numeric" className={fieldInput} />
             </label>
             <label className={fieldLabel}>
-              Year you watched it
+              {tr("Year you watched it")}
               <input value={years.view_year} onChange={(e) => setYears((y) => ({ ...y, view_year: e.target.value }))} inputMode="numeric" className={fieldInput} />
             </label>
           </div>
           {isSeries(t.kind) ? (
             <label className={fieldLabel}>
-              Seasons watched <span className="font-normal text-[#a39a89]">up to season{t.seasons ? ` · ${t.seasons} released` : ""}</span>
+              {tr("Seasons watched")}{" "}
+              <span className="font-normal text-[#a39a89]">
+                {tr("up to season")}
+                {t.seasons ? ` · ${tr("{n} released", { n: t.seasons })}` : ""}
+              </span>
               <span className="mt-1 flex items-center gap-2">
                 <input value={watchedSeasons} onChange={(e) => setWatchedSeasons(e.target.value)} inputMode="numeric" className={`${fieldInput} mt-0 w-24`} />
                 {t.seasons ? (
                   <button type="button" onClick={() => setWatchedSeasons(String(t.seasons))} className="text-xs text-[#6f675b] underline decoration-black/15 underline-offset-2">
-                    All {t.seasons}
+                    {tr("All {n}", { n: t.seasons })}
                   </button>
                 ) : null}
               </span>
             </label>
           ) : null}
           <label className={fieldLabel}>
-            Genres <span className="font-normal text-[#a39a89]">comma-separated</span>
+            {tr("Genres")} <span className="font-normal text-[#a39a89]">{tr("comma-separated")}</span>
             <input value={lists.genres} onChange={(e) => setLists((l) => ({ ...l, genres: e.target.value }))} className={fieldInput} />
           </label>
           <label className={fieldLabel}>
-            Studio / distributor
+            {tr("Studio / distributor")}
             <input value={lists.studios} onChange={(e) => setLists((l) => ({ ...l, studios: e.target.value }))} className={fieldInput} />
           </label>
           <label className={fieldLabel}>
-            Actors
+            {tr("Actors")}
             <textarea value={lists.actors} onChange={(e) => setLists((l) => ({ ...l, actors: e.target.value }))} rows={2} className={fieldInput} />
           </label>
           <label className={fieldLabel}>
-            Notes
-            <textarea value={t.notes} onChange={(e) => set("notes", e.target.value)} rows={2} className={fieldInput} placeholder="What stayed with you, who to watch it with…" />
+            {tr("Notes")}
+            <textarea
+              value={t.notes}
+              onChange={(e) => set("notes", e.target.value)}
+              rows={2}
+              className={fieldInput}
+              placeholder={tr("What stayed with you, who to watch it with…")}
+            />
           </label>
         </div>
       </div>
 
-      {error ? <p className="mt-3 text-xs text-rose-700">{error}</p> : null}
+      {error ? <p className="mt-3 text-xs text-rose-700">{tr(error)}</p> : null}
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => void save()} disabled={busy !== null} className={investingPrimarySaveActive}>
-          {busy === "save" ? "Saving…" : isNew ? "Add to list" : "Save"}
+          {busy === "save" ? tr("Saving…") : isNew ? tr("Add to list") : tr("Save")}
         </button>
         <button type="button" onClick={onClose} className={investingToolbarBtn}>
-          Cancel
+          {tr("Cancel")}
         </button>
         {onDelete ? (
           confirmDelete ? (
             <span className="ml-auto flex items-center gap-2 text-xs text-rose-800">
-              Delete “{t.title}”?
+              {tr("Delete “{title}”?", { title: t.title })}
               <button type="button" onClick={() => void remove()} disabled={busy !== null} className="rounded-full bg-rose-700 px-3 py-1 font-medium text-white hover:bg-rose-800">
-                {busy === "delete" ? "Deleting…" : "Delete"}
+                {busy === "delete" ? tr("Deleting…") : tr("Delete")}
               </button>
               <button type="button" onClick={() => setConfirmDelete(false)} className="underline">
-                Keep
+                {tr("Keep")}
               </button>
             </span>
           ) : (
             <button type="button" onClick={() => setConfirmDelete(true)} className="ml-auto text-xs text-rose-700 underline decoration-rose-200 underline-offset-2">
-              Delete
+              {tr("Delete")}
             </button>
           )
         ) : null}

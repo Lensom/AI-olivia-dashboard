@@ -14,6 +14,7 @@ import {
 import { fieldInput, Modal, Poster } from "@/features/cinema/ui";
 import { investingToolbarBtn } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 
 const EXAMPLES: Record<CinemaKind, string> = {
@@ -38,6 +39,7 @@ type Props = {
 
 export function AddDialog({ kind, tmdbEnabled, existing, onPick, onOpenExisting, onClose }: Props) {
   const { token } = useAuth();
+  const tr = useT();
   const meta = cinemaKindMeta(kind);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<CinemaSearchResult[]>([]);
@@ -83,22 +85,20 @@ export function AddDialog({ kind, tmdbEnabled, existing, onPick, onOpenExisting,
   const shown = q.trim().length >= 2 ? results : [];
 
   return (
-    <Modal title={`Add ${meta.singular}`} onClose={onClose}>
+    <Modal title={tr(meta.add)} onClose={onClose}>
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder={tmdbEnabled ? `Search TMDB — e.g. ${EXAMPLES[kind]}` : "Title"}
+        placeholder={tmdbEnabled ? tr("Search TMDB — e.g. {example}", { example: EXAMPLES[kind] }) : tr("Title")}
         className={fieldInput}
         autoFocus
       />
       {!tmdbEnabled ? (
         <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          Search, posters and auto-filled genres and actors need a free TMDB key: create one at themoviedb.org → Settings → API,
-          then add <code className="font-mono">TMDB_API_KEY=…</code> to <code className="font-mono">back/.env</code> and restart the
-          backend. You can still add titles by hand.
+          {tr("Search, posters and auto-filled genres and actors need a free TMDB key: create one at themoviedb.org → Settings → API, then add TMDB_API_KEY=… to back/.env and restart the backend. You can still add titles by hand.")}
         </p>
       ) : null}
-      {error ? <p className="mt-2 text-xs text-rose-700">{error}</p> : null}
+      {error ? <p className="mt-2 text-xs text-rose-700">{tr(error)}</p> : null}
 
       <ul className="mt-3 max-h-[55vh] space-y-1 overflow-y-auto">
         {shown.map((r) => {
@@ -122,23 +122,23 @@ export function AddDialog({ kind, tmdbEnabled, existing, onPick, onOpenExisting,
                   <span className="mt-0.5 line-clamp-2 block text-xs text-[#6f675b]">{r.overview}</span>
                 </span>
                 <span className="shrink-0 text-right text-[11px] text-[#8f8676]">
-                  {dup ? <span className="block font-medium text-emerald-700">✓ In your list</span> : null}
-                  {picking === r.tmdb_id ? "Loading…" : r.tmdb_rating ? `TMDB ${r.tmdb_rating}` : null}
-                  {r.animation && (kind === "film" || kind === "tv") ? <span className="block">Animation</span> : null}
+                  {dup ? <span className="block font-medium text-emerald-700">✓ {tr("In your list")}</span> : null}
+                  {picking === r.tmdb_id ? tr("Loading…") : r.tmdb_rating ? `TMDB ${r.tmdb_rating}` : null}
+                  {r.animation && (kind === "film" || kind === "tv") ? <span className="block">{tr("Animation")}</span> : null}
                 </span>
               </button>
             </li>
           );
         })}
         {tmdbEnabled && q.trim().length >= 2 && !searching && !shown.length && !error ? (
-          <li className="px-2 py-3 text-sm text-[#8f8676]">Nothing found on TMDB.</li>
+          <li className="px-2 py-3 text-sm text-[#8f8676]">{tr("Nothing found on TMDB.")}</li>
         ) : null}
-        {searching && !shown.length ? <li className="px-2 py-3 text-sm text-[#8f8676]">Searching…</li> : null}
+        {searching && !shown.length ? <li className="px-2 py-3 text-sm text-[#8f8676]">{tr("Searching…")}</li> : null}
       </ul>
 
       <div className="mt-3 border-t border-black/5 pt-3">
         <button type="button" onClick={() => onPick(blankTitle(kind, q.trim()))} className={investingToolbarBtn}>
-          {q.trim() ? `Add “${q.trim()}” by hand` : "Add by hand"}
+          {q.trim() ? tr("Add “{title}” by hand", { title: q.trim() }) : tr("Add by hand")}
         </button>
       </div>
     </Modal>

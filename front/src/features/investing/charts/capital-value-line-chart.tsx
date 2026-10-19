@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useMemo } from "react";
+import { useT } from "@/lib/i18n";
 
 export type CapitalValuePoint = {
   label: string;
@@ -56,6 +57,7 @@ export function CapitalValueLineChart({
   data: CapitalValuePoint[];
 }) {
   const clipId = useId().replace(/:/g, "");
+  const tr = useT();
 
   const { pathD, circles, ticks, tickYs, viewW, viewH, xLabels } = useMemo(() => {
     const viewW = INNER_W + PAD_L + PAD_R;
@@ -104,14 +106,14 @@ export function CapitalValueLineChart({
     return (
       <article className="flex h-full min-h-[300px] flex-col rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{title}</h2>
+          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr(title)}</h2>
           <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-[#6f675b]">
-            Capital
+            {tr("Capital")}
           </span>
         </div>
-        <p className="mt-1 text-xs text-[#655d51]">{subtitle}</p>
+        <p className="mt-1 text-xs text-[#655d51]">{tr(subtitle)}</p>
         <p className="mt-10 text-center text-sm text-[#7f7668]">
-          On the Dashboard, add capital rows with a date (e.g. 15.03.2024 or 2024-03-15) and total value.
+          {tr("On the Dashboard, add capital rows with a date (e.g. 15.03.2024 or 2024-03-15) and total value.")}
         </p>
       </article>
     );
@@ -120,17 +122,17 @@ export function CapitalValueLineChart({
   return (
     <article className="flex h-full flex-col rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-[#1f1c17]">{title}</h2>
+        <h2 className="text-sm font-semibold text-[#1f1c17]">{tr(title)}</h2>
         <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-[#6f675b]">
-          Capital
+          {tr("Capital")}
         </span>
       </div>
-      <p className="mt-1 text-xs text-[#655d51]">{subtitle}</p>
+      <p className="mt-1 text-xs text-[#655d51]">{tr(subtitle)}</p>
       <svg
         className="mx-auto mt-3 w-full max-w-full overflow-visible"
         viewBox={`0 0 ${viewW} ${viewH}`}
         role="img"
-        aria-label={title}
+        aria-label={tr(title)}
       >
         <defs>
           <clipPath id={clipId}>

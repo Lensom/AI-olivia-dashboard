@@ -3,24 +3,25 @@ import { cinemaKindMeta } from "@/features/cinema/nav";
 import type { CinemaTitle } from "@/features/cinema/types";
 import { ImdbRating, ScoreBadge } from "@/features/cinema/ui";
 import { listFromTexts, type TopDimension, type TopItem } from "@/features/shared/tops-board";
+import type { T } from "@/lib/i18n";
 
 export const CINEMA_TOP_DIMENSIONS: TopDimension[] = [
   { value: "genre", label: "Genres", min: 2 },
   { value: "actor", label: "Actors", min: 3 },
   { value: "director", label: "Directors", min: 2 },
   { value: "studio", label: "Studios", min: 3 },
-  { value: "decade", label: "Decades", min: 2, newestFirst: true },
-  { value: "kind", label: "Kinds", min: 1 },
+  { value: "decade", label: "Decades", min: 2, newestFirst: true, format: (k, t) => t("{d}s", { d: k }) },
+  { value: "kind", label: "Kinds", min: 1, format: (k, t) => t(k) },
 ];
 
 /** A title for the Tops board: ranked by your score, then IMDb, then ✓. */
-export function cinemaTopItem(t: CinemaTitle): TopItem {
+export function cinemaTopItem(t: CinemaTitle, tr: T): TopItem {
   const meta = cinemaKindMeta(t.kind);
   return {
     id: t.id,
     title: t.title,
     altTitle: t.original_title,
-    subtitle: [meta.label, t.year].filter(Boolean).join(" · "),
+    subtitle: [tr(meta.label), t.year].filter(Boolean).join(" · "),
     cover: t.poster,
     href: `/cinematography/${meta.slug}`,
     kind: t.kind,
@@ -31,7 +32,7 @@ export function cinemaTopItem(t: CinemaTitle): TopItem {
       actor: t.actors,
       director: t.directors,
       studio: t.studios,
-      decade: t.year ? [`${Math.floor(t.year / 10) * 10}s`] : [],
+      decade: t.year ? [String(Math.floor(t.year / 10) * 10)] : [],
       kind: [meta.label],
     },
     badges: createElement(

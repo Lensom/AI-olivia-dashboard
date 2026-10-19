@@ -8,6 +8,7 @@ import { formatUsd, parseUsd } from "@/features/investing/format";
 import { investingPageHref, investingPageLabel } from "@/features/investing/nav";
 import { investingToolbarBtn } from "@/features/investing/ui/investing-classes";
 import { useCategories, type Subcategory } from "@/state/categories-store";
+import { useT } from "@/lib/i18n";
 import { useInvesting } from "@/state/investing-store";
 
 const DESCRIPTION: Record<string, string> = {
@@ -26,6 +27,7 @@ export default function InvestingPage() {
   const { categories, subcategoriesByCategoryId, refreshSubcategories, reorderSubcategories, createSubcategory } =
     useCategories();
   const { holdings, refills, activities, pickingRows, notes } = useInvesting();
+  const t = useT();
   const investing = useMemo(() => categories.find((c) => c.slug === "investing"), [categories]);
   const saved = useMemo(
     () => (investing ? (subcategoriesByCategoryId[investing.id] ?? []) : []),
@@ -54,13 +56,13 @@ export default function InvestingPage() {
     const words = notes.trim() ? notes.trim().split(/\s+/).length : 0;
     return {
       dashboard: value > 0 ? formatUsd(value) : null,
-      table: holdings.length ? `${holdings.length} holdings` : null,
-      finance: topped > 0 ? `${formatUsd(topped)} deposited` : null,
-      activities: activities.length ? `${activities.length} trades` : null,
-      picking: pickingRows.length ? `${pickingRows.length} on the list` : null,
-      notes: words ? `${words} words` : null,
+      table: holdings.length ? t("{n} holdings", { n: holdings.length }) : null,
+      finance: topped > 0 ? t("{v} deposited", { v: formatUsd(topped) }) : null,
+      activities: activities.length ? t("{n} trades", { n: activities.length }) : null,
+      picking: pickingRows.length ? t("{n} on the list", { n: pickingRows.length }) : null,
+      notes: words ? t("{n} words", { n: words }) : null,
     } as Record<string, string | null>;
-  }, [holdings, refills, activities, pickingRows, notes]);
+  }, [holdings, refills, activities, pickingRows, notes, t]);
 
   async function commit(next: Subcategory[]) {
     if (!investing) return;
@@ -106,16 +108,16 @@ export default function InvestingPage() {
       <div className="space-y-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">Category</p>
-            <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">Investing</h1>
+            <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">{t("Category")}</p>
+            <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">{t("Investing")}</h1>
             <p className="mt-1.5 text-sm text-[#655d51]">
               {reordering
-                ? "Drag tiles (or use the arrows) to set the order. It applies to the sidebar and the Stocks tabs."
-                : "What needs your attention, and your investing pages in sidebar order."}
+                ? t("Drag tiles (or use the arrows) to set the order. It applies to the sidebar and the Stocks tabs.")
+                : t("What needs your attention, and your investing pages in sidebar order.")}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {busy ? <span className="text-xs text-[#8f8676]">Saving…</span> : null}
+            {busy ? <span className="text-xs text-[#8f8676]">{t("Saving…")}</span> : null}
             <button
               type="button"
               onClick={() => {
@@ -129,18 +131,18 @@ export default function InvestingPage() {
                   : investingToolbarBtn
               }
             >
-              {reordering ? "Done" : "Reorder"}
+              {reordering ? t("Done") : t("Reorder")}
             </button>
           </div>
         </div>
-        {error ? <p className="text-sm text-rose-700">{error}</p> : null}
+        {error ? <p className="text-sm text-rose-700">{t(error)}</p> : null}
 
         {reordering ? null : <AttentionStrip />}
 
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Investing pages">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label={t("Investing pages")}>
           {tiles.map((s, index) => {
             const href = investingPageHref(s.slug);
-            const label = investingPageLabel(s.slug, s.name);
+            const label = t(investingPageLabel(s.slug, s.name));
             const isDragging = dragId === s.id;
             const body = (
               <>
@@ -156,7 +158,7 @@ export default function InvestingPage() {
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-1 text-xs text-[#6f675b]">{DESCRIPTION[s.slug] ?? "Custom page"}</p>
+                <p className="mt-1 text-xs text-[#6f675b]">{t(DESCRIPTION[s.slug] ?? "Custom page")}</p>
               </>
             );
             return (
@@ -190,8 +192,8 @@ export default function InvestingPage() {
                     <div className="min-w-0 flex-1">{body}</div>
                     <span className="flex flex-col gap-1">
                       {[
-                        { d: -1, label: "↑", aria: `Move ${label} earlier` },
-                        { d: 1, label: "↓", aria: `Move ${label} later` },
+                        { d: -1, label: "↑", aria: t("Move {page} earlier", { page: label }) },
+                        { d: 1, label: "↓", aria: t("Move {page} later", { page: label }) },
                       ].map(({ d, label: arrow, aria }) => (
                         <button
                           key={d}
@@ -217,7 +219,7 @@ export default function InvestingPage() {
               </li>
             );
           })}
-          {tiles.length === 0 ? <li className="text-sm text-[#8f8676]">Loading pages…</li> : null}
+          {tiles.length === 0 ? <li className="text-sm text-[#8f8676]">{t("Loading pages…")}</li> : null}
         </ul>
 
         {reordering ? (
@@ -227,20 +229,20 @@ export default function InvestingPage() {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void addPage()}
-                placeholder="Page name"
+                placeholder={t("Page name")}
                 className="w-56 rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-sm outline-none focus:border-black/20"
                 autoFocus
               />
               <button type="button" onClick={() => void addPage()} className={investingToolbarBtn}>
-                Add
+                {t("Add")}
               </button>
               <button type="button" onClick={() => setAdding(false)} className="text-xs text-[#6f675b] hover:text-[#1f1c17]">
-                Cancel
+                {t("Cancel")}
               </button>
             </div>
           ) : (
             <button type="button" onClick={() => setAdding(true)} className="text-xs text-[#6f675b] underline decoration-black/15 underline-offset-2 hover:text-[#1f1c17]">
-              + Add a custom page
+              + {t("Add a custom page")}
             </button>
           )
         ) : null}
