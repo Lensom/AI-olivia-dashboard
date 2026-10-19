@@ -8,6 +8,7 @@ import {
 } from "@/features/investing/ui/investing-classes";
 import { formatCryptoUsd, parseCryptoAmount } from "@/features/investing/crypto-format";
 import { buildCoinPositions, rebalancingSplit, ruleBtcShare } from "@/features/investing/crypto-stats";
+import { useLocale, useT } from "@/lib/i18n";
 import { useCrypto } from "@/state/crypto-store";
 import { cryptoInputClasses } from "../_inputs";
 import { useMemo, useState } from "react";
@@ -25,6 +26,8 @@ export default function CryptoRulesPage() {
     saveCrypto,
     refreshCrypto,
   } = useCrypto();
+  const tr = useT();
+  const locale = useLocale();
 
   const [previewUsd, setPreviewUsd] = useState("100");
 
@@ -57,9 +60,7 @@ export default function CryptoRulesPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <span className={investingMetaBadge}>
-          {cryptoMeta.updatedAt
-            ? `Synced ${new Date(cryptoMeta.updatedAt).toLocaleString()}`
-            : "Not synced"}
+          {cryptoMeta.updatedAt ? tr("Synced {when}", { when: new Date(cryptoMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
         </span>
         <button
           type="button"
@@ -67,7 +68,7 @@ export default function CryptoRulesPage() {
           disabled={isCryptoLoading}
           className={`${investingToolbarBtn} disabled:opacity-50`}
         >
-          {isCryptoLoading ? "…" : "Refresh"}
+          {isCryptoLoading ? "…" : tr("Refresh")}
         </button>
         <button
           type="button"
@@ -80,19 +81,17 @@ export default function CryptoRulesPage() {
               : investingPrimarySaveActive,
           ].join(" ")}
         >
-          {isCryptoSaving ? "Saving…" : "Save"}
+          {isCryptoSaving ? tr("Saving…") : tr("Save")}
         </button>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-          <h2 className="text-sm font-semibold text-[#1f1c17]">New deposit split</h2>
-          <p className="mt-1 text-xs text-[#655d51]">
-            Your target BTC / ETH mix. Percentages needn’t add to 100% — they’re used as a ratio.
-          </p>
+          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("New deposit split")}</h2>
+          <p className="mt-1 text-xs text-[#655d51]">{tr("Your target BTC / ETH mix. Percentages needn’t add to 100% — they’re used as a ratio.")}</p>
           {Math.abs(sumPct - 100) > 0.01 && sumPct > 0 ? (
             <p className="mt-2 text-xs text-amber-700">
-              Total {sumPct.toFixed(0)}% — preview uses ratio {btcPct}:{ethPct}.
+              {tr("Total {v}% — preview uses ratio {btc}:{eth}.", { v: sumPct.toFixed(0), btc: btcPct, eth: ethPct })}
             </p>
           ) : null}
 
@@ -118,30 +117,30 @@ export default function CryptoRulesPage() {
           </div>
 
           <label className="mt-4 block text-xs font-medium text-[#6f675b]">
-            BTC note (free text)
+            {tr("BTC note (free text)")}
             <textarea
               value={rules.btc_note}
               onChange={(e) => setRules({ btc_note: e.target.value })}
               rows={2}
               className={`${cryptoInputClasses()} mt-1 min-h-[3.5rem] resize-y`}
-              placeholder="e.g. $87.50 goes to BTC"
+              placeholder={tr("e.g. $87.50 goes to BTC")}
             />
           </label>
           <label className="mt-3 block text-xs font-medium text-[#6f675b]">
-            ETH note
+            {tr("ETH note")}
             <textarea
               value={rules.eth_note}
               onChange={(e) => setRules({ eth_note: e.target.value })}
               rows={2}
               className={`${cryptoInputClasses()} mt-1 min-h-[3.5rem] resize-y`}
-              placeholder="e.g. $37.50 goes to ETH"
+              placeholder={tr("e.g. $37.50 goes to ETH")}
             />
           </label>
         </article>
 
         <article className="rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-          <h2 className="text-sm font-semibold text-[#1f1c17]">Split preview</h2>
-          <p className="mt-1 text-xs text-[#655d51]">Hypothetical deposit size in USD.</p>
+          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Split preview")}</h2>
+          <p className="mt-1 text-xs text-[#655d51]">{tr("Hypothetical deposit size in USD.")}</p>
           <input
             value={previewUsd}
             onChange={(e) => setPreviewUsd(e.target.value)}
@@ -150,26 +149,29 @@ export default function CryptoRulesPage() {
           />
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-black/5 bg-[#faf8f2] p-4">
-              <p className="text-xs font-medium text-[#6f675b]">Fixed split ({rules.btc_percent}/{rules.eth_percent})</p>
+              <p className="text-xs font-medium text-[#6f675b]">{tr("Fixed split ({btc}/{eth})", { btc: rules.btc_percent, eth: rules.eth_percent })}</p>
               <p className="mt-2 text-sm tabular-nums text-[#1f1c17]">BTC {formatCryptoUsd(preview.btc)}</p>
               <p className="text-sm tabular-nums text-[#1f1c17]">ETH {formatCryptoUsd(preview.eth)}</p>
               {mixNow != null ? (
-                <p className="mt-2 text-[11px] text-[#8f8676]">BTC share after: {mixAfter(preview).toFixed(1)}%</p>
+                <p className="mt-2 text-[11px] text-[#8f8676]">{tr("BTC share after: {v}%", { v: mixAfter(preview).toFixed(1) })}</p>
               ) : null}
             </div>
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-              <p className="text-xs font-medium text-emerald-900">Toward the rule</p>
+              <p className="text-xs font-medium text-emerald-900">{tr("Toward the rule")}</p>
               <p className="mt-2 text-sm tabular-nums text-[#1f1c17]">BTC {formatCryptoUsd(rebalance.btc)}</p>
               <p className="text-sm tabular-nums text-[#1f1c17]">ETH {formatCryptoUsd(rebalance.eth)}</p>
               {mixNow != null ? (
-                <p className="mt-2 text-[11px] text-emerald-900/70">BTC share after: {mixAfter(rebalance).toFixed(1)}%</p>
+                <p className="mt-2 text-[11px] text-emerald-900/70">{tr("BTC share after: {v}%", { v: mixAfter(rebalance).toFixed(1) })}</p>
               ) : null}
             </div>
           </div>
           <p className="mt-2 text-[11px] text-[#8f8676]">
             {mixNow == null
-              ? "Add BTC and ETH on Portfolio to get a rebalancing suggestion."
-              : `Your BTC share is ${(mixNow * 100).toFixed(1)}% now vs ${(share * 100).toFixed(0)}% in the rule. “Toward the rule” puts the deposit into the under-weight coin first.`}
+              ? tr("Add BTC and ETH on Portfolio to get a rebalancing suggestion.")
+              : tr("Your BTC share is {now}% now vs {rule}% in the rule. “Toward the rule” puts the deposit into the under-weight coin first.", {
+                  now: (mixNow * 100).toFixed(1),
+                  rule: (share * 100).toFixed(0),
+                })}
           </p>
           {(rules.btc_note || rules.eth_note) && (
             <div className="mt-4 space-y-2 text-xs text-[#655d51]">

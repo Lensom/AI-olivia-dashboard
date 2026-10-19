@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import { useMemo } from "react";
 
 export type YearlyInvestPoint = {
@@ -38,6 +39,7 @@ export function YearlyInvestmentsBarChart({
   yAxisLabel?: string;
   xAxisLabel?: string;
 }) {
+  const tr = useT();
   const { bars, yMax, ticks, viewW, viewH } = useMemo(() => {
     const viewW = INNER_W + PAD_L + PAD_R;
     const viewH = INNER_H + PAD_T + PAD_B;
@@ -64,20 +66,20 @@ export function YearlyInvestmentsBarChart({
   if (data.length === 0) {
     return (
       <div className="flex min-h-[280px] flex-col rounded-2xl border border-black/5 bg-white p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-        <h2 className="text-center text-sm font-semibold text-[#1f1c17]">{title}</h2>
-        <p className="mt-8 text-center text-sm text-[#7f7668]">No buy activities with dates yet.</p>
+        <h2 className="text-center text-sm font-semibold text-[#1f1c17]">{tr(title)}</h2>
+        <p className="mt-8 text-center text-sm text-[#7f7668]">{tr("No buy activities with dates yet.")}</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col rounded-2xl border border-black/5 bg-white p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-      <h2 className="text-center text-sm font-semibold text-[#1f1c17]">{title}</h2>
+      <h2 className="text-center text-sm font-semibold text-[#1f1c17]">{tr(title)}</h2>
       <svg
         className="mx-auto mt-2 w-full max-w-full"
         viewBox={`0 0 ${viewW} ${viewH}`}
         role="img"
-        aria-label={title}
+        aria-label={tr(title)}
       >
         <rect x="0" y="0" width={viewW} height={viewH} fill="#ffffff" />
         {ticks.map((tv) => {
@@ -112,7 +114,7 @@ export function YearlyInvestmentsBarChart({
           fill="#655d51"
           fontSize={11}
         >
-          {yAxisLabel}
+          {tr(yAxisLabel)}
         </text>
         {bars.map((b) => (
           <g key={b.year}>
@@ -144,7 +146,7 @@ export function YearlyInvestmentsBarChart({
           fill="#655d51"
           fontSize={11}
         >
-          {xAxisLabel}
+          {tr(xAxisLabel)}
         </text>
       </svg>
     </div>

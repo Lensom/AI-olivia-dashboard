@@ -49,6 +49,12 @@ The frontend calls the API on port 8000 of the same host the page was opened fro
 | `GOOGLE_BOOKS_API_KEY` | no | Library: adds Google Books to search and matching, which lists Ukrainian editions far better than Open Library. Free in Google Cloud console → APIs → Books API. Without it, Library uses Open Library plus Wikidata. |
 | `TMDB_API_KEY` | no | Enables Cinematography search, posters and auto-filled genres / actors / studios. Free at themoviedb.org → Settings → API; a v3 API key or a v4 read access token both work. Without it, titles are added by hand. |
 
+## Interface language
+
+The **EN / UA** switch in the header changes the whole interface. The choice is remembered in the browser. Your own data (titles, genres, notes, list and account names) stays as you entered it. Dates and numbers follow the chosen language.
+
+English text is the key: components call `useT()` from `front/src/lib/i18n.tsx`, e.g. `t("Add task")` or `t("{n} titles", { n })`. The Ukrainian dictionary lives in `front/src/lib/i18n/` (`common.ts`, `media.ts`, `investing.ts`). A value can be an array of plural forms `[one, few, many]`, and a missing entry falls back to English.
+
 ## Features: Investing
 
 The **Investing** page (`/investing`) starts with **Needs attention**: rules you've broken (fees over your limit, return under your minimum, ETF share out of range, a position over its cap, holdings or net-worth groups drifting from target), opportunities (a stock in its buy zone, idle broker cash) and to-dos (record this month on Total, enter broker cash, record dividends). Each item links to the page that fixes it; the limits are editable under **Thresholds**. Below it, every investing page is a tile with a live figure. **Reorder** lets you drag tiles (or use arrows) to change the order of the sidebar and the Stocks tabs; you can also add custom pages there. Page names and links are defined once in `front/src/features/investing/nav.ts`.

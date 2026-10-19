@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import { useMemo, useState } from "react";
 import { formatUsd } from "@/features/investing/format";
 
@@ -20,6 +21,7 @@ function niceStep(range: number, ticks = 4): number {
 }
 
 function Legend({ items }: { items: { label: string; color: string; dashed?: boolean }[] }) {
+  const t = useT();
   return (
     <div className="flex flex-wrap items-center gap-4 text-xs text-[#6f675b]">
       {items.map((it) => (
@@ -28,7 +30,7 @@ function Legend({ items }: { items: { label: string; color: string; dashed?: boo
             className="inline-block h-0 w-4 border-t-2"
             style={{ borderColor: it.color, borderStyle: it.dashed ? "dashed" : "solid" }}
           />
-          {it.label}
+          {t(it.label)}
         </span>
       ))}
     </div>
@@ -40,6 +42,7 @@ export type AnnualReturnPoint = { label: string; you: number | null; benchmark: 
 /** Grouped bars per year around a zero baseline: your return vs the benchmark's. */
 export function AnnualReturnsChart({ data, benchmarkLabel }: { data: AnnualReturnPoint[]; benchmarkLabel: string }) {
   const [hover, setHover] = useState<number | null>(null);
+  const t = useT();
   const { yMin, yMax, ticks } = useMemo(() => {
     const vals = data.flatMap((d) => [d.you, d.benchmark]).filter((v): v is number => v != null);
     const lo = Math.min(0, ...vals);
@@ -66,7 +69,7 @@ export function AnnualReturnsChart({ data, benchmarkLabel }: { data: AnnualRetur
         ]}
       />
       <div className="relative mt-2">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Annual return by year">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={t("Annual return by year")}>
           {ticks.map((t) => (
             <g key={t}>
               <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke={t === 0 ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.06)"} />
@@ -115,7 +118,7 @@ export function AnnualReturnsChart({ data, benchmarkLabel }: { data: AnnualRetur
             <p className="font-semibold text-[#1f1c17]">{hovered.label}</p>
             <p className="tabular-nums text-[#3b352d]">
               <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: SERIES_YOU }} />
-              You {hovered.you == null ? "—" : `${hovered.you > 0 ? "+" : ""}${hovered.you.toFixed(1)}%`}
+              {t("You")} {hovered.you == null ? "—" : `${hovered.you > 0 ? "+" : ""}${hovered.you.toFixed(1)}%`}
             </p>
             <p className="tabular-nums text-[#3b352d]">
               <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: SERIES_OTHER }} />
@@ -134,6 +137,7 @@ export type ValueInvestedPoint = { label: string; value: number; invested: numbe
 /** Two $ series on one axis: portfolio value vs cumulative money put in. The gap is the gain. */
 export function ValueVsInvestedChart({ data }: { data: ValueInvestedPoint[] }) {
   const [hover, setHover] = useState<number | null>(null);
+  const t = useT();
   const { yMax, ticks } = useMemo(() => {
     const hi = Math.max(1, ...data.flatMap((d) => [d.value, d.invested]));
     const step = niceStep(hi);
@@ -157,7 +161,7 @@ export function ValueVsInvestedChart({ data }: { data: ValueInvestedPoint[] }) {
         ]}
       />
       <div className="relative mt-2">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Portfolio value vs money invested">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={t("Portfolio value vs money invested")}>
           {ticks.map((t) => (
             <g key={t}>
               <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke="rgba(0,0,0,0.06)" />
@@ -204,10 +208,10 @@ export function ValueVsInvestedChart({ data }: { data: ValueInvestedPoint[] }) {
             }}
           >
             <p className="font-semibold text-[#1f1c17]">{hovered.label}</p>
-            <p className="tabular-nums text-[#3b352d]">Value {formatUsd(hovered.value)}</p>
-            <p className="tabular-nums text-[#3b352d]">Invested {formatUsd(hovered.invested)}</p>
+            <p className="tabular-nums text-[#3b352d]">{t("Value")} {formatUsd(hovered.value)}</p>
+            <p className="tabular-nums text-[#3b352d]">{t("Invested")} {formatUsd(hovered.invested)}</p>
             <p className={`tabular-nums ${hovered.value >= hovered.invested ? "text-emerald-700" : "text-rose-700"}`}>
-              Gain {hovered.value - hovered.invested >= 0 ? "+" : ""}
+              {t("Gain")} {hovered.value - hovered.invested >= 0 ? "+" : ""}
               {formatUsd(hovered.value - hovered.invested)}
             </p>
           </div>

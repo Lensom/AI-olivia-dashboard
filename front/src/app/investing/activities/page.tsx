@@ -17,6 +17,7 @@ import {
   type InvestingActivitiesImportSummary,
   type InvestingActivity,
 } from "@/state/investing-store";
+import { useLocale, useT } from "@/lib/i18n";
 
 function importErrorMessage(err: unknown): string {
   const raw = (err as { message?: string })?.message ?? "Unknown error";
@@ -74,6 +75,8 @@ export default function InvestingActivitiesPage() {
     saveActivities,
     importActivities,
   } = useInvesting();
+  const tr = useT();
+  const locale = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<
@@ -206,12 +209,12 @@ export default function InvestingActivitiesPage() {
   return (
     <div className={investingPageStack}>
       <p className="text-sm text-[#655d51]">
-        Every buy and sell. USD amounts and FX rates are calculated when you save.
+        {tr("Every buy and sell. USD amounts and FX rates are calculated when you save.")}
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className={investingMetaBadge}>
-          {activitiesMeta.updatedAt ? `Synced ${new Date(activitiesMeta.updatedAt).toLocaleString()}` : "Not synced"}
+          {activitiesMeta.updatedAt ? tr("Synced {when}", { when: new Date(activitiesMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
         </span>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -225,10 +228,10 @@ export default function InvestingActivitiesPage() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
-            title="Broker trade export: Trade#, Time, Ticker, Direction, Price, Quantity, Amount, Fee, Profit"
+            title={tr("Broker trade export: Trade#, Time, Ticker, Direction, Price, Quantity, Amount, Fee, Profit")}
             className={["transition", isImporting ? investingPrimarySaveDisabled : investingToolbarBtn].join(" ")}
           >
-            {isImporting ? "Importing…" : "Import XLSX"}
+            {isImporting ? tr("Importing…") : tr("Import XLSX")}
           </button>
           <div className="flex rounded-full border border-black/10 bg-white p-1">
             {(["view", "edit"] as const).map((m) => (
@@ -241,17 +244,17 @@ export default function InvestingActivitiesPage() {
                   mode === m ? "bg-[#f3efe5] text-[#1f1c17]" : "text-[#6f675b] hover:bg-[#faf8f2]",
                 ].join(" ")}
               >
-                {m}
+                {m === "view" ? tr("View") : tr("Edit")}
               </button>
             ))}
           </div>
           {mode === "edit" ? (
             <>
               <button type="button" onClick={() => addActivity("buy")} className={investingToolbarBtn}>
-                Add purchase
+                {tr("Add purchase")}
               </button>
               <button type="button" onClick={() => addActivity("sell")} className={investingToolbarBtn}>
-                Add sale
+                {tr("Add sale")}
               </button>
               <button
                 type="button"
@@ -264,7 +267,7 @@ export default function InvestingActivitiesPage() {
                     : investingPrimarySaveActive,
                 ].join(" ")}
               >
-                {isActivitiesSaving ? "Saving..." : "Save"}
+                {isActivitiesSaving ? tr("Saving…") : tr("Save")}
               </button>
             </>
           ) : null}
@@ -274,11 +277,11 @@ export default function InvestingActivitiesPage() {
       {isActivitiesDirty ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
           <span>
-            <span aria-hidden>●</span> Unsaved changes — press Save to store them and recalculate USD amounts.
+            <span aria-hidden>●</span> {tr("Unsaved changes — press Save to store them and recalculate USD amounts.")}
           </span>
           {mode === "view" ? (
             <button type="button" onClick={() => setMode("edit")} className={investingToolbarBtn}>
-              Go to Edit
+              {tr("Go to Edit")}
             </button>
           ) : null}
         </div>
@@ -297,28 +300,32 @@ export default function InvestingActivitiesPage() {
             <div className="grid gap-0.5">
               <p className="font-medium">
                 {importResult.summary.added > 0
-                  ? `Added ${importResult.summary.added} trades (${importResult.summary.addedBuys} buys, ${importResult.summary.addedSells} sells) at the top — review and press Save.`
-                  : "No new trades — everything in this file is already recorded."}
+                  ? tr("Added {n} trades ({buys} buys, {sells} sells) at the top — review and press Save.", {
+                      n: importResult.summary.added,
+                      buys: importResult.summary.addedBuys,
+                      sells: importResult.summary.addedSells,
+                    })
+                  : tr("No new trades — everything in this file is already recorded.")}
               </p>
               {importResult.summary.duplicates > 0 ? (
-                <p>Already recorded, skipped: {importResult.summary.duplicates}</p>
+                <p>{tr("Already recorded, skipped: {n}", { n: importResult.summary.duplicates })}</p>
               ) : null}
               {importResult.summary.skippedFx > 0 ? (
-                <p>Currency exchanges (e.g. RUR/USD), skipped: {importResult.summary.skippedFx}</p>
+                <p>{tr("Currency exchanges (e.g. RUR/USD), skipped: {n}", { n: importResult.summary.skippedFx })}</p>
               ) : null}
               {importResult.summary.invalid.length > 0 ? (
                 <p>
-                  Couldn&apos;t read {importResult.summary.invalid.length}:{" "}
+                  {tr("Couldn’t read {n}:", { n: importResult.summary.invalid.length })}{" "}
                   {importResult.summary.invalid.slice(0, 5).join("; ")}
                   {importResult.summary.invalid.length > 5 ? "; …" : ""}
                 </p>
               ) : null}
             </div>
           ) : (
-            <p>Import failed: {importResult.message}</p>
+            <p>{tr("Import failed: {v}", { v: tr(importResult.message) })}</p>
           )}
           <button type="button" onClick={() => setImportResult(null)} className="text-xs opacity-70 hover:opacity-100">
-            Dismiss
+            {tr("Dismiss")}
           </button>
         </div>
       ) : null}
@@ -328,11 +335,11 @@ export default function InvestingActivitiesPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search ticker, name, category…"
-          aria-label="Search activities"
+          placeholder={tr("Search ticker, name, category…")}
+          aria-label={tr("Search activities")}
           className="w-full max-w-xs rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20"
         />
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by type">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter by type")}>
           {(
             [
               ["all", "All"],
@@ -341,14 +348,14 @@ export default function InvestingActivitiesPage() {
             ] as const
           ).map(([key, label]) => (
             <button key={key} type="button" onClick={() => setTypeFilter(key)} className={chip(typeFilter === key)}>
-              {label} <span className="opacity-60">{typeCounts[key]}</span>
+              {tr(label)} <span className="opacity-60">{typeCounts[key]}</span>
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by year">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter by year")}>
           {(["all", ...years] as const).map((y) => (
             <button key={y} type="button" onClick={() => setYearFilter(y)} className={chip(yearFilter === y)}>
-              {y === "all" ? "All years" : y}
+              {y === "all" ? tr("All years") : y}
             </button>
           ))}
         </div>
@@ -357,7 +364,11 @@ export default function InvestingActivitiesPage() {
       {/* Summary of what is shown */}
       <section className="flex flex-wrap gap-x-8 gap-y-3 rounded-2xl border border-black/5 bg-white/90 px-5 py-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
         {[
-          { label: isFiltered ? "Trades shown" : "Trades", value: `${visible.length}`, sub: `${summary.buys} buys · ${summary.sells} sells` },
+          {
+            label: isFiltered ? "Trades shown" : "Trades",
+            value: `${visible.length}`,
+            sub: tr("{buys} buys · {sells} sells", { buys: summary.buys, sells: summary.sells }),
+          },
           { label: "Bought", value: formatUsd(summary.bought) },
           { label: "Sold", value: formatUsd(summary.sold) },
           { label: "Realized P&L", value: signedUsd(summary.pnl), tone: toneClass(summary.pnl) },
@@ -366,12 +377,12 @@ export default function InvestingActivitiesPage() {
             value: formatUsd(summary.fees),
             sub:
               summary.bought + summary.sold > 0
-                ? `${((summary.fees / (summary.bought + summary.sold)) * 100).toFixed(2)}% of volume`
+                ? tr("{v}% of volume", { v: ((summary.fees / (summary.bought + summary.sold)) * 100).toFixed(2) })
                 : undefined,
           },
         ].map((s) => (
           <div key={s.label}>
-            <p className="text-[11px] text-[#8f8676]">{s.label}</p>
+            <p className="text-[11px] text-[#8f8676]">{tr(s.label)}</p>
             <p className={`text-base font-semibold tabular-nums ${s.tone ?? "text-[#1f1c17]"}`}>{s.value}</p>
             {s.sub ? <p className="text-[11px] text-[#8f8676]">{s.sub}</p> : null}
           </div>
@@ -384,30 +395,30 @@ export default function InvestingActivitiesPage() {
           <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
             {mode === "view" ? (
               <tr>
-                <th className="px-3 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Type</th>
-                <th className="px-3 py-2 font-medium">Holding</th>
-                <th className="px-3 py-2 font-medium">Category</th>
-                <th className="px-3 py-2 text-right font-medium">Shares</th>
-                <th className="px-3 py-2 text-right font-medium">Price</th>
-                <th className="px-3 py-2 text-right font-medium">Amount (USD)</th>
-                <th className="px-3 py-2 text-right font-medium">Realized P&L</th>
-                <th className="px-3 py-2 text-right font-medium">Fee</th>
+                <th className="px-3 py-2 font-medium">{tr("Date")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Type")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Holding")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Category")}</th>
+                <th className="px-3 py-2 text-right font-medium">{tr("Shares")}</th>
+                <th className="px-3 py-2 text-right font-medium">{tr("Price")}</th>
+                <th className="px-3 py-2 text-right font-medium">{tr("Amount (USD)")}</th>
+                <th className="px-3 py-2 text-right font-medium">{tr("Realized P&L")}</th>
+                <th className="px-3 py-2 text-right font-medium">{tr("Fee")}</th>
               </tr>
             ) : (
               <tr>
-                <th className="w-[96px] px-3 py-2 font-medium">Type</th>
-                <th className="w-[200px] px-3 py-2 font-medium">Name</th>
-                <th className="w-[90px] px-3 py-2 font-medium">Ticker</th>
-                <th className="w-[150px] px-3 py-2 font-medium">Category</th>
-                <th className="w-[72px] px-3 py-2 font-medium">Count</th>
-                <th className="w-[100px] px-3 py-2 font-medium">Price</th>
-                <th className="w-[66px] px-3 py-2 font-medium">Currency</th>
-                <th className="w-[100px] px-3 py-2 font-medium">Amount</th>
-                <th className="w-[96px] px-3 py-2 font-medium">Gains/Losses</th>
-                <th className="w-[90px] px-3 py-2 font-medium">Commission</th>
+                <th className="w-[96px] px-3 py-2 font-medium">{tr("Type")}</th>
+                <th className="w-[200px] px-3 py-2 font-medium">{tr("Name")}</th>
+                <th className="w-[90px] px-3 py-2 font-medium">{tr("Ticker")}</th>
+                <th className="w-[150px] px-3 py-2 font-medium">{tr("Category")}</th>
+                <th className="w-[72px] px-3 py-2 font-medium">{tr("Count")}</th>
+                <th className="w-[100px] px-3 py-2 font-medium">{tr("Price")}</th>
+                <th className="w-[66px] px-3 py-2 font-medium">{tr("Currency")}</th>
+                <th className="w-[100px] px-3 py-2 font-medium">{tr("Amount")}</th>
+                <th className="w-[96px] px-3 py-2 font-medium">{tr("Gains/Losses")}</th>
+                <th className="w-[90px] px-3 py-2 font-medium">{tr("Commission")}</th>
                 <th className="w-[66px] px-3 py-2 font-medium">FX</th>
-                <th className="w-[120px] px-3 py-2 font-medium">Date</th>
+                <th className="w-[120px] px-3 py-2 font-medium">{tr("Date")}</th>
                 <th className="px-3 py-2 font-medium" />
               </tr>
             )}
@@ -416,7 +427,7 @@ export default function InvestingActivitiesPage() {
             {visible.length === 0 ? (
               <tr>
                 <td colSpan={colCount} className="px-3 py-8 text-center text-sm text-[#8f8676]">
-                  {activities.length === 0 ? "No trades yet — switch to Edit and add a purchase." : "No trades match these filters."}
+                  {activities.length === 0 ? tr("No trades yet — switch to Edit and add a purchase.") : tr("No trades match these filters.")}
                 </td>
               </tr>
             ) : null}
@@ -435,7 +446,7 @@ export default function InvestingActivitiesPage() {
                         ].join(" ")}
                       >
                         <span aria-hidden>{isSell ? "↑" : "↓"}</span>
-                        {isSell ? "Sell" : "Buy"}
+                        {isSell ? tr("Sell") : tr("Buy")}
                       </span>
                     </td>
                     <td className="px-3 py-2">
@@ -451,14 +462,14 @@ export default function InvestingActivitiesPage() {
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-[#3b352d]">{row.count}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[#3b352d]">
-                      {parseUsd(row.price).toLocaleString("en-US", { maximumFractionDigits: 4 })}{" "}
+                      {parseUsd(row.price).toLocaleString(locale, { maximumFractionDigits: 4 })}{" "}
                       <span className="text-[11px] text-[#8f8676]">{row.currency || "USD"}</span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[#1f1c17]">
                       {formatUsd(u.amount)}
                       {row.currency && row.currency !== "USD" ? (
                         <span className="block text-[11px] text-[#8f8676]">
-                          {parseUsd(row.amount).toLocaleString("en-US")} {row.currency}
+                          {parseUsd(row.amount).toLocaleString(locale)} {row.currency}
                         </span>
                       ) : null}
                     </td>
@@ -476,14 +487,14 @@ export default function InvestingActivitiesPage() {
                       value={row.type}
                       onChange={(e) => updateActivity(row.id, { type: e.target.value as "buy" | "sell" })}
                       className={inputBaseClasses()}
-                      aria-label="Type"
+                      aria-label={tr("Type")}
                     >
-                      <option value="buy">Buy</option>
-                      <option value="sell">Sell</option>
+                      <option value="buy">{tr("Buy")}</option>
+                      <option value="sell">{tr("Sell")}</option>
                     </select>
                   </td>
                   <td className="px-2 py-2">
-                    <input value={row.name} onChange={(e) => updateActivity(row.id, { name: e.target.value })} className={inputBaseClasses()} placeholder="Company" />
+                    <input value={row.name} onChange={(e) => updateActivity(row.id, { name: e.target.value })} className={inputBaseClasses()} placeholder={tr("Company")} />
                   </td>
                   <td className="px-2 py-2">
                     <input
@@ -521,7 +532,7 @@ export default function InvestingActivitiesPage() {
                       inputMode="decimal"
                       placeholder="0"
                       disabled={!isSell}
-                      title={isSell ? undefined : "Only sales have realized gains/losses"}
+                      title={isSell ? undefined : tr("Only sales have realized gains/losses")}
                     />
                   </td>
                   <td className="px-2 py-2">
@@ -542,7 +553,7 @@ export default function InvestingActivitiesPage() {
                   </td>
                   <td className="px-2 py-2">
                     <button type="button" onClick={() => deleteActivity(row.id)} className={investingToolbarBtn}>
-                      Delete
+                      {tr("Delete")}
                     </button>
                   </td>
                 </tr>
@@ -553,26 +564,25 @@ export default function InvestingActivitiesPage() {
       </div>
       {mode === "edit" ? (
         <p className="-mt-2 text-[11px] text-[#8f8676]">
-          Amber border = missing ticker or a date that isn&apos;t DD.MM.YYYY. New rows appear at the top and stay
-          visible whatever the filters.
+          {tr("Amber border = missing ticker or a date that isn’t DD.MM.YYYY. New rows appear at the top and stay visible whatever the filters.")}
         </p>
       ) : null}
 
       {/* By ticker */}
       <section className={investingSubsectionStack}>
-        <InvestingSubsectionHeader title={`By ticker (${byTicker.length})`} isOpen={isTickersOpen} onToggle={() => setTickersOpen((v) => !v)} />
+        <InvestingSubsectionHeader title={tr("By ticker ({n})", { n: byTicker.length })} isOpen={isTickersOpen} onToggle={() => setTickersOpen((v) => !v)} />
         {isTickersOpen ? (
           <div className={investingTableScrollWrap}>
             <table className="w-full min-w-[760px] border-collapse text-left text-sm tabular-nums">
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Ticker</th>
-                  <th className="px-3 py-2 text-right font-medium">Buys / Sells</th>
-                  <th className="px-3 py-2 text-right font-medium">Bought</th>
-                  <th className="px-3 py-2 text-right font-medium">Sold</th>
-                  <th className="px-3 py-2 text-right font-medium">Realized P&L</th>
-                  <th className="px-3 py-2 text-right font-medium">Fees</th>
-                  <th className="px-3 py-2 text-right font-medium">Last trade</th>
+                  <th className="px-3 py-2 font-medium">{tr("Ticker")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Buys / Sells")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Bought")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Sold")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Realized P&L")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Fees")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Last trade")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -586,7 +596,7 @@ export default function InvestingActivitiesPage() {
                       setYearFilter("all");
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
-                    title="Show this ticker's trades"
+                    title={tr("Show this ticker’s trades")}
                   >
                     <td className="px-3 py-2">
                       <span className="font-semibold text-[#1f1c17]">{r.ticker}</span>{" "}
@@ -602,7 +612,7 @@ export default function InvestingActivitiesPage() {
                     </td>
                     <td className="px-3 py-2 text-right text-[#6f675b]">{formatUsd(r.fees)}</td>
                     <td className="px-3 py-2 text-right text-[#6f675b]">
-                      {r.last == null ? "—" : new Date(r.last).toLocaleDateString()}
+                      {r.last == null ? "—" : new Date(r.last).toLocaleDateString(locale)}
                     </td>
                   </tr>
                 ))}
@@ -620,14 +630,14 @@ export default function InvestingActivitiesPage() {
             <table className="w-full min-w-[760px] border-collapse text-left text-sm tabular-nums">
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Year</th>
-                  <th className="px-3 py-2 text-right font-medium">Purchases</th>
-                  <th className="px-3 py-2 text-right font-medium">Purchase fees</th>
-                  <th className="px-3 py-2 text-right font-medium">Sales</th>
-                  <th className="px-3 py-2 text-right font-medium">Sale fees</th>
-                  <th className="px-3 py-2 text-right font-medium">Realized P&L</th>
-                  <th className="px-3 py-2 text-right font-medium" title="Sales − purchases − fees + realized P&L">
-                    Net cash flow
+                  <th className="px-3 py-2 font-medium">{tr("Year")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Purchases")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Purchase fees")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Sales")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Sale fees")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Realized P&L")}</th>
+                  <th className="px-3 py-2 text-right font-medium" title={tr("Sales − purchases − fees + realized P&L")}>
+                    {tr("Net cash flow")}
                   </th>
                 </tr>
               </thead>
@@ -650,7 +660,7 @@ export default function InvestingActivitiesPage() {
                 {activitiesSummary.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-3 py-4 text-center text-xs text-[#8f8676]">
-                      No yearly data yet.
+                      {tr("No yearly data yet.")}
                     </td>
                   </tr>
                 ) : null}

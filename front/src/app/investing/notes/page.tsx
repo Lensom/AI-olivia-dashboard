@@ -9,6 +9,7 @@ import {
   investingPrimarySaveActive,
   investingPrimarySaveDisabled,
 } from "@/features/investing/ui/investing-classes";
+import { useLocale, useT } from "@/lib/i18n";
 import { useBroker } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
 
@@ -30,6 +31,7 @@ function inline(text: string): ReactNode {
 
 /** Minimal Markdown-ish preview: # headings, "* "/"- " bullets, "1. " lists, lines ending in ":" or "?" as section titles. */
 function NotesPreview({ text }: { text: string }) {
+  const t = useT();
   const blocks: ReactNode[] = [];
   let list: { ordered: boolean; items: string[] } | null = null;
   const flush = () => {
@@ -75,16 +77,17 @@ function NotesPreview({ text }: { text: string }) {
   return blocks.length ? (
     <div className="space-y-2 text-sm leading-6 text-[#2f2922]">{blocks}</div>
   ) : (
-    <p className="text-sm text-[#8f8676]">Nothing to preview yet.</p>
+    <p className="text-sm text-[#8f8676]">{t("Nothing to preview yet.")}</p>
   );
 }
 
 function Fact({ label, value, hint, href }: { label: string; value: string; hint?: string; href: string }) {
+  const t = useT();
   return (
     <Link href={href} className="block rounded-xl bg-[#faf8f2] px-3 py-2.5 transition hover:bg-[#f4efe4]">
-      <p className="text-[11px] text-[#8f8676]">{label}</p>
+      <p className="text-[11px] text-[#8f8676]">{t(label)}</p>
       <p className="text-base font-semibold tabular-nums text-[#1f1c17]">{value}</p>
-      {hint ? <p className="text-[11px] text-[#8f8676]">{hint}</p> : null}
+      {hint ? <p className="text-[11px] text-[#8f8676]">{t(hint)}</p> : null}
     </Link>
   );
 }
@@ -104,6 +107,8 @@ export default function InvestingNotesPage() {
     activitiesSummary,
   } = useInvesting();
   const { cashUsd } = useBroker();
+  const tr = useT();
+  const locale = useLocale();
   const [mode, setMode] = useState<"write" | "preview">("write");
   const [saveError, setSaveError] = useState(false);
 
@@ -167,20 +172,19 @@ export default function InvestingNotesPage() {
 
   const words = notes.trim() ? notes.trim().split(/\s+/).length : 0;
   const status = saveError
-    ? { text: "Couldn't save — check connection", cls: "text-rose-700" }
+    ? { text: tr("Couldn’t save — check connection"), cls: "text-rose-700" }
     : isNotesSaving
-      ? { text: "Saving…", cls: "text-[#8f8676]" }
+      ? { text: tr("Saving…"), cls: "text-[#8f8676]" }
       : isNotesDirty
-        ? { text: "Unsaved changes", cls: "text-amber-700" }
+        ? { text: tr("Unsaved changes"), cls: "text-amber-700" }
         : notesMeta.updatedAt
-          ? { text: `Saved ${new Date(notesMeta.updatedAt).toLocaleString()}`, cls: "text-[#8f8676]" }
-          : { text: "Not saved yet", cls: "text-[#8f8676]" };
+          ? { text: tr("Saved {when}", { when: new Date(notesMeta.updatedAt).toLocaleString(locale) }), cls: "text-[#8f8676]" }
+          : { text: tr("Not saved yet"), cls: "text-[#8f8676]" };
 
   return (
     <div className={investingPageStack}>
       <p className="text-sm text-[#655d51]">
-        Your investing rules and plans. Changes save automatically; the panel on the right shows your current numbers
-        to check the rules against.
+        {tr("Your investing rules and plans. Changes save automatically; the panel on the right shows your current numbers to check the rules against.")}
       </p>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_280px] [&>*]:min-w-0">
@@ -197,7 +201,7 @@ export default function InvestingNotesPage() {
                     mode === m ? "bg-[#f3efe5] text-[#1f1c17]" : "text-[#6f675b] hover:bg-[#faf8f2]",
                   ].join(" ")}
                 >
-                  {m}
+                  {m === "write" ? tr("Write") : tr("Preview")}
                 </button>
               ))}
             </div>
@@ -217,7 +221,7 @@ export default function InvestingNotesPage() {
                     : investingPrimarySaveActive,
                 ].join(" ")}
               >
-                Save now
+                {tr("Save now")}
               </button>
             </div>
           </div>
@@ -226,8 +230,8 @@ export default function InvestingNotesPage() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder={"Write your investing rules…\n\n* Bullets start with * or -\nSection titles end with :"}
-              aria-label="Investing notes"
+              placeholder={tr("Write your investing rules…\n\n* Bullets start with * or -\nSection titles end with :")}
+              aria-label={tr("Investing notes")}
               className="min-h-[420px] w-full resize-y rounded-xl border border-black/10 bg-[#faf8f2] p-4 font-mono text-[13px] leading-6 text-[#2f2922] outline-none focus:border-black/20"
             />
           ) : (
@@ -237,15 +241,14 @@ export default function InvestingNotesPage() {
           )}
 
           <p className="mt-2 text-[11px] text-[#8f8676]">
-            {words} words · Use * or - for bullets, # for headings, **bold** for emphasis. Ctrl/⌘ + S saves
-            immediately.
+            {tr("{n} words", { n: words })} · {tr("Use * or - for bullets, # for headings, **bold** for emphasis. Ctrl/⌘ + S saves immediately.")}
           </p>
         </article>
 
         <aside className={`${card} h-fit space-y-2`}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">Your numbers</h2>
-          <p className="pb-1 text-[11px] text-[#8f8676]">Live values to check your rules against. Click to open.</p>
-          <Fact label="Account value" value={formatUsd(facts.value)} hint={cashUsd > 0 ? `incl. ${formatUsd(cashUsd)} broker cash` : undefined} href="/investing/holdings" />
+          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Your numbers")}</h2>
+          <p className="pb-1 text-[11px] text-[#8f8676]">{tr("Live values to check your rules against. Click to open.")}</p>
+          <Fact label="Account value" value={formatUsd(facts.value)} hint={cashUsd > 0 ? tr("incl. {v} broker cash", { v: formatUsd(cashUsd) }) : undefined} href="/investing/holdings" />
           <Fact
             label="ETF share"
             value={`${facts.etfPct.toFixed(1)}%`}

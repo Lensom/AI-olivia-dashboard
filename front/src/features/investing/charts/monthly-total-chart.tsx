@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import { useMemo, useState } from "react";
 import { formatUsd } from "@/features/investing/format";
 
@@ -15,6 +16,7 @@ export type MonthlyTotalPoint = { key: string; label: string; value: number; cha
 /** One bar per month (single series, so no legend); hover shows the value and the change from the month before. */
 export function MonthlyTotalChart({ data }: { data: MonthlyTotalPoint[] }) {
   const [hover, setHover] = useState<number | null>(null);
+  const t = useT();
   const { yMax, ticks } = useMemo(() => {
     const hi = Math.max(1, ...data.map((d) => d.value));
     const raw = hi / 4;
@@ -35,7 +37,7 @@ export function MonthlyTotalChart({ data }: { data: MonthlyTotalPoint[] }) {
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Total by month">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={t("Total by month")}>
         {ticks.map((t) => (
           <g key={t}>
             <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke="rgba(0,0,0,0.06)" />
@@ -88,7 +90,7 @@ export function MonthlyTotalChart({ data }: { data: MonthlyTotalPoint[] }) {
           {hovered.change != null ? (
             <p className={`tabular-nums ${hovered.change >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
               {hovered.change >= 0 ? "+" : ""}
-              {formatUsd(hovered.change)} vs month before
+              {formatUsd(hovered.change)} {t("vs month before")}
             </p>
           ) : null}
         </div>

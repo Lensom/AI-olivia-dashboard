@@ -90,7 +90,7 @@ export function CapitalValueLineChart({
 
     const pts = data.map((d, i) => ({ x: xAt(i), y: yAt(d.value) }));
     const pathD = buildStepAfterPath(pts);
-    const circles = pts;
+    const circles = pts.map((p) => ({ cx: p.x, cy: p.y }));
     const tickYs = ticks.map((tv) => yAt(tv));
 
     const maxLabels = 8;

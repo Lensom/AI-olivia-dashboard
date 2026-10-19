@@ -15,6 +15,7 @@ import {
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useBroker } from "@/state/broker-store";
 import { useCrypto } from "@/state/crypto-store";
@@ -95,10 +96,10 @@ const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30
 const input =
   "w-full rounded-lg border border-black/10 bg-white/90 px-2 py-1 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20 focus:bg-white";
 
-function monthLabel(ym: string, short = false): string {
+function formatMonth(ym: string, short: boolean, locale: string): string {
   const [y, m] = ym.split("-").map(Number);
   if (!y || !m) return ym;
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", {
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString(locale, {
     month: short ? "short" : "long",
     year: short ? "2-digit" : "numeric",
     timeZone: "UTC",
@@ -117,6 +118,9 @@ export default function InvestingTotalPage() {
   const { holdings } = useInvesting();
   const { holdings: cryptoHoldings } = useCrypto();
   const { cashUsd: brokerCashUsd } = useBroker();
+  const tr = useT();
+  const locale = useLocale();
+  const monthLabel = useCallback((ym: string, short = false) => formatMonth(ym, short, locale), [locale]);
 
   const [data, setData] = useState<TotalData | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -141,7 +145,7 @@ export default function InvestingTotalPage() {
         }
         setUpdatedAt(res.updated_at);
       })
-      .catch(() => setSaveError("Couldn't load your totals."));
+      .catch(() => setSaveError("Couldn’t load your totals."));
     apiFetch<{ to_usd: Record<string, number>; date: string | null }>("/investing/rates", { token })
       .then(setRates)
       .catch(() => setRates({ to_usd: { USD: 1 }, date: null }));
@@ -174,7 +178,7 @@ export default function InvestingTotalPage() {
       setDirty(false);
       setPrefilled(false);
     } catch {
-      setSaveError("Couldn't save — try again.");
+      setSaveError("Couldn’t save — try again.");
     } finally {
       setSaving(false);
     }
@@ -215,7 +219,7 @@ export default function InvestingTotalPage() {
         value: m.total_usd,
         change: i > 0 ? m.total_usd - months[i - 1]!.total_usd : null,
       })),
-    [months],
+    [months, monthLabel],
   );
   const last = months.filter((m) => m.month < nowMonth).at(-1) ?? null;
   const lastDec = months.filter((m) => m.month <= `${Number(nowMonth.slice(0, 4)) - 1}-12`).at(-1) ?? null;
@@ -250,7 +254,7 @@ export default function InvestingTotalPage() {
   if (!data) {
     return (
       <div className={investingPageStack}>
-        <p className="text-sm text-[#8f8676]">{saveError ?? "Loading…"}</p>
+        <p className="text-sm text-[#8f8676]">{tr(saveError ?? "Loading…")}</p>
       </div>
     );
   }
@@ -267,24 +271,23 @@ export default function InvestingTotalPage() {
     <div className={investingPageStack}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">Investing</p>
-          <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">Total</h1>
+          <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">{tr("Investing")}</p>
+          <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">{tr("Total")}</h1>
           <p className="mt-1.5 max-w-2xl text-sm text-[#655d51]">
-            Everything you own in one number: stocks and crypto live from the app, bank accounts and cash in any
-            currency at official NBU rates, minus debts. Record it once a month to build your history.
+            {tr("Everything you own in one number: stocks and crypto live from the app, bank accounts and cash in any currency at official NBU rates, minus debts. Record it once a month to build your history.")}
           </p>
         </div>
         <Link href="/investing" className={investingToolbarBtn}>
-          Back to Investing
+          {tr("Back to Investing")}
         </Link>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={investingMetaBadge}>{updatedAt ? `Saved ${new Date(updatedAt).toLocaleString()}` : "Not saved yet"}</span>
+          <span className={investingMetaBadge}>{updatedAt ? tr("Saved {when}", { when: new Date(updatedAt).toLocaleString(locale) }) : tr("Not saved yet")}</span>
           <span className={investingMetaBadge}>
-            Rates: NBU {rates?.date ?? "…"}
-            {Object.keys(data.rate_overrides).length ? " · with your overrides" : ""}
+            {tr("Rates: NBU {date}", { date: rates?.date ?? "…" })}
+            {Object.keys(data.rate_overrides).length ? ` · ${tr("with your overrides")}` : ""}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -292,9 +295,9 @@ export default function InvestingTotalPage() {
             type="button"
             onClick={recordMonth}
             className={investingToolbarBtn}
-            title="Store today's net worth as this month's total"
+            title={tr("Store today’s net worth as this month’s total")}
           >
-            {thisMonthRecorded ? `Update ${monthLabel(nowMonth)}` : `Record ${monthLabel(nowMonth)}`}
+            {thisMonthRecorded ? tr("Update {month}", { month: monthLabel(nowMonth) }) : tr("Record {month}", { month: monthLabel(nowMonth) })}
           </button>
           <div className="flex rounded-full border border-black/10 bg-white p-1">
             {(["view", "edit"] as const).map((m) => (
@@ -307,7 +310,7 @@ export default function InvestingTotalPage() {
                   mode === m ? "bg-[#f3efe5] text-[#1f1c17]" : "text-[#6f675b] hover:bg-[#faf8f2]",
                 ].join(" ")}
               >
-                {m}
+                {m === "view" ? tr("View") : tr("Edit")}
               </button>
             ))}
           </div>
@@ -317,37 +320,36 @@ export default function InvestingTotalPage() {
             disabled={!isDirty || isSaving}
             className={!isDirty || isSaving ? investingPrimarySaveDisabled : investingPrimarySaveActive}
           >
-            {isSaving ? "Saving…" : "Save"}
+            {isSaving ? tr("Saving…") : tr("Save")}
           </button>
         </div>
       </div>
 
       {isPrefilled ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-          Pre-filled from your spreadsheet: the accounts and monthly totals Jan 2025 – Sep 2026. Stocks and Crypto are
-          live from the app. Check the numbers (Edit), then press <strong>Save</strong>.
+          {tr("Pre-filled from your spreadsheet: the accounts and monthly totals Jan 2025 – Sep 2026. Stocks and Crypto are live from the app. Check the numbers (Edit), then press Save.")}
         </div>
       ) : isDirty ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
-          <span aria-hidden>●</span> Unsaved changes — press Save to keep them.
+          <span aria-hidden>●</span> {tr("Unsaved changes — press Save to keep them.")}
         </div>
       ) : null}
-      {saveError ? <p className="text-sm text-rose-700">{saveError}</p> : null}
+      {saveError ? <p className="text-sm text-rose-700">{tr(saveError)}</p> : null}
 
       {/* Headline */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article className={card}>
-          <p className="text-xs text-[#7f7668]">Net worth</p>
+          <p className="text-xs text-[#7f7668]">{tr("Net worth")}</p>
           <p className="mt-1.5 text-3xl font-semibold tabular-nums text-[#1f1c17]">{formatUsd(sums.net)}</p>
           <p className="mt-1 text-xs text-[#6f675b]">
-            Assets {formatUsd(sums.assets)}
-            {sums.by.owed_to_me || sums.by.i_owe ? ` · debts ${signedUsd(sums.by.owed_to_me - sums.by.i_owe)}` : ""}
+            {tr("Assets {v}", { v: formatUsd(sums.assets) })}
+            {sums.by.owed_to_me || sums.by.i_owe ? ` · ${tr("debts {v}", { v: signedUsd(sums.by.owed_to_me - sums.by.i_owe) })}` : ""}
           </p>
         </article>
         {[
-          { label: "Since last month", base: last, hint: last ? `vs ${monthLabel(last.month)}` : "No earlier month" },
-          { label: "This year", base: lastDec, hint: lastDec ? `vs ${monthLabel(lastDec.month)}` : "No year-end month" },
-          { label: "Last 12 months", base: yearAgo, hint: yearAgo ? `vs ${monthLabel(yearAgo.month)}` : "Less than a year of history" },
+          { label: tr("Since last month"), base: last, hint: last ? tr("vs {month}", { month: monthLabel(last.month) }) : tr("No earlier month") },
+          { label: tr("This year"), base: lastDec, hint: lastDec ? tr("vs {month}", { month: monthLabel(lastDec.month) }) : tr("No year-end month") },
+          { label: tr("Last 12 months"), base: yearAgo, hint: yearAgo ? tr("vs {month}", { month: monthLabel(yearAgo.month) }) : tr("Less than a year of history") },
         ].map(({ label, base, hint }) => {
           const diff = base ? sums.net - base.total_usd : null;
           return (
@@ -369,7 +371,7 @@ export default function InvestingTotalPage() {
         {/* Accounts */}
         <article className={card}>
           <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold text-[#1f1c17]">Accounts</h2>
+            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Accounts")}</h2>
             {mode === "edit" ? (
               <button
                 type="button"
@@ -381,7 +383,7 @@ export default function InvestingTotalPage() {
                 }
                 className={investingToolbarBtn}
               >
-                Add account
+                {tr("Add account")}
               </button>
             ) : null}
           </div>
@@ -389,11 +391,11 @@ export default function InvestingTotalPage() {
             <table className={`w-full ${mode === "edit" ? "min-w-[720px]" : "min-w-[520px]"} border-collapse text-left text-sm`}>
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Account</th>
-                  <th className="px-3 py-2 font-medium">Group</th>
-                  <th className="px-3 py-2 text-right font-medium">Amount</th>
+                  <th className="px-3 py-2 font-medium">{tr("Account")}</th>
+                  <th className="px-3 py-2 font-medium">{tr("Group")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Amount")}</th>
                   <th className="px-3 py-2 text-right font-medium">USD</th>
-                  {mode === "view" ? <th className="px-3 py-2 text-right font-medium">Share</th> : <th className="px-3 py-2" />}
+                  {mode === "view" ? <th className="px-3 py-2 text-right font-medium">{tr("Share")}</th> : <th className="px-3 py-2" />}
                 </tr>
               </thead>
               <tbody>
@@ -407,7 +409,7 @@ export default function InvestingTotalPage() {
                             value={a.name}
                             onChange={(e) => edit((d) => ({ ...d, accounts: d.accounts.map((x) => (x.id === a.id ? { ...x, name: e.target.value } : x)) }))}
                             className={input}
-                            placeholder="ING, Cash…"
+                            placeholder={tr("ING, Cash…")}
                           />
                         </td>
                         <td className="px-2 py-2">
@@ -420,7 +422,7 @@ export default function InvestingTotalPage() {
                           >
                             {(Object.keys(CATEGORY_LABEL) as Category[]).map((c) => (
                               <option key={c} value={c}>
-                                {CATEGORY_LABEL[c]}
+                                {tr(CATEGORY_LABEL[c])}
                               </option>
                             ))}
                           </select>
@@ -433,11 +435,11 @@ export default function InvestingTotalPage() {
                                 edit((d) => ({ ...d, accounts: d.accounts.map((x) => (x.id === a.id ? { ...x, source: e.target.value as Source } : x)) }))
                               }
                               className={`${input} w-[118px]`}
-                              aria-label="Source"
+                              aria-label={tr("Source")}
                             >
-                              <option value="manual">Typed</option>
-                              <option value="stocks">Live: Stocks</option>
-                              <option value="crypto">Live: Crypto</option>
+                              <option value="manual">{tr("Typed")}</option>
+                              <option value="stocks">{tr("Live: Stocks")}</option>
+                              <option value="crypto">{tr("Live: Crypto")}</option>
                             </select>
                             {a.source === "manual" ? (
                               <>
@@ -452,7 +454,7 @@ export default function InvestingTotalPage() {
                                   value={a.currency}
                                   onChange={(e) => edit((d) => ({ ...d, accounts: d.accounts.map((x) => (x.id === a.id ? { ...x, currency: e.target.value } : x)) }))}
                                   className={`${input} w-[78px]`}
-                                  aria-label="Currency"
+                                  aria-label={tr("Currency")}
                                 >
                                   {[...new Set([...CURRENCIES, a.currency])].map((c) => (
                                     <option key={c} value={c}>
@@ -471,7 +473,7 @@ export default function InvestingTotalPage() {
                             onClick={() => edit((d) => ({ ...d, accounts: d.accounts.filter((x) => x.id !== a.id) }))}
                             className={investingToolbarBtn}
                           >
-                            Delete
+                            {tr("Delete")}
                           </button>
                         </td>
                       </tr>
@@ -481,20 +483,20 @@ export default function InvestingTotalPage() {
                     <tr key={a.id} className="border-t border-black/5 hover:bg-[#faf8f2]">
                       <td className="px-3 py-2.5 font-medium text-[#1f1c17]">
                         {a.name || "—"}
-                        {live ? <span className="ml-1.5 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800">LIVE</span> : null}
+                        {live ? <span className="ml-1.5 rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800">{tr("LIVE")}</span> : null}
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-[#6f675b]">{CATEGORY_LABEL[a.category]}</td>
+                      <td className="px-3 py-2.5 text-xs text-[#6f675b]">{tr(CATEGORY_LABEL[a.category])}</td>
                       <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-[#3b352d]">
                         {live ? (
                           <Link href={a.source === "stocks" ? "/investing/holdings" : "/investing/crypto"} className="text-xs underline decoration-black/15 underline-offset-2">
-                            from {a.source === "stocks" ? (brokerCashUsd > 0 ? "Portfolio + cash" : "Portfolio") : "Crypto"}
+                            {tr("from {where}", { where: tr(a.source === "stocks" ? (brokerCashUsd > 0 ? "Portfolio + cash" : "Portfolio") : "Crypto") })}
                           </Link>
                         ) : (
-                          `${parseCryptoAmount(a.amount).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${CURRENCY_SIGN[a.currency] ?? a.currency}`
+                          `${parseCryptoAmount(a.amount).toLocaleString(locale, { maximumFractionDigits: 2 })} ${CURRENCY_SIGN[a.currency] ?? a.currency}`
                         )}
                       </td>
                       <td className={`whitespace-nowrap px-3 py-2.5 text-right font-medium tabular-nums ${a.category === "i_owe" && usd > 0 ? "text-rose-700" : "text-[#1f1c17]"}`}>
-                        {missingRate ? <span title="No rate for this currency — add an override">⚠ no rate</span> : `${a.category === "i_owe" && usd > 0 ? "−" : ""}${formatUsd(usd)}`}
+                        {missingRate ? <span title={tr("No rate for this currency — add an override")}>⚠ {tr("no rate")}</span> : `${a.category === "i_owe" && usd > 0 ? "−" : ""}${formatUsd(usd)}`}
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-[#6f675b]">
                         {isDebt || sums.assets <= 0 ? "—" : `${((usd / sums.assets) * 100).toFixed(1)}%`}
@@ -506,7 +508,7 @@ export default function InvestingTotalPage() {
               <tfoot>
                 <tr className="border-t-2 border-black/15 bg-[#f6f3ea] font-semibold text-[#1f1c17]">
                   <td className="px-3 py-2" colSpan={3}>
-                    Net worth
+                    {tr("Net worth")}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatUsd(sums.net)}</td>
                   <td />
@@ -515,14 +517,14 @@ export default function InvestingTotalPage() {
             </table>
           </div>
           <p className="mt-2 text-[11px] text-[#8f8676]">
-            Net worth = stocks + savings + crypto + owed to me − I owe. Shares are of assets (debts excluded).
+            {tr("Net worth = stocks + savings + crypto + owed to me − I owe. Shares are of assets (debts excluded).")}
           </p>
         </article>
 
         <div className="space-y-4">
           {/* Allocation vs goal */}
           <article className={card}>
-            <h2 className="text-sm font-semibold text-[#1f1c17]">Mix vs goal</h2>
+            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Mix vs goal")}</h2>
             <div className="mt-3 space-y-3">
               {GROUPS.map((g) => {
                 const pct = sums.assets > 0 ? (sums.by[g.key]! / sums.assets) * 100 : 0;
@@ -532,7 +534,7 @@ export default function InvestingTotalPage() {
                     <div className="flex items-baseline justify-between gap-2 text-sm">
                       <span className="inline-flex items-center gap-1.5 text-[#2f2922]">
                         <span className="h-2.5 w-2.5 rounded-full" style={{ background: g.color }} />
-                        {g.label}
+                        {tr(g.label)}
                       </span>
                       <span className="text-xs tabular-nums text-[#6f675b]">
                         <span className="font-semibold text-[#1f1c17]">{pct.toFixed(1)}%</span> · {formatUsd(sums.by[g.key]!)} ·{" "}
@@ -542,40 +544,44 @@ export default function InvestingTotalPage() {
                             onChange={(e) => edit((d) => ({ ...d, goals: { ...d.goals, [g.key]: Number(e.target.value.replace(",", ".")) || 0 } }))}
                             className="w-12 rounded border border-black/10 px-1 text-right"
                             inputMode="decimal"
-                            aria-label={`${g.label} goal %`}
+                            aria-label={tr("{group} goal %", { group: tr(g.label) })}
                           />
                         ) : (
                           goal
                         )}
-                        % goal
+                        % {tr("goal")}
                       </span>
                     </div>
                     <div className="relative mt-1 h-2 rounded-full bg-black/5">
                       <div className="h-2 rounded-full" style={{ width: `${Math.min(100, pct)}%`, background: g.color }} />
-                      <div className="absolute -top-1 h-4 w-0.5 bg-[#1f1c17]" style={{ left: `${Math.min(100, goal)}%` }} title={`Goal ${goal}%`} />
+                      <div className="absolute -top-1 h-4 w-0.5 bg-[#1f1c17]" style={{ left: `${Math.min(100, goal)}%` }} title={tr("Goal {v}%", { v: goal })} />
                     </div>
                   </div>
                 );
               })}
             </div>
             {Math.abs(goalsSum - 100) > 0.5 ? (
-              <p className="mt-3 text-xs text-amber-800">⚠ Goals add up to {goalsSum}%, not 100%.</p>
+              <p className="mt-3 text-xs text-amber-800">⚠ {tr("Goals add up to {v}%, not 100%.", { v: goalsSum })}</p>
             ) : underweight && underweight.gap > 1 ? (
               <p className="mt-3 text-xs text-[#3b352d]">
-                Furthest below goal: <span className="font-semibold">{underweight.g.label}</span> by {underweight.gap.toFixed(1)} pp — reaching{" "}
-                {data.goals[underweight.g.key]}% would take about{" "}
-                {formatUsd(Math.max(0, ((data.goals[underweight.g.key] ?? 0) / 100) * sums.assets - sums.by[underweight.g.key]!))}{" "}
-                more at today&apos;s total.
+                {tr("Furthest below goal: {group} by {pp} pp — reaching {goal}% would take about {v} more at today’s total.", {
+                  group: tr(underweight.g.label),
+                  pp: underweight.gap.toFixed(1),
+                  goal: data.goals[underweight.g.key] ?? 0,
+                  v: formatUsd(Math.max(0, ((data.goals[underweight.g.key] ?? 0) / 100) * sums.assets - sums.by[underweight.g.key]!)),
+                })}
               </p>
             ) : (
-              <p className="mt-3 text-xs text-emerald-800">✓ Within 1 pp of every goal.</p>
+              <p className="mt-3 text-xs text-emerald-800">✓ {tr("Within 1 pp of every goal.")}</p>
             )}
           </article>
 
           {/* Rates */}
           <article className={card}>
-            <h2 className="text-sm font-semibold text-[#1f1c17]">Exchange rates</h2>
-            <p className="mt-0.5 text-xs text-[#8f8676]">Official NBU rates {rates?.date ? `for ${rates.date}` : ""}. Override one only if you need a different rate.</p>
+            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Exchange rates")}</h2>
+            <p className="mt-0.5 text-xs text-[#8f8676]">
+              {rates?.date ? tr("Official NBU rates for {date}.", { date: rates.date }) : tr("Official NBU rates.")} {tr("Override one only if you need a different rate.")}
+            </p>
             <table className="mt-3 w-full text-sm tabular-nums">
               <tbody>
                 {usedCurrencies.map((c) => {
@@ -587,7 +593,7 @@ export default function InvestingTotalPage() {
                       <td className="py-1.5 font-medium text-[#1f1c17]">{c}</td>
                       <td className="py-1.5 text-right text-[#3b352d]">
                         {used ? (used >= 1 ? `1 ${c} = $${used.toFixed(4)}` : `$1 = ${(1 / used).toFixed(2)} ${c}`) : "—"}
-                        {override != null ? <span className="ml-1 text-[11px] text-amber-700">override</span> : null}
+                        {override != null ? <span className="ml-1 text-[11px] text-amber-700">{tr("override")}</span> : null}
                       </td>
                       {mode === "edit" ? (
                         <td className="py-1.5 pl-2 text-right">
@@ -603,8 +609,8 @@ export default function InvestingTotalPage() {
                               });
                             }}
                             className="w-28 rounded border border-black/10 px-1.5 py-0.5 text-right text-xs"
-                            placeholder={official ? official.toFixed(4) : "USD per 1"}
-                            aria-label={`${c} override, USD per 1`}
+                            placeholder={official ? official.toFixed(4) : tr("USD per 1")}
+                            aria-label={tr("{c} override, USD per 1", { c })}
                           />
                         </td>
                       ) : null}
@@ -613,7 +619,7 @@ export default function InvestingTotalPage() {
                 })}
               </tbody>
             </table>
-            {mode === "edit" ? <p className="mt-2 text-[11px] text-[#8f8676]">Override = USD per 1 unit. Leave empty to use NBU.</p> : null}
+            {mode === "edit" ? <p className="mt-2 text-[11px] text-[#8f8676]">{tr("Override = USD per 1 unit. Leave empty to use NBU.")}</p> : null}
           </article>
         </div>
       </section>
@@ -622,9 +628,9 @@ export default function InvestingTotalPage() {
       <article className={card}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
-            <h2 className="text-sm font-semibold text-[#1f1c17]">Net worth by month</h2>
+            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Net worth by month")}</h2>
             <p className="mt-0.5 text-xs text-[#8f8676]">
-              Use “Record {monthLabel(nowMonth)}” once a month; it stores today&apos;s net worth with its breakdown.
+              {tr("Use “Record {month}” once a month; it stores today’s net worth with its breakdown.", { month: monthLabel(nowMonth) })}
             </p>
           </div>
           {mode === "edit" ? (
@@ -633,7 +639,7 @@ export default function InvestingTotalPage() {
               onClick={() => edit((d) => ({ ...d, months: [...d.months, { id: newId(), month: "", total_usd: 0, breakdown: {} }] }))}
               className={investingToolbarBtn}
             >
-              Add month
+              {tr("Add month")}
             </button>
           ) : null}
         </div>
@@ -642,7 +648,7 @@ export default function InvestingTotalPage() {
             <MonthlyTotalChart data={chart} />
           </div>
         ) : (
-          <p className="mt-4 text-sm text-[#8f8676]">No months yet — press Record to add this month.</p>
+          <p className="mt-4 text-sm text-[#8f8676]">{tr("No months yet — press Record to add this month.")}</p>
         )}
 
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] [&>*]:min-w-0">
@@ -650,9 +656,9 @@ export default function InvestingTotalPage() {
             <table className="w-full min-w-[460px] border-collapse text-left text-sm tabular-nums">
               <thead className="sticky top-0 bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Month</th>
-                  <th className="px-3 py-2 text-right font-medium">Total</th>
-                  <th className="px-3 py-2 text-right font-medium">Change</th>
+                  <th className="px-3 py-2 font-medium">{tr("Month")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Total")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Change")}</th>
                   <th className="px-3 py-2" />
                 </tr>
               </thead>
@@ -674,7 +680,7 @@ export default function InvestingTotalPage() {
                         ) : (
                           <>
                             {monthLabel(m.month)}
-                            {Object.keys(m.breakdown).length ? <span className="ml-1.5 text-[10px] text-[#8f8676]" title="Recorded from the page with a breakdown">●</span> : null}
+                            {Object.keys(m.breakdown).length ? <span className="ml-1.5 text-[10px] text-[#8f8676]" title={tr("Recorded from the page with a breakdown")}>●</span> : null}
                           </>
                         )}
                       </td>
@@ -696,7 +702,7 @@ export default function InvestingTotalPage() {
                       <td className="px-2 py-2 text-right">
                         {mode === "edit" ? (
                           <button type="button" onClick={() => edit((d) => ({ ...d, months: d.months.filter((x) => x.id !== m.id) }))} className={investingToolbarBtn}>
-                            Delete
+                            {tr("Delete")}
                           </button>
                         ) : null}
                       </td>
@@ -711,9 +717,9 @@ export default function InvestingTotalPage() {
             <table className="w-full border-collapse text-left text-sm tabular-nums">
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
-                  <th className="px-3 py-2 font-medium">Year</th>
-                  <th className="px-3 py-2 text-right font-medium">Year-end</th>
-                  <th className="px-3 py-2 text-right font-medium">Change</th>
+                  <th className="px-3 py-2 font-medium">{tr("Year")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Year-end")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Change")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -721,7 +727,7 @@ export default function InvestingTotalPage() {
                   <tr key={y.year} className="border-t border-black/5">
                     <td className="px-3 py-2 font-medium text-[#1f1c17]">
                       {y.year}
-                      {y.m.month.slice(5) !== "12" ? <span className="ml-1 text-[11px] font-normal text-[#8f8676]">(to {monthLabel(y.m.month, true)})</span> : null}
+                      {y.m.month.slice(5) !== "12" ? <span className="ml-1 text-[11px] font-normal text-[#8f8676]">({tr("to {month}", { month: monthLabel(y.m.month, true) })})</span> : null}
                     </td>
                     <td className="px-3 py-2 text-right text-[#1f1c17]">{formatUsd(y.m.total_usd)}</td>
                     <td className={`px-3 py-2 text-right ${tone(y.change)}`}>

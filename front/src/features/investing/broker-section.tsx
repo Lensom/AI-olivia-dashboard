@@ -11,6 +11,7 @@ import {
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { InvestingSubsectionHeader } from "@/features/investing/ui/investing-subsection-header";
+import { useT } from "@/lib/i18n";
 import { newBrokerId, useBroker, type BrokerDividend } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
 
@@ -36,6 +37,7 @@ export function dividendsLast12mUsd(rows: BrokerDividend[], nowMs: number): numb
 export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: number }) {
   const { cash, dividends, cashUsd, isDirty, isSaving, setCash, setDividends, save } = useBroker();
   const { metrics } = useInvesting();
+  const t = useT();
   const [open, setOpen] = useState(true);
   const [nowMs] = useState(() => Date.now());
   const [error, setError] = useState<string | null>(null);
@@ -94,21 +96,19 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
               disabled={!isDirty || isSaving}
               className={!isDirty || isSaving ? investingPrimarySaveDisabled : investingPrimarySaveActive}
             >
-              {isSaving ? "Saving…" : "Save cash & dividends"}
+              {isSaving ? t("Saving…") : t("Save cash & dividends")}
             </button>
-            {isDirty ? <span className="text-xs text-amber-800">● Unsaved changes</span> : null}
-            {error ? <span className="text-xs text-rose-700">{error}</span> : null}
+            {isDirty ? <span className="text-xs text-amber-800">● {t("Unsaved changes")}</span> : null}
+            {error ? <span className="text-xs text-rose-700">{t(error)}</span> : null}
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] [&>*]:min-w-0">
             {/* Cash */}
             <article className={card}>
-              <h3 className="text-sm font-semibold text-[#1f1c17]">Uninvested cash at the broker</h3>
-              <p className="mt-0.5 text-xs text-[#8f8676]">
-                Counted in current value, total return and XIRR. Update it when you check your broker.
-              </p>
+              <h3 className="text-sm font-semibold text-[#1f1c17]">{t("Uninvested cash at the broker")}</h3>
+              <p className="mt-0.5 text-xs text-[#8f8676]">{t("Counted in current value, total return and XIRR. Update it when you check your broker.")}</p>
               <p className="mt-3 text-2xl font-semibold tabular-nums text-[#1f1c17]">{formatUsd(cashUsd)}</p>
-              <p className="text-xs text-[#6f675b]">{cashShare.toFixed(1)}% of the account (holdings + cash)</p>
+              <p className="text-xs text-[#6f675b]">{t("{v}% of the account (holdings + cash)", { v: cashShare.toFixed(1) })}</p>
               <ul className="mt-3 space-y-2">
                 {cash.map((c) => (
                   <li key={c.id} className="flex items-center gap-2">
@@ -118,13 +118,13 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                       className={`${input} text-right tabular-nums`}
                       inputMode="decimal"
                       placeholder="0"
-                      aria-label="Cash amount"
+                      aria-label={t("Cash amount")}
                     />
                     <select
                       value={c.currency}
                       onChange={(e) => setCash((rows) => rows.map((r) => (r.id === c.id ? { ...r, currency: e.target.value } : r)))}
                       className={`${input} w-24`}
-                      aria-label="Currency"
+                      aria-label={t("Currency")}
                     >
                       {[...new Set([...CURRENCIES, c.currency])].map((cur) => (
                         <option key={cur} value={cur}>
@@ -136,7 +136,7 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                       type="button"
                       onClick={() => setCash((rows) => rows.filter((r) => r.id !== c.id))}
                       className="text-xs text-[#8f8676] hover:text-rose-700"
-                      aria-label="Remove balance"
+                      aria-label={t("Remove balance")}
                     >
                       ✕
                     </button>
@@ -148,17 +148,17 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                 onClick={() => setCash((rows) => [...rows, { id: newBrokerId(), currency: rows.length ? "EUR" : "USD", amount: "" }])}
                 className={`${investingToolbarBtn} mt-3`}
               >
-                {cash.length ? "Add another currency" : "Add cash balance"}
+                {cash.length ? t("Add another currency") : t("Add cash balance")}
               </button>
               {cash.some((c) => c.currency !== "USD") ? (
-                <p className="mt-2 text-[11px] text-[#8f8676]">Other currencies are converted at official NBU rates.</p>
+                <p className="mt-2 text-[11px] text-[#8f8676]">{t("Other currencies are converted at official NBU rates.")}</p>
               ) : null}
             </article>
 
             {/* Dividends */}
             <article className={card}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="text-sm font-semibold text-[#1f1c17]">Dividends received</h3>
+                <h3 className="text-sm font-semibold text-[#1f1c17]">{t("Dividends received")}</h3>
                 <button
                   type="button"
                   onClick={() =>
@@ -169,14 +169,14 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                   }
                   className={investingToolbarBtn}
                 >
-                  Add dividend
+                  {t("Add dividend")}
                 </button>
               </div>
               <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
                 {[
-                  { label: "Last 12 months (net)", value: formatUsd(stats.last12), sub: estimated > 0 ? `estimate at current yield: ${formatUsd(estimated)}` : "" },
-                  { label: `${new Date(nowMs).getUTCFullYear()} so far`, value: formatUsd(stats.thisYear), sub: "" },
-                  { label: "All time (net)", value: formatUsd(stats.allTime), sub: stats.taxAll > 0 ? `${formatUsd(stats.taxAll)} tax withheld` : "" },
+                  { label: t("Last 12 months (net)"), value: formatUsd(stats.last12), sub: estimated > 0 ? t("estimate at current yield: {v}", { v: formatUsd(estimated) }) : "" },
+                  { label: t("{year} so far", { year: new Date(nowMs).getUTCFullYear() }), value: formatUsd(stats.thisYear), sub: "" },
+                  { label: t("All time (net)"), value: formatUsd(stats.allTime), sub: stats.taxAll > 0 ? t("{v} tax withheld", { v: formatUsd(stats.taxAll) }) : "" },
                 ].map((s) => (
                   <div key={s.label}>
                     <p className="text-[11px] text-[#8f8676]">{s.label}</p>
@@ -186,8 +186,8 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                 ))}
                 {stats.topPayers.length ? (
                   <div>
-                    <p className="text-[11px] text-[#8f8676]">Top payers, 12 months</p>
-                    <p className="text-xs text-[#3b352d]">{stats.topPayers.map(([t, v]) => `${t} ${formatUsd(v)}`).join(" · ")}</p>
+                    <p className="text-[11px] text-[#8f8676]">{t("Top payers, 12 months")}</p>
+                    <p className="text-xs text-[#3b352d]">{stats.topPayers.map(([tk, v]) => `${tk} ${formatUsd(v)}`).join(" · ")}</p>
                   </div>
                 ) : null}
               </div>
@@ -196,12 +196,12 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                 <table className="w-full min-w-[640px] border-collapse text-left text-sm">
                   <thead className="sticky top-0 bg-[#f4efe4] text-xs text-[#7f7668]">
                     <tr>
-                      <th className="px-2 py-2 font-medium">Date</th>
-                      <th className="px-2 py-2 font-medium">Ticker</th>
-                      <th className="px-2 py-2 font-medium">Gross</th>
-                      <th className="px-2 py-2 font-medium">Tax withheld</th>
-                      <th className="px-2 py-2 font-medium">Currency</th>
-                      <th className="px-2 py-2 text-right font-medium">Net, USD</th>
+                      <th className="px-2 py-2 font-medium">{t("Date")}</th>
+                      <th className="px-2 py-2 font-medium">{t("Ticker")}</th>
+                      <th className="px-2 py-2 font-medium">{t("Gross")}</th>
+                      <th className="px-2 py-2 font-medium">{t("Tax withheld")}</th>
+                      <th className="px-2 py-2 font-medium">{t("Currency")}</th>
+                      <th className="px-2 py-2 text-right font-medium">{t("Net, USD")}</th>
                       <th className="px-2 py-2" />
                     </tr>
                   </thead>
@@ -209,7 +209,7 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                     {dividends.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-3 py-6 text-center text-xs text-[#8f8676]">
-                          No dividends recorded yet — Add dividend for each payout your broker shows.
+                          {t("No dividends recorded yet — Add dividend for each payout your broker shows.")}
                         </td>
                       </tr>
                     ) : null}
@@ -249,7 +249,7 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                               type="button"
                               onClick={() => setDividends((rows) => rows.filter((r) => r.id !== d.id))}
                               className="text-xs text-[#8f8676] hover:text-rose-700"
-                              aria-label="Delete dividend"
+                              aria-label={t("Delete dividend")}
                             >
                               ✕
                             </button>
@@ -262,13 +262,12 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
               </div>
               {stats.years.length ? (
                 <p className="mt-2 text-xs text-[#6f675b]">
-                  By year (net):{" "}
+                  {t("By year (net):")}{" "}
                   {stats.years.map(([y, v]) => `${y} ${formatUsd(v.gross - v.tax)} (${v.count})`).join(" · ")}
                 </p>
               ) : null}
               <p className="mt-1 text-[11px] text-[#8f8676]">
-                Dividends usually land in broker cash, so they&apos;re tracked here as income and not added to current
-                value a second time. Non-USD amounts are converted at the payment date&apos;s rate when you save.
+                {t("Dividends usually land in broker cash, so they’re tracked here as income and not added to current value a second time. Non-USD amounts are converted at the payment date’s rate when you save.")}
               </p>
             </article>
           </div>

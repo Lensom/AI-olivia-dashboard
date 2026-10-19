@@ -11,6 +11,7 @@ import {
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { useLocale, useT, type T } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useInvesting, type InvestingPickingRow } from "@/state/investing-store";
 
@@ -38,24 +39,25 @@ function signedPct(n: number, digits = 1): string {
 type Signal = { rank: number; label: string; detail: string; cls: string; icon: string };
 
 /** Where the price sits against the user's buy zones; rank sorts the best opportunities first. */
-function buySignal(row: InvestingPickingRow): Signal {
+function buySignal(row: InvestingPickingRow, t: T): Signal {
   const override = row.buy_right_now.trim();
-  if (override) return { rank: 2, label: override, detail: "Manual note", cls: "bg-[#f4efe4] text-[#3b352d]", icon: "✎" };
+  if (override) return { rank: 2, label: override, detail: t("Manual note"), cls: "bg-[#f4efe4] text-[#3b352d]", icon: "✎" };
   const px = num(row.current_price);
   const strong = num(row.strong_buy_until);
   const may = num(row.may_buy_until);
-  if (!Number.isFinite(px)) return { rank: 5, label: "No price", detail: "Refresh quotes", cls: "bg-[#f4efe4] text-[#8f8676]", icon: "…" };
+  if (!Number.isFinite(px)) return { rank: 5, label: t("No price"), detail: t("Refresh quotes"), cls: "bg-[#f4efe4] text-[#8f8676]", icon: "…" };
   if (Number.isFinite(strong) && px <= strong)
-    return { rank: 0, label: "Strong buy", detail: `${signedPct((px / strong - 1) * 100)} vs ${formatUsd(strong)}`, cls: "bg-emerald-50 text-emerald-800", icon: "▼" };
+    return { rank: 0, label: t("Strong buy"), detail: `${signedPct((px / strong - 1) * 100)} ${t("vs")} ${formatUsd(strong)}`, cls: "bg-emerald-50 text-emerald-800", icon: "▼" };
   if (Number.isFinite(may) && px <= may)
-    return { rank: 1, label: "May buy", detail: `${signedPct((px / may - 1) * 100)} vs ${formatUsd(may)}`, cls: "bg-amber-50 text-amber-800", icon: "◐" };
+    return { rank: 1, label: t("May buy"), detail: `${signedPct((px / may - 1) * 100)} ${t("vs")} ${formatUsd(may)}`, cls: "bg-amber-50 text-amber-800", icon: "◐" };
   const next = Number.isFinite(may) ? may : strong;
-  if (!Number.isFinite(next)) return { rank: 4, label: "No zone set", detail: "Add buy prices in Edit", cls: "bg-[#f4efe4] text-[#8f8676]", icon: "–" };
-  return { rank: 3, label: "Wait", detail: `needs ${signedPct((next / px - 1) * 100)} to ${formatUsd(next)}`, cls: "bg-rose-50 text-rose-800", icon: "■" };
+  if (!Number.isFinite(next)) return { rank: 4, label: t("No zone set"), detail: t("Add buy prices in Edit"), cls: "bg-[#f4efe4] text-[#8f8676]", icon: "–" };
+  return { rank: 3, label: t("Wait"), detail: t("needs {pct} to {v}", { pct: signedPct((next / px - 1) * 100), v: formatUsd(next) }), cls: "bg-rose-50 text-rose-800", icon: "■" };
 }
 
 /** Price track: green = strong-buy zone, amber = may-buy zone, dot = current price. */
 function ZoneBar({ row }: { row: InvestingPickingRow }) {
+  const t = useT();
   const px = num(row.current_price);
   const strong = num(row.strong_buy_until);
   const may = num(row.may_buy_until);
@@ -67,7 +69,7 @@ function ZoneBar({ row }: { row: InvestingPickingRow }) {
   return (
     <div
       className="relative h-2.5 w-36 rounded-full bg-black/5"
-      title={`Strong ≤ ${Number.isFinite(strong) ? formatUsd(strong) : "—"} · May ≤ ${Number.isFinite(may) ? formatUsd(may) : "—"} · Now ${formatUsd(px)}`}
+      title={`${t("Strong")} ≤ ${Number.isFinite(strong) ? formatUsd(strong) : "—"} · ${t("May")} ≤ ${Number.isFinite(may) ? formatUsd(may) : "—"} · ${t("Now")} ${formatUsd(px)}`}
     >
       {Number.isFinite(strong) ? <div className="absolute inset-y-0 left-0 rounded-l-full bg-emerald-400/80" style={{ width: x(strong) }} /> : null}
       {Number.isFinite(may) ? (
@@ -105,6 +107,8 @@ export default function InvestingPickingPage() {
     refreshPicking,
     holdings,
   } = useInvesting();
+  const tr = useT();
+  const locale = useLocale();
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [isAutofilling, setAutofilling] = useState(false);
   const [autofillMsg, setAutofillMsg] = useState<string | null>(null);
@@ -144,7 +148,7 @@ export default function InvestingPickingPage() {
     const groups = new Map<string, { row: InvestingPickingRow; signal: Signal; distance: number }[]>();
     for (const row of pickingRows) {
       const key = BUCKETS.some((b) => b.key === row.bucket) ? row.bucket : "value_blue_chips";
-      const signal = buySignal(row);
+      const signal = buySignal(row, tr);
       const px = num(row.current_price);
       const next = Number.isFinite(num(row.may_buy_until)) ? num(row.may_buy_until) : num(row.strong_buy_until);
       const distance = Number.isFinite(px) && Number.isFinite(next) ? px / next - 1 : Infinity;
@@ -159,7 +163,7 @@ export default function InvestingPickingPage() {
       );
     }
     return BUCKETS.map((b) => ({ bucket: b, items: groups.get(b.key) ?? [] }));
-  }, [pickingRows, mode]);
+  }, [pickingRows, mode, tr]);
 
   const readyToBuy = useMemo(
     () => grouped.flatMap((g) => g.items).filter((i) => i.signal.rank <= 1),
@@ -203,10 +207,10 @@ export default function InvestingPickingPage() {
         }
       }
       setAutofillMsg(
-        filled.length ? `Filled ${filled.join(", ")} — review and press Save.` : "Nothing to fill: every field already has a value.",
+        filled.length ? tr("Filled {list} — review and press Save.", { list: filled.join(", ") }) : tr("Nothing to fill: every field already has a value."),
       );
     } catch {
-      setAutofillMsg("Autofill failed — try again.");
+      setAutofillMsg(tr("Autofill failed — try again."));
     } finally {
       setAutofilling(false);
     }
@@ -217,14 +221,13 @@ export default function InvestingPickingPage() {
   return (
     <div className={investingPageStack}>
       <p className="text-sm text-[#655d51]">
-        Your buckets and buy zones. Each stock shows whether today&apos;s price is in your strong-buy or may-buy zone,
-        and each bucket shows how your portfolio compares with its target.
+        {tr("Your buckets and buy zones. Each stock shows whether today’s price is in your strong-buy or may-buy zone, and each bucket shows how your portfolio compares with its target.")}
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className={investingMetaBadge}>
-            {pickingMeta.updatedAt ? `Synced ${new Date(pickingMeta.updatedAt).toLocaleString()}` : "Not synced"}
+            {pickingMeta.updatedAt ? tr("Synced {when}", { when: new Date(pickingMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
           </span>
           <button
             type="button"
@@ -232,7 +235,7 @@ export default function InvestingPickingPage() {
             disabled={isPickingLoading}
             className={`${investingToolbarBtn} disabled:cursor-not-allowed disabled:opacity-50`}
           >
-            {isPickingLoading ? "Loading…" : "Refresh quotes"}
+            {isPickingLoading ? tr("Loading…") : tr("Refresh quotes")}
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -247,23 +250,23 @@ export default function InvestingPickingPage() {
                   mode === m ? "bg-[#f3efe5] text-[#1f1c17]" : "text-[#6f675b] hover:bg-[#faf8f2]",
                 ].join(" ")}
               >
-                {m}
+                {m === "view" ? tr("View") : tr("Edit")}
               </button>
             ))}
           </div>
           {mode === "edit" ? (
             <>
               <button type="button" onClick={addPickingRow} className={investingToolbarBtn}>
-                Add row
+                {tr("Add row")}
               </button>
               <button
                 type="button"
                 onClick={() => void autofill()}
                 disabled={isAutofilling}
-                title="Fill empty name, industry, P/E, EPS, beta and yield from Finviz"
+                title={tr("Fill empty name, industry, P/E, EPS, beta and yield from Finviz")}
                 className={isAutofilling ? investingPrimarySaveDisabled : investingToolbarBtn}
               >
-                {isAutofilling ? "Looking up…" : "Autofill fundamentals"}
+                {isAutofilling ? tr("Looking up…") : tr("Autofill fundamentals")}
               </button>
               <button
                 type="button"
@@ -271,7 +274,7 @@ export default function InvestingPickingPage() {
                 disabled={!isPickingDirty || isPickingSaving || isPickingLoading}
                 className={!isPickingDirty || isPickingSaving || isPickingLoading ? investingPrimarySaveDisabled : investingPrimarySaveActive}
               >
-                {isPickingSaving ? "Saving..." : "Save"}
+                {isPickingSaving ? tr("Saving…") : tr("Save")}
               </button>
             </>
           ) : null}
@@ -281,11 +284,11 @@ export default function InvestingPickingPage() {
       {isPickingDirty ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
           <span>
-            <span aria-hidden>●</span> Unsaved changes — press Save to keep them.
+            <span aria-hidden>●</span> {tr("Unsaved changes — press Save to keep them.")}
           </span>
           {mode === "view" ? (
             <button type="button" onClick={() => setMode("edit")} className={investingToolbarBtn}>
-              Go to Edit
+              {tr("Go to Edit")}
             </button>
           ) : null}
         </div>
@@ -294,7 +297,7 @@ export default function InvestingPickingPage() {
         <div className="flex items-start justify-between gap-3 rounded-xl border border-black/10 bg-[#faf8f2] px-4 py-3 text-sm text-[#3b352d]">
           <p>{autofillMsg}</p>
           <button type="button" onClick={() => setAutofillMsg(null)} className="text-xs opacity-70 hover:opacity-100">
-            Dismiss
+            {tr("Dismiss")}
           </button>
         </div>
       ) : null}
@@ -307,48 +310,52 @@ export default function InvestingPickingPage() {
           const gap = actual.pct - b.target;
           const status =
             count > b.max
-              ? { text: `⚠ ${count - b.max} over the ${b.max}-position limit`, cls: "text-amber-800" }
+              ? { text: `⚠ ${tr("{n} over the {max}-position limit", { n: count - b.max, max: b.max })}`, cls: "text-amber-800" }
               : Math.abs(gap) > 5
-                ? { text: `${gap > 0 ? "▲" : "▼"} ${Math.abs(gap).toFixed(1)} pp ${gap > 0 ? "above" : "below"} target`, cls: "text-[#6f675b]" }
-                : { text: "✓ Close to target", cls: "text-emerald-800" };
+                ? {
+                    text: `${gap > 0 ? "▲" : "▼"} ${tr(gap > 0 ? "{v} pp above target" : "{v} pp below target", { v: Math.abs(gap).toFixed(1) })}`,
+                    cls: "text-[#6f675b]",
+                  }
+                : { text: `✓ ${tr("Close to target")}`, cls: "text-emerald-800" };
           return (
             <article key={b.key} className={card}>
               <div className="flex items-baseline justify-between gap-2">
-                <h2 className="text-sm font-semibold text-[#1f1c17]">{b.title}</h2>
+                <h2 className="text-sm font-semibold text-[#1f1c17]">{tr(b.title)}</h2>
                 <span className="text-xs text-[#8f8676]">
-                  target {b.target}% · max {b.max}
+                  {tr("target {t}% · max {max}", { t: b.target, max: b.max })}
                 </span>
               </div>
               <p className="mt-2 text-2xl font-semibold tabular-nums text-[#1f1c17]">{actual.pct.toFixed(1)}%</p>
               <div className="relative mt-2 h-2 rounded-full bg-black/5" aria-hidden>
                 <div className="h-2 rounded-full bg-[#2a78d6]" style={{ width: `${Math.min(100, actual.pct)}%` }} />
-                <div className="absolute -top-1 h-4 w-0.5 bg-[#1f1c17]" style={{ left: `${b.target}%` }} title={`Target ${b.target}%`} />
+                <div className="absolute -top-1 h-4 w-0.5 bg-[#1f1c17]" style={{ left: `${b.target}%` }} title={tr("Target {v}%", { v: b.target })} />
               </div>
               <p className={`mt-2 text-xs font-medium ${status.cls}`}>{status.text}</p>
               <p className="mt-1 text-xs text-[#6f675b]">
-                {count} of {b.max} positions{count ? `: ${actual.tickers.join(", ")}` : ""}
+                {tr("{n} of {max} positions", { n: count, max: b.max })}
+                {count ? `: ${actual.tickers.join(", ")}` : ""}
               </p>
             </article>
           );
         })}
         <article className={card}>
           <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold text-[#1f1c17]">Not in a bucket</h2>
-            <span className="text-xs text-[#8f8676]">stocks you hold</span>
+            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Not in a bucket")}</h2>
+            <span className="text-xs text-[#8f8676]">{tr("stocks you hold")}</span>
           </div>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-[#1f1c17]">{(unassigned?.pct ?? 0).toFixed(1)}%</p>
           <p className="mt-2 text-xs text-[#6f675b]">
             {unassigned?.tickers.length
-              ? `${unassigned.tickers.join(", ")} — add them as rows in Edit to assign a bucket.`
-              : "Every holding belongs to a bucket."}
+              ? tr("{list} — add them as rows in Edit to assign a bucket.", { list: unassigned.tickers.join(", ") })
+              : tr("Every holding belongs to a bucket.")}
           </p>
-          <p className="mt-1 text-[11px] text-[#8f8676]">Funds (industry “ETF …”) count as ETF / REIT / Fund automatically.</p>
+          <p className="mt-1 text-[11px] text-[#8f8676]">{tr("Funds (industry “ETF …”) count as ETF / REIT / Fund automatically.")}</p>
         </article>
       </section>
 
       {mode === "view" && readyToBuy.length > 0 ? (
         <section className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900">
-          <p className="font-semibold">In your buy zone now</p>
+          <p className="font-semibold">{tr("In your buy zone now")}</p>
           <p className="mt-1">
             {readyToBuy.map((i) => `${i.row.ticker} (${i.signal.label.toLowerCase()}, ${formatUsd(num(i.row.current_price))})`).join(" · ")}
           </p>
@@ -360,21 +367,21 @@ export default function InvestingPickingPage() {
           <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
             <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
               <tr>
-                <th className="px-3 py-2 font-medium">Stock</th>
-                <th className="px-3 py-2 text-right font-medium">Price</th>
-                <th className="px-3 py-2 font-medium">Signal</th>
-                <th className="px-3 py-2 font-medium">Buy zones</th>
-                <th className="px-3 py-2 text-right font-medium">Upside 1y / 5y</th>
-                <th className="px-3 py-2 text-right font-medium">P/E · Beta · Yield</th>
-                <th className="px-3 py-2 text-right font-medium">You own</th>
-                <th className="px-3 py-2 font-medium">Notes</th>
+                <th className="px-3 py-2 font-medium">{tr("Stock")}</th>
+                <th className="px-3 py-2 text-right font-medium">{tr("Price")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Signal")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Buy zones")}</th>
+                <th className="px-3 py-2 text-right font-medium">{tr("Upside 1y / 5y")}</th>
+                <th className="px-3 py-2 text-right font-medium">{tr("P/E · Beta · Yield")}</th>
+                <th className="px-3 py-2 text-right font-medium">{tr("You own")}</th>
+                <th className="px-3 py-2 font-medium">{tr("Notes")}</th>
               </tr>
             </thead>
             <tbody>
               {pickingRows.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#8f8676]">
-                    No stocks yet — switch to Edit, add a row with a ticker and your buy prices, then Autofill.
+                    {tr("No stocks yet — switch to Edit, add a row with a ticker and your buy prices, then Autofill.")}
                   </td>
                 </tr>
               ) : null}
@@ -383,7 +390,7 @@ export default function InvestingPickingPage() {
                   <Fragment key={bucket.key}>
                     <tr className="border-t border-black/10 bg-[#ebe6dc]">
                       <td colSpan={8} className="px-3 py-2 text-xs font-semibold text-[#1f1c17]">
-                        {bucket.title} <span className="font-normal text-[#6f675b]">· {items.length} on the list</span>
+                        {tr(bucket.title)} <span className="font-normal text-[#6f675b]">· {tr("{n} on the list", { n: items.length })}</span>
                       </td>
                     </tr>
                     {items.map(({ row, signal }) => {
@@ -414,7 +421,7 @@ export default function InvestingPickingPage() {
                           <td className="px-3 py-3">
                             <ZoneBar row={row} />
                             <span className="block pt-1 text-[11px] tabular-nums text-[#8f8676]">
-                              ≤{row.strong_buy_until || "—"} strong · ≤{row.may_buy_until || "—"} may
+                              ≤{row.strong_buy_until || "—"} {tr("strong")} · ≤{row.may_buy_until || "—"} {tr("may")}
                             </span>
                           </td>
                           <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-[#3b352d]">
@@ -445,20 +452,20 @@ export default function InvestingPickingPage() {
           <table className="w-full min-w-[1700px] border-collapse text-left text-sm">
             <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
               <tr>
-                <th className="px-2 py-2 font-medium">Bucket</th>
-                <th className="px-2 py-2 font-medium">Name</th>
-                <th className="px-2 py-2 font-medium">Ticker</th>
-                <th className="px-2 py-2 font-medium">Industry</th>
+                <th className="px-2 py-2 font-medium">{tr("Bucket")}</th>
+                <th className="px-2 py-2 font-medium">{tr("Name")}</th>
+                <th className="px-2 py-2 font-medium">{tr("Ticker")}</th>
+                <th className="px-2 py-2 font-medium">{tr("Industry")}</th>
                 <th className="px-2 py-2 font-medium">P/E</th>
                 <th className="px-2 py-2 font-medium">EPS</th>
-                <th className="px-2 py-2 font-medium">Beta</th>
-                <th className="px-2 py-2 font-medium">Div yield %</th>
-                <th className="px-2 py-2 font-medium">Strong buy until</th>
-                <th className="px-2 py-2 font-medium">May buy until</th>
-                <th className="px-2 py-2 font-medium">Signal override</th>
-                <th className="px-2 py-2 font-medium">Price goal 1y</th>
-                <th className="px-2 py-2 font-medium">Price goal 5y</th>
-                <th className="min-w-[220px] px-2 py-2 font-medium">Notes</th>
+                <th className="px-2 py-2 font-medium">{tr("Beta")}</th>
+                <th className="px-2 py-2 font-medium">{tr("Div yield %")}</th>
+                <th className="px-2 py-2 font-medium">{tr("Strong buy until")}</th>
+                <th className="px-2 py-2 font-medium">{tr("May buy until")}</th>
+                <th className="px-2 py-2 font-medium">{tr("Signal override")}</th>
+                <th className="px-2 py-2 font-medium">{tr("Price goal 1y")}</th>
+                <th className="px-2 py-2 font-medium">{tr("Price goal 5y")}</th>
+                <th className="min-w-[220px] px-2 py-2 font-medium">{tr("Notes")}</th>
                 <th className="px-2 py-2 font-medium" />
               </tr>
             </thead>
@@ -473,7 +480,7 @@ export default function InvestingPickingPage() {
                     >
                       {BUCKETS.map((b) => (
                         <option key={b.key} value={b.key}>
-                          {BUCKET_TITLE[b.key]}
+                          {tr(BUCKET_TITLE[b.key])}
                         </option>
                       ))}
                     </select>
@@ -503,7 +510,7 @@ export default function InvestingPickingPage() {
                     <input
                       value={row.buy_right_now ?? ""}
                       onChange={(e) => updatePickingRow(row.id, { buy_right_now: e.target.value })}
-                      placeholder="Auto from zones"
+                      placeholder={tr("Auto from zones")}
                       className={inputBaseClasses()}
                     />
                   </td>
@@ -527,7 +534,7 @@ export default function InvestingPickingPage() {
                   </td>
                   <td className="px-2 py-2">
                     <button type="button" onClick={() => deletePickingRow(row.id)} className={investingToolbarBtn}>
-                      Delete
+                      {tr("Delete")}
                     </button>
                   </td>
                 </tr>
@@ -535,7 +542,7 @@ export default function InvestingPickingPage() {
               {pickingRows.length === 0 ? (
                 <tr>
                   <td colSpan={15} className="px-3 py-4 text-center text-xs text-[#8f8676]">
-                    No rows yet — Add row.
+                    {tr("No rows yet — Add row.")}
                   </td>
                 </tr>
               ) : null}
@@ -545,8 +552,7 @@ export default function InvestingPickingPage() {
       )}
       {mode === "edit" ? (
         <p className="-mt-2 text-[11px] text-[#8f8676]">
-          Signal is automatic: price ≤ strong-buy → Strong buy, ≤ may-buy → May buy, otherwise Wait. Type in Signal
-          override only to replace it with your own note. Autofill only fills empty fields.
+          {tr("Signal is automatic: price ≤ strong-buy → Strong buy, ≤ may-buy → May buy, otherwise Wait. Type in Signal override only to replace it with your own note. Autofill only fills empty fields.")}
         </p>
       ) : null}
     </div>

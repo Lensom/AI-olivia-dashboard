@@ -1,4 +1,5 @@
 import { COMMON } from "@/lib/i18n/common";
+import { INVESTING } from "@/lib/i18n/investing";
 import { MEDIA } from "@/lib/i18n/media";
 
 /**
@@ -8,6 +9,7 @@ import { MEDIA } from "@/lib/i18n/media";
 export const UK: Record<string, string | string[]> = {
   ...COMMON,
   ...MEDIA,
+  ...INVESTING,
 };
 
 /** English plural forms [one, other] for keys that take `n`. */
@@ -36,4 +38,23 @@ export const EN_PLURALS: Record<string, [string, string]> = {
   "{n} books read": ["{n} book read", "{n} books read"],
   "IMDb {v} on the same {n} titles": ["IMDb {v} on the same title", "IMDb {v} on the same {n} titles"],
   "Readers’ average from {n} ratings": ["Readers’ average from {n} rating", "Readers’ average from {n} ratings"],
+  // Investing
+  "{n} holdings": ["{n} holding", "{n} holdings"],
+  "{n} trades": ["{n} trade", "{n} trades"],
+  "{n} words": ["{n} word", "{n} words"],
+  "{n} rules": ["{n} rule", "{n} rules"],
+  "{n} opportunities": ["{n} opportunity", "{n} opportunities"],
+  "{n} refills": ["{n} refill", "{n} refills"],
+  "{n} days ago": ["{n} day ago", "{n} days ago"],
+  "{n} buys": ["{n} buy", "{n} buys"],
+  "{n} purchase days": ["{n} purchase day", "{n} purchase days"],
+  "{n} holdings off target by ≥ {pp} pp": ["{n} holding off target by ≥ {pp} pp", "{n} holdings off target by ≥ {pp} pp"],
+  "{n} positions · cost {v}": ["{n} position · cost {v}", "{n} positions · cost {v}"],
+  "of {n} positions": ["of {n} position", "of {n} positions"],
+  "Added {n} trades ({buys} buys, {sells} sells) at the top — review and press Save.": [
+    "Added {n} trade ({buys} buys, {sells} sells) at the top — review and press Save.",
+    "Added {n} trades ({buys} buys, {sells} sells) at the top — review and press Save.",
+  ],
+  "Beat the index in {beat} of {n} years": ["Beat the index in {beat} of {n} year", "Beat the index in {beat} of {n} years"],
+  "Clear {n} completed": ["Clear {n} completed", "Clear {n} completed"],
 };

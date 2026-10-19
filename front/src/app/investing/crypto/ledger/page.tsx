@@ -12,6 +12,7 @@ import {
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { InvestingSubsectionHeader } from "@/features/investing/ui/investing-subsection-header";
+import { useLocale, useT } from "@/lib/i18n";
 import { useCrypto } from "@/state/crypto-store";
 import { cryptoInputClasses } from "../_inputs";
 
@@ -40,6 +41,8 @@ export default function CryptoLedgerPage() {
     saveCrypto,
     refreshCrypto,
   } = useCrypto();
+  const tr = useT();
+  const locale = useLocale();
 
   const [purchOpen, setPurchOpen] = useState(true);
   const [refillOpen, setRefillOpen] = useState(true);
@@ -73,7 +76,7 @@ export default function CryptoLedgerPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
         <span className={investingMetaBadge}>
-          {cryptoMeta.updatedAt ? `Synced ${new Date(cryptoMeta.updatedAt).toLocaleString()}` : "Not synced"}
+          {cryptoMeta.updatedAt ? tr("Synced {when}", { when: new Date(cryptoMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
         </span>
         <button
           type="button"
@@ -81,7 +84,7 @@ export default function CryptoLedgerPage() {
           disabled={isCryptoLoading}
           className={`${investingToolbarBtn} disabled:opacity-50`}
         >
-          {isCryptoLoading ? "…" : "Reload"}
+          {isCryptoLoading ? "…" : tr("Reload")}
         </button>
         <button
           type="button"
@@ -89,30 +92,30 @@ export default function CryptoLedgerPage() {
           disabled={!isCryptoDirty || isCryptoSaving || isCryptoLoading}
           className={!isCryptoDirty || isCryptoSaving || isCryptoLoading ? investingPrimarySaveDisabled : investingPrimarySaveActive}
         >
-          {isCryptoSaving ? "Saving…" : "Save"}
+          {isCryptoSaving ? tr("Saving…") : tr("Save")}
         </button>
       </div>
 
       {isCryptoDirty ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
-          <span aria-hidden>●</span> Unsaved changes — press Save to keep them.
+          <span aria-hidden>●</span> {tr("Unsaved changes — press Save to keep them.")}
         </div>
       ) : null}
 
       <section className="flex flex-wrap gap-x-8 gap-y-3 rounded-2xl border border-black/5 bg-white/90 px-5 py-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
         {[
-          { label: "Funded", value: formatCryptoUsd(summary.usd), sub: `${summary.uah.toLocaleString("en-US", { maximumFractionDigits: 2 })} UAH` },
-          { label: "Average rate", value: summary.rate ? `${summary.rate.toFixed(2)} UAH/$` : "—", sub: "UAH ÷ USD across funding" },
+          { label: "Funded", value: formatCryptoUsd(summary.usd), sub: `${summary.uah.toLocaleString(locale, { maximumFractionDigits: 2 })} UAH` },
+          { label: "Average rate", value: summary.rate ? `${summary.rate.toFixed(2)} UAH/$` : "—", sub: tr("UAH ÷ USD across funding") },
           { label: "Spent on BTC", value: formatCryptoUsd(summary.btc.spent), sub: `${coins(summary.btc.coins)} BTC` },
           { label: "Spent on ETH", value: formatCryptoUsd(summary.eth.spent), sub: `${coins(summary.eth.coins)} ETH` },
           {
             label: "Funded − spent",
             value: formatCryptoUsd(summary.usd - summary.spent),
-            sub: "Fees / spread or unused cash",
+            sub: tr("Fees / spread or unused cash"),
           },
         ].map((s) => (
           <div key={s.label}>
-            <p className="text-[11px] text-[#8f8676]">{s.label}</p>
+            <p className="text-[11px] text-[#8f8676]">{tr(s.label)}</p>
             <p className="text-base font-semibold tabular-nums text-[#1f1c17]">{s.value}</p>
             <p className="text-[11px] text-[#8f8676]">{s.sub}</p>
           </div>
@@ -124,19 +127,18 @@ export default function CryptoLedgerPage() {
         {refillOpen ? (
           <>
             <p className="text-xs text-[#655d51]">
-              Date, UAH paid and USD received. Rate and “Spent” are calculated; Spent is what the purchases on the same
-              date used.
+              {tr("Date, UAH paid and USD received. Rate and “Spent” are calculated; Spent is what the purchases on the same date used.")}
             </p>
             <div className={investingTableScrollWrap}>
               <table className="w-full min-w-[780px] border-collapse text-sm">
                 <thead className="bg-[#f4efe4]">
                   <tr>
-                    <th className={`${th} text-center`}>Date</th>
+                    <th className={`${th} text-center`}>{tr("Date")}</th>
                     <th className={`${th} text-center`}>UAH</th>
                     <th className={`${th} text-center`}>USD</th>
-                    <th className={`${th} text-right`}>Rate, UAH/$</th>
-                    <th className={`${th} text-right`}>Spent on coins</th>
-                    <th className={`${th} text-right`}>Difference</th>
+                    <th className={`${th} text-right`}>{tr("Rate, UAH/$")}</th>
+                    <th className={`${th} text-right`}>{tr("Spent on coins")}</th>
+                    <th className={`${th} text-right`}>{tr("Difference")}</th>
                     <th className={th} />
                   </tr>
                 </thead>
@@ -164,7 +166,7 @@ export default function CryptoLedgerPage() {
                         </td>
                         <td className={`${tdMid} text-right`}>
                           <button type="button" onClick={() => deleteRefill(row.id)} className={investingToolbarBtn}>
-                            Delete
+                            {tr("Delete")}
                           </button>
                         </td>
                       </tr>
@@ -172,8 +174,8 @@ export default function CryptoLedgerPage() {
                   })}
                   {refillRows.length > 0 ? (
                     <tr className="border-t-2 border-black/15 bg-[#f6f3ea] font-semibold text-[#1f1c17]">
-                      <td className="px-3 py-2">Total</td>
-                      <td className="px-3 py-2 text-center tabular-nums">{summary.uah.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2">{tr("Total")}</td>
+                      <td className="px-3 py-2 text-center tabular-nums">{summary.uah.toLocaleString(locale, { maximumFractionDigits: 2 })}</td>
                       <td className="px-3 py-2 text-center tabular-nums">{formatCryptoUsd(summary.usd)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{summary.rate ? summary.rate.toFixed(2) : "—"}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{formatCryptoUsd(summary.spent)}</td>
@@ -185,7 +187,7 @@ export default function CryptoLedgerPage() {
               </table>
             </div>
             <button type="button" onClick={addRefill} className={investingToolbarBtn}>
-              Add funding row
+              {tr("Add funding row")}
             </button>
           </>
         ) : null}
@@ -196,20 +198,19 @@ export default function CryptoLedgerPage() {
         {purchOpen ? (
           <>
             <p className="text-xs text-[#655d51]">
-              Per date: USD spent and the execution price. Leave a coin empty if you only bought the other. Coins bought
-              are calculated (USD ÷ price).
+              {tr("Per date: USD spent and the execution price. Leave a coin empty if you only bought the other. Coins bought are calculated (USD ÷ price).")}
             </p>
             <div className={investingTableScrollWrap}>
               <table className="w-full min-w-[1040px] border-collapse text-sm">
                 <thead className="bg-[#f4efe4]">
                   <tr>
-                    <th className={`${th} text-center`}>Date</th>
+                    <th className={`${th} text-center`}>{tr("Date")}</th>
                     <th className={`${th} text-center`}>BTC, $</th>
-                    <th className={`${th} text-center`}>BTC price</th>
-                    <th className={`${th} text-right`}>BTC bought</th>
+                    <th className={`${th} text-center`}>{tr("BTC price")}</th>
+                    <th className={`${th} text-right`}>{tr("BTC bought")}</th>
                     <th className={`${th} text-center`}>ETH, $</th>
-                    <th className={`${th} text-center`}>ETH price</th>
-                    <th className={`${th} text-right`}>ETH bought</th>
+                    <th className={`${th} text-center`}>{tr("ETH price")}</th>
+                    <th className={`${th} text-right`}>{tr("ETH bought")}</th>
                     <th className={th} />
                   </tr>
                 </thead>
@@ -238,7 +239,7 @@ export default function CryptoLedgerPage() {
                         <td className={tdCalc}>{coins(eth)}</td>
                         <td className={`${tdMid} text-right`}>
                           <button type="button" onClick={() => deletePurchase(row.id)} className={investingToolbarBtn}>
-                            Delete
+                            {tr("Delete")}
                           </button>
                         </td>
                       </tr>
@@ -246,14 +247,14 @@ export default function CryptoLedgerPage() {
                   })}
                   {purchaseRows.length > 0 ? (
                     <tr className="border-t-2 border-black/15 bg-[#f6f3ea] font-semibold text-[#1f1c17]">
-                      <td className="px-3 py-2">Total / avg</td>
+                      <td className="px-3 py-2">{tr("Total / avg")}</td>
                       <td className="px-3 py-2 text-center tabular-nums">{formatCryptoUsd(summary.btc.spent)}</td>
-                      <td className="px-3 py-2 text-center tabular-nums" title="Average buy price">
+                      <td className="px-3 py-2 text-center tabular-nums" title={tr("Average buy price")}>
                         {summary.btc.avgPrice != null ? formatCryptoUsd(summary.btc.avgPrice) : "—"}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">{coins(summary.btc.coins)}</td>
                       <td className="px-3 py-2 text-center tabular-nums">{formatCryptoUsd(summary.eth.spent)}</td>
-                      <td className="px-3 py-2 text-center tabular-nums" title="Average buy price">
+                      <td className="px-3 py-2 text-center tabular-nums" title={tr("Average buy price")}>
                         {summary.eth.avgPrice != null ? formatCryptoUsd(summary.eth.avgPrice) : "—"}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">{coins(summary.eth.coins)}</td>
@@ -264,7 +265,7 @@ export default function CryptoLedgerPage() {
               </table>
             </div>
             <button type="button" onClick={addPurchase} className={investingToolbarBtn}>
-              Add purchase row
+              {tr("Add purchase row")}
             </button>
           </>
         ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import { useMemo } from "react";
 
 export type YearlyActivityPoint = {
@@ -37,6 +38,7 @@ export function YearlyActivityVolumeChart({
   subtitle?: string;
   data: YearlyActivityPoint[];
 }) {
+  const tr = useT();
   const { groups, yMax, ticks, viewW, viewH } = useMemo(() => {
     const viewW = INNER_W + PAD_L + PAD_R;
     const viewH = INNER_H + PAD_T + PAD_B;
@@ -76,13 +78,13 @@ export function YearlyActivityVolumeChart({
     return (
       <article className="flex h-full min-h-[300px] flex-col rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{title}</h2>
+          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr(title)}</h2>
           <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-[#6f675b]">
             Activities
           </span>
         </div>
-        <p className="mt-1 text-xs text-[#655d51]">{subtitle}</p>
-        <p className="mt-10 text-center text-sm text-[#7f7668]">No buy/sell amounts by year yet.</p>
+        <p className="mt-1 text-xs text-[#655d51]">{tr(subtitle)}</p>
+        <p className="mt-10 text-center text-sm text-[#7f7668]">{tr("No buy/sell amounts by year yet.")}</p>
       </article>
     );
   }
@@ -90,27 +92,27 @@ export function YearlyActivityVolumeChart({
   return (
     <article className="flex h-full flex-col rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-[#1f1c17]">{title}</h2>
+        <h2 className="text-sm font-semibold text-[#1f1c17]">{tr(title)}</h2>
         <div className="flex flex-wrap items-center gap-3">
           <span className="flex items-center gap-1.5 text-[11px] text-[#655d51]">
             <span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" aria-hidden />
-            Purchases
+            {tr("Purchases")}
           </span>
           <span className="flex items-center gap-1.5 text-[11px] text-[#655d51]">
             <span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-500" aria-hidden />
-            Sales
+            {tr("Sales")}
           </span>
           <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-[#6f675b]">
             Activities
           </span>
         </div>
       </div>
-      <p className="mt-1 text-xs text-[#655d51]">{subtitle}</p>
+      <p className="mt-1 text-xs text-[#655d51]">{tr(subtitle)}</p>
       <svg
         className="mx-auto mt-2 w-full max-w-full"
         viewBox={`0 0 ${viewW} ${viewH}`}
         role="img"
-        aria-label={title}
+        aria-label={tr(title)}
       >
         <rect x="0" y="0" width={viewW} height={viewH} fill="#ffffff" />
         {ticks.map((tv) => {

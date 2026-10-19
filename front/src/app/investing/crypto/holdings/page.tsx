@@ -10,6 +10,7 @@ import {
   investingTableScrollWrap,
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
+import { useLocale, useT } from "@/lib/i18n";
 import { useCrypto } from "@/state/crypto-store";
 import { cryptoInputClasses } from "../_inputs";
 
@@ -38,6 +39,8 @@ export default function CryptoHoldingsPage() {
     saveCrypto,
     refreshCrypto,
   } = useCrypto();
+  const tr = useT();
+  const locale = useLocale();
   const [mode, setMode] = useState<"view" | "edit">("view");
 
   useEffect(() => {
@@ -62,7 +65,7 @@ export default function CryptoHoldingsPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className={investingMetaBadge}>
-            {cryptoMeta.updatedAt ? `Synced ${new Date(cryptoMeta.updatedAt).toLocaleString()}` : "Not synced"}
+            {cryptoMeta.updatedAt ? tr("Synced {when}", { when: new Date(cryptoMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
           </span>
           <button
             type="button"
@@ -70,7 +73,7 @@ export default function CryptoHoldingsPage() {
             disabled={isCryptoLoading}
             className={`${investingToolbarBtn} disabled:opacity-50`}
           >
-            {isCryptoLoading ? "…" : "Refresh prices"}
+            {isCryptoLoading ? "…" : tr("Refresh prices")}
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -85,14 +88,14 @@ export default function CryptoHoldingsPage() {
                   mode === m ? "bg-[#f3efe5] text-[#1f1c17]" : "text-[#6f675b] hover:bg-[#faf8f2]",
                 ].join(" ")}
               >
-                {m}
+                {m === "view" ? tr("View") : tr("Edit")}
               </button>
             ))}
           </div>
           {mode === "edit" ? (
             <>
               <button type="button" onClick={addHolding} className={investingToolbarBtn}>
-                Add coin
+                {tr("Add coin")}
               </button>
               <button
                 type="button"
@@ -100,7 +103,7 @@ export default function CryptoHoldingsPage() {
                 disabled={!isCryptoDirty || isCryptoSaving || isCryptoLoading}
                 className={!isCryptoDirty || isCryptoSaving || isCryptoLoading ? investingPrimarySaveDisabled : investingPrimarySaveActive}
               >
-                {isCryptoSaving ? "Saving…" : "Save"}
+                {isCryptoSaving ? tr("Saving…") : tr("Save")}
               </button>
             </>
           ) : null}
@@ -110,11 +113,11 @@ export default function CryptoHoldingsPage() {
       {isCryptoDirty ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
           <span>
-            <span aria-hidden>●</span> Unsaved changes — press Save to keep them.
+            <span aria-hidden>●</span> {tr("Unsaved changes — press Save to keep them.")}
           </span>
           {mode === "view" ? (
             <button type="button" onClick={() => setMode("edit")} className={investingToolbarBtn}>
-              Go to Edit
+              {tr("Go to Edit")}
             </button>
           ) : null}
         </div>
@@ -125,21 +128,21 @@ export default function CryptoHoldingsPage() {
           <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead className="bg-[#f4efe4]">
               <tr>
-                <th className={`${th} text-left`}>Coin</th>
-                <th className={`${th} text-right`}>Quantity</th>
-                <th className={`${th} text-right`}>Price</th>
-                <th className={`${th} text-right`}>Day</th>
-                <th className={`${th} text-right`}>Value</th>
-                <th className={`${th} text-right`}>Weight</th>
-                <th className={`${th} text-right`}>Avg buy</th>
-                <th className={`${th} text-right`}>P&L</th>
+                <th className={`${th} text-left`}>{tr("Coin")}</th>
+                <th className={`${th} text-right`}>{tr("Quantity")}</th>
+                <th className={`${th} text-right`}>{tr("Price")}</th>
+                <th className={`${th} text-right`}>{tr("Day")}</th>
+                <th className={`${th} text-right`}>{tr("Value")}</th>
+                <th className={`${th} text-right`}>{tr("Weight")}</th>
+                <th className={`${th} text-right`}>{tr("Avg buy")}</th>
+                <th className={`${th} text-right`}>{tr("P&L")}</th>
               </tr>
             </thead>
             <tbody>
               {positions.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#8f8676]">
-                    No coins yet — switch to Edit and add BTC or ETH.
+                    {tr("No coins yet — switch to Edit and add BTC or ETH.")}
                   </td>
                 </tr>
               ) : null}
@@ -149,7 +152,7 @@ export default function CryptoHoldingsPage() {
                     <span className="font-semibold text-[#1f1c17]">{p.symbol}</span>
                     {p.name && p.name !== p.symbol ? <span className="block text-[11px] text-[#8f8676]">{p.name}</span> : null}
                   </td>
-                  <td className={`${td} text-right text-[#3b352d]`}>{p.quantity.toLocaleString("en-US", { maximumFractionDigits: 8 })}</td>
+                  <td className={`${td} text-right text-[#3b352d]`}>{p.quantity.toLocaleString(locale, { maximumFractionDigits: 8 })}</td>
                   <td className={`${td} text-right text-[#3b352d]`}>{p.price != null ? formatCryptoUsd(p.price) : "—"}</td>
                   <td className={`${td} text-right`}>
                     <span className={`font-semibold ${tone(p.dayPct)}`}>{signedPct(p.dayPct, 2)}</span>
@@ -160,7 +163,7 @@ export default function CryptoHoldingsPage() {
                   <td className={`${td} text-right text-[#3b352d]`}>
                     {p.history?.avgPrice != null ? formatCryptoUsd(p.history.avgPrice) : "—"}
                     {p.priceVsAvgPct != null ? (
-                      <span className="block text-[11px] text-[#8f8676]">price {signedPct(p.priceVsAvgPct)}</span>
+                      <span className="block text-[11px] text-[#8f8676]">{tr("price {v}", { v: signedPct(p.priceVsAvgPct) })}</span>
                     ) : null}
                   </td>
                   <td className={`${td} text-right`}>
@@ -174,7 +177,7 @@ export default function CryptoHoldingsPage() {
               <tfoot>
                 <tr className="border-t-2 border-black/15 bg-[#f6f3ea] font-semibold">
                   <td className={`${td} text-left text-[#1f1c17]`} colSpan={3}>
-                    Total
+                    {tr("Total")}
                   </td>
                   <td className={`${td} text-right ${tone(totals.dayUsd)}`}>{signedUsd(totals.dayUsd)}</td>
                   <td className={`${td} text-right text-[#1f1c17]`}>{formatCryptoUsd(totals.value)}</td>
@@ -192,10 +195,10 @@ export default function CryptoHoldingsPage() {
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead className="bg-[#f4efe4]">
               <tr>
-                <th className={`${th} text-left`}>Ticker</th>
-                <th className={`${th} text-left`}>Name</th>
-                <th className={`${th} text-left`}>Quantity</th>
-                <th className={`${th} text-right`}>Price</th>
+                <th className={`${th} text-left`}>{tr("Ticker")}</th>
+                <th className={`${th} text-left`}>{tr("Name")}</th>
+                <th className={`${th} text-left`}>{tr("Quantity")}</th>
+                <th className={`${th} text-right`}>{tr("Price")}</th>
                 <th className={th} />
               </tr>
             </thead>
@@ -225,7 +228,7 @@ export default function CryptoHoldingsPage() {
                   <td className={`${td} text-right text-[#6f675b]`}>{row.quoteUsd ?? "—"}</td>
                   <td className="px-2 py-2 text-right">
                     <button type="button" onClick={() => deleteHolding(row.id)} className={investingToolbarBtn}>
-                      Delete
+                      {tr("Delete")}
                     </button>
                   </td>
                 </tr>
@@ -233,7 +236,7 @@ export default function CryptoHoldingsPage() {
               {holdings.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-3 py-6 text-center text-xs text-[#8f8676]">
-                    No coins — Add coin. Prices use the TICKER-USD pair automatically.
+                    {tr("No coins — Add coin. Prices use the TICKER-USD pair automatically.")}
                   </td>
                 </tr>
               ) : null}
@@ -242,7 +245,7 @@ export default function CryptoHoldingsPage() {
         )}
       </div>
       <p className="text-[11px] text-[#8f8676]">
-        Avg buy and P&L come from BTC / ETH purchases on Funding &amp; buys. Other coins show value only.
+        {tr("Avg buy and P&L come from BTC / ETH purchases on Funding & buys. Other coins show value only.")}
       </p>
     </div>
   );

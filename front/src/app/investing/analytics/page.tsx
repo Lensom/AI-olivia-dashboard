@@ -12,6 +12,7 @@ import { YearlyActivityVolumeChart } from "@/features/investing/charts/yearly-ac
 import { formatUsd, parseInvestingDateMs, parseUsd } from "@/features/investing/format";
 import { investingTableScrollWrap } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { dividendsLast12mUsd } from "@/features/investing/broker-section";
 import { useBroker } from "@/state/broker-store";
@@ -60,6 +61,7 @@ export default function InvestingAnalyticsPage() {
   const { token } = useAuth();
   const { holdings, capitalEntries, refills, activitiesSummary } = useInvesting();
   const { cashUsd, dividends } = useBroker();
+  const tr = useT();
   const [nowYear] = useState(() => new Date().getFullYear());
   const [nowMs] = useState(() => Date.now());
   const [bench, setBench] = useState<Record<string, number> | null>(null);
@@ -123,7 +125,7 @@ export default function InvestingAnalyticsPage() {
       const base = last.endValue + deposit;
       rows.push({
         year: nowYear,
-        label: `${nowYear} YTD`,
+        label: tr("{year} YTD", { year: nowYear }),
         deposit,
         endValue: accountValue,
         invested: last.invested + deposit,
@@ -133,7 +135,7 @@ export default function InvestingAnalyticsPage() {
       });
     }
     return rows;
-  }, [capitalEntries, refills, accountValue, bench, nowYear]);
+  }, [capitalEntries, refills, accountValue, bench, nowYear, tr]);
 
   // A first year that started after January can't be compared with the index's full calendar year.
   const firstYearPartial = useMemo(() => {
@@ -164,8 +166,8 @@ export default function InvestingAnalyticsPage() {
     [yearRows],
   );
   const valueChart = useMemo<ValueInvestedPoint[]>(
-    () => yearRows.map((r) => ({ label: r.ytd ? "Now" : r.label, value: r.endValue, invested: r.invested })),
-    [yearRows],
+    () => yearRows.map((r) => ({ label: r.ytd ? tr("Now") : r.label, value: r.endValue, invested: r.invested })),
+    [yearRows, tr],
   );
 
   // ---- Risk & income by holding ----
@@ -234,10 +236,9 @@ export default function InvestingAnalyticsPage() {
   return (
     <div className="space-y-5">
       <p className="text-sm text-[#655d51]">
-        How the portfolio has performed over the years against the market, where its risk and income come from, and
-        what trading has cost. Current allocation and today&apos;s moves are on{" "}
+        {tr("How the portfolio has performed over the years against the market, where its risk and income come from, and what trading has cost. Current allocation and today’s moves are on")}{" "}
         <Link href="/investing/dashboard" className="font-medium text-[#3b352d] underline decoration-black/15 underline-offset-2">
-          Overview
+          {tr("Overview")}
         </Link>
         .
       </p>
@@ -245,37 +246,37 @@ export default function InvestingAnalyticsPage() {
       {/* Headline performance */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <article className={card}>
-          <p className="text-xs text-[#7f7668]">Average annual return</p>
+          <p className="text-xs text-[#7f7668]">{tr("Average annual return")}</p>
           <p className={`mt-1.5 text-xl font-semibold tabular-nums ${toneClass(kpis.you)}`}>{signedPct(kpis.you)}</p>
           <p className="mt-1 text-xs text-[#6f675b]">
-            {BENCHMARK_LABEL} {bench == null ? "…" : signedPct(kpis.them)} over the same years ({kpis.span})
+            {tr("{bench} {v} over the same years ({span})", { bench: BENCHMARK_LABEL, v: bench == null ? "…" : signedPct(kpis.them), span: kpis.span })}
           </p>
         </article>
         <article className={card}>
-          <p className="text-xs text-[#7f7668]">vs {BENCHMARK_LABEL}</p>
+          <p className="text-xs text-[#7f7668]">{tr("vs {bench}", { bench: BENCHMARK_LABEL })}</p>
           <p className={`mt-1.5 text-xl font-semibold tabular-nums ${toneClass(kpis.you != null && kpis.them != null ? kpis.you - kpis.them : null)}`}>
-            {kpis.you != null && kpis.them != null ? `${signedPct(kpis.you - kpis.them)} / yr` : "—"}
+            {kpis.you != null && kpis.them != null ? `${signedPct(kpis.you - kpis.them)} / ${tr("yr")}` : "—"}
           </p>
           <p className="mt-1 text-xs text-[#6f675b]">
-            Beat the index in {kpis.beat} of {kpis.years} years
+            {tr("Beat the index in {beat} of {n} years", { beat: kpis.beat, n: kpis.years })}
           </p>
         </article>
         <article className={card}>
-          <p className="text-xs text-[#7f7668]">Best year</p>
+          <p className="text-xs text-[#7f7668]">{tr("Best year")}</p>
           <p className={`mt-1.5 text-xl font-semibold tabular-nums ${toneClass(kpis.best?.ret)}`}>
             {kpis.best ? signedPct(kpis.best.ret) : "—"}
           </p>
           <p className="mt-1 text-xs text-[#6f675b]">
-            {kpis.best ? `${kpis.best.year} · index ${signedPct(kpis.best.bench)}` : "No history yet"}
+            {kpis.best ? `${kpis.best.year} · ${tr("index {v}", { v: signedPct(kpis.best.bench) })}` : tr("No history yet")}
           </p>
         </article>
         <article className={card}>
-          <p className="text-xs text-[#7f7668]">Worst year</p>
+          <p className="text-xs text-[#7f7668]">{tr("Worst year")}</p>
           <p className={`mt-1.5 text-xl font-semibold tabular-nums ${toneClass(kpis.worst?.ret)}`}>
             {kpis.worst ? signedPct(kpis.worst.ret) : "—"}
           </p>
           <p className="mt-1 text-xs text-[#6f675b]">
-            {kpis.worst ? `${kpis.worst.year} · index ${signedPct(kpis.worst.bench)}` : "No history yet"}
+            {kpis.worst ? `${kpis.worst.year} · ${tr("index {v}", { v: signedPct(kpis.worst.bench) })}` : tr("No history yet")}
           </p>
         </article>
       </section>
@@ -284,34 +285,34 @@ export default function InvestingAnalyticsPage() {
         <>
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
             <article className={card}>
-              <h2 className="text-sm font-semibold text-[#1f1c17]">Annual return vs the market</h2>
+              <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Annual return vs the market")}</h2>
               <p className="mb-3 mt-0.5 text-xs text-[#8f8676]">
-                Your return each year next to {BENCHMARK_LABEL} with dividends reinvested.
+                {tr("Your return each year next to {bench} with dividends reinvested.", { bench: BENCHMARK_LABEL })}
               </p>
               <AnnualReturnsChart data={returnsChart} benchmarkLabel={BENCHMARK_LABEL} />
             </article>
             <article className={card}>
-              <h2 className="text-sm font-semibold text-[#1f1c17]">Value vs money invested</h2>
+              <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Value vs money invested")}</h2>
               <p className="mb-3 mt-0.5 text-xs text-[#8f8676]">
-                Year-end value against everything you&apos;ve put in. The gap between the lines is your gain.
+                {tr("Year-end value against everything you’ve put in. The gap between the lines is your gain.")}
               </p>
               <ValueVsInvestedChart data={valueChart} />
             </article>
           </section>
 
           <article className={card}>
-            <h2 className="text-sm font-semibold text-[#1f1c17]">Year by year</h2>
+            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Year by year")}</h2>
             <div className={`${investingTableScrollWrap} mt-3`}>
               <table className="w-full min-w-[680px] border-collapse text-left text-sm">
                 <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                   <tr>
-                    <th className={th}>Year</th>
-                    <th className={`${th} text-right`}>Deposited</th>
-                    <th className={`${th} text-right`}>Total invested</th>
-                    <th className={`${th} text-right`}>Year-end value</th>
-                    <th className={`${th} text-right`}>Your return</th>
+                    <th className={th}>{tr("Year")}</th>
+                    <th className={`${th} text-right`}>{tr("Deposited")}</th>
+                    <th className={`${th} text-right`}>{tr("Total invested")}</th>
+                    <th className={`${th} text-right`}>{tr("Year-end value")}</th>
+                    <th className={`${th} text-right`}>{tr("Your return")}</th>
                     <th className={`${th} text-right`}>{BENCHMARK_LABEL}</th>
-                    <th className={`${th} text-right`}>Difference</th>
+                    <th className={`${th} text-right`}>{tr("Difference")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -326,7 +327,7 @@ export default function InvestingAnalyticsPage() {
                         <td className={`${td} text-right font-medium ${toneClass(r.ret)}`}>{signedPct(r.ret)}</td>
                         <td className={`${td} text-right ${toneClass(r.bench)}`}>{bench == null ? "…" : signedPct(r.bench)}</td>
                         <td className={`${td} text-right font-medium ${toneClass(diff)}`}>
-                          {diff == null ? "—" : `${diff > 0 ? "▲" : "▼"} ${Math.abs(diff).toFixed(1)} pp`}
+                          {diff == null ? "—" : `${diff > 0 ? "▲" : "▼"} ${Math.abs(diff).toFixed(1)} ${tr("pp")}`}
                         </td>
                       </tr>
                     );
@@ -335,22 +336,18 @@ export default function InvestingAnalyticsPage() {
               </table>
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-[#8f8676]">
-              Your return per year treats that year&apos;s deposits as made on Jan 1 (same as the 1Y column in Capital
-              entries on Overview).{" "}
-              {firstYearPartial
-                ? `${firstYearPartial} is a partial year (you started mid-year), so the cards above leave it out. `
-                : ""}
-              * Year to date uses current holdings plus broker cash (enter it on Finance).
+              {tr("Your return per year treats that year’s deposits as made on Jan 1 (same as the 1Y column in Capital entries on Overview).")}{" "}
+              {firstYearPartial ? tr("{year} is a partial year (you started mid-year), so the cards above leave it out.", { year: firstYearPartial }) + " " : ""}
+              * {tr("Year to date uses current holdings plus broker cash (enter it on Finance).")}
             </p>
           </article>
         </>
       ) : (
         <article className={`${card} text-sm text-[#655d51]`}>
-          Add year-end rows in Capital entries on{" "}
+          {tr("Add year-end rows in Capital entries on Overview to see performance over time.")}{" "}
           <Link href="/investing/dashboard" className="underline">
-            Overview
-          </Link>{" "}
-          to see performance over time.
+            {tr("Overview")} →
+          </Link>
         </article>
       )}
 
@@ -358,24 +355,25 @@ export default function InvestingAnalyticsPage() {
       <article className={card}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
-            <h2 className="text-sm font-semibold text-[#1f1c17]">Risk & income by holding</h2>
+            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Risk & income by holding")}</h2>
             <p className="mt-0.5 text-xs text-[#8f8676]">
-              Beta: how much a holding moves with the market (1.0 = same as the market). Contribution = weight × beta,
-              and the contributions add up to the portfolio&apos;s beta.
+              {tr("Beta: how much a holding moves with the market (1.0 = same as the market). Contribution = weight × beta, and the contributions add up to the portfolio’s beta.")}
             </p>
           </div>
           <p className="text-xs text-[#6f675b]">
-            Portfolio beta{" "}
+            {tr("Portfolio beta")}{" "}
             <span className="font-semibold text-[#1f1c17]">
               {riskRows.portfolioBeta == null ? "…" : riskRows.portfolioBeta.toFixed(2)}
             </span>
-            {" · "}Expected dividends{" "}
+            {" · "}
+            {tr("Expected dividends")}{" "}
             <span className="font-semibold text-[#1f1c17]">
-              {fundamentals == null ? "…" : `${formatUsd(riskRows.income)}/yr (${riskRows.yieldPct.toFixed(2)}%)`}
+              {fundamentals == null ? "…" : `${formatUsd(riskRows.income)}/${tr("yr")} (${riskRows.yieldPct.toFixed(2)}%)`}
             </span>
-            {" · "}Received, last 12 months{" "}
+            {" · "}
+            {tr("Received, last 12 months")}{" "}
             <span className="font-semibold text-[#1f1c17]">
-              {dividends.length ? formatUsd(dividendsLast12mUsd(dividends, nowMs)) : "not recorded"}
+              {dividends.length ? formatUsd(dividendsLast12mUsd(dividends, nowMs)) : tr("not recorded")}
             </span>
           </p>
         </div>
@@ -383,13 +381,13 @@ export default function InvestingAnalyticsPage() {
           <table className="w-full min-w-[720px] border-collapse text-left text-sm">
             <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
               <tr>
-                <th className={th}>Holding</th>
-                <th className={`${th} text-right`}>Weight</th>
-                <th className={`${th} text-right`}>Beta</th>
-                <th className={`${th} text-right`}>Beta contribution</th>
-                <th className={`${th} text-right`}>Div. yield</th>
-                <th className={`${th} text-right`}>Income / yr</th>
-                <th className={`${th} text-right`}>Share of income</th>
+                <th className={th}>{tr("Holding")}</th>
+                <th className={`${th} text-right`}>{tr("Weight")}</th>
+                <th className={`${th} text-right`}>{tr("Beta")}</th>
+                <th className={`${th} text-right`}>{tr("Beta contribution")}</th>
+                <th className={`${th} text-right`}>{tr("Div. yield")}</th>
+                <th className={`${th} text-right`}>{tr("Income / yr")}</th>
+                <th className={`${th} text-right`}>{tr("Share of income")}</th>
               </tr>
             </thead>
             <tbody>
@@ -402,7 +400,7 @@ export default function InvestingAnalyticsPage() {
                   <td className={`${td} text-right text-[#3b352d]`}>{r.weight.toFixed(1)}%</td>
                   <td
                     className={`${td} text-right ${r.beta != null && r.beta >= 1.5 ? "font-semibold text-amber-700" : "text-[#3b352d]"}`}
-                    title={r.beta != null && r.beta >= 1.5 ? "High beta: swings ~1.5× the market or more" : undefined}
+                    title={r.beta != null && r.beta >= 1.5 ? tr("High beta: swings ~1.5× the market or more") : undefined}
                   >
                     {fundamentals == null ? "…" : r.beta == null ? "—" : r.beta.toFixed(2)}
                   </td>
@@ -422,7 +420,7 @@ export default function InvestingAnalyticsPage() {
           </table>
         </div>
         <p className="mt-2 text-[11px] text-[#8f8676]">
-          Beta and trailing 12-month yield from Finviz. Income is an estimate: value × yield. Beta ≥ 1.5 is highlighted.
+          {tr("Beta and trailing 12-month yield from Finviz. Income is an estimate: value × yield. Beta ≥ 1.5 is highlighted.")}
         </p>
       </article>
 
@@ -430,24 +428,23 @@ export default function InvestingAnalyticsPage() {
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <YearlyActivityVolumeChart data={tradingRows.map((r) => ({ year: r.year, purchases: r.bought, sales: r.sold }))} />
         <article className={card}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">Trading results by year</h2>
+          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Trading results by year")}</h2>
           <p className="mt-0.5 text-xs text-[#8f8676]">
-            Profit locked in by selling, and what trades cost. From{" "}
+            {tr("Profit locked in by selling, and what trades cost.")}{" "}
             <Link href="/investing/activities" className="underline decoration-black/15 underline-offset-2">
-              Activities
+              {tr("Activities")} →
             </Link>
-            .
           </p>
           <div className={`${investingTableScrollWrap} mt-3`}>
             <table className="w-full min-w-[480px] border-collapse text-left text-sm">
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
-                  <th className={th}>Year</th>
-                  <th className={`${th} text-right`}>Bought</th>
-                  <th className={`${th} text-right`}>Sold</th>
-                  <th className={`${th} text-right`}>Realized P&L</th>
-                  <th className={`${th} text-right`}>Fees</th>
-                  <th className={`${th} text-right`}>Fees % of volume</th>
+                  <th className={th}>{tr("Year")}</th>
+                  <th className={`${th} text-right`}>{tr("Bought")}</th>
+                  <th className={`${th} text-right`}>{tr("Sold")}</th>
+                  <th className={`${th} text-right`}>{tr("Realized P&L")}</th>
+                  <th className={`${th} text-right`}>{tr("Fees")}</th>
+                  <th className={`${th} text-right`}>{tr("Fees % of volume")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -466,7 +463,7 @@ export default function InvestingAnalyticsPage() {
                 ))}
                 {tradingRows.length > 0 ? (
                   <tr className="border-t-2 border-black/15 bg-[#f6f3ea] font-semibold">
-                    <td className="px-3 py-2 text-[#1f1c17]">Total</td>
+                    <td className="px-3 py-2 text-[#1f1c17]">{tr("Total")}</td>
                     <td className={`${td} text-right`}>{fmt0(tradingTotals.bought)}</td>
                     <td className={`${td} text-right`}>{fmt0(tradingTotals.sold)}</td>
                     <td className={`${td} text-right ${toneClass(tradingTotals.realized)}`}>
