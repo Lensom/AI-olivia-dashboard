@@ -64,6 +64,8 @@ export default function CinemaKindPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<CinemaStatus | "all">("all");
   const [genre, setGenre] = useState("");
+  const [releaseYear, setReleaseYear] = useState("");
+  const [viewYear, setViewYear] = useState("");
   const [onlyRecommended, setOnlyRecommended] = useState(false);
   const [onlyNewSeasons, setOnlyNewSeasons] = useState(false);
   const [sort, setSort] = useState<SortKey>("score");
@@ -87,6 +89,18 @@ export default function CinemaKindPage() {
     for (const t of mine) for (const g of t.genres) counts.set(g, (counts.get(g) ?? 0) + 1);
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }, [mine]);
+  // Years present on this page, newest first, with how many titles each has.
+  const yearOptions = useMemo(() => {
+    const count = (pick: (t: CinemaTitle) => number | null) => {
+      const m = new Map<number, number>();
+      for (const t of mine) {
+        const y = pick(t);
+        if (y != null) m.set(y, (m.get(y) ?? 0) + 1);
+      }
+      return [...m.entries()].sort((a, b) => b[0] - a[0]);
+    };
+    return { release: count((t) => t.year), view: count((t) => t.view_year) };
+  }, [mine]);
   const statusCounts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const t of mine) c[t.status] = (c[t.status] ?? 0) + 1;
@@ -99,13 +113,15 @@ export default function CinemaKindPage() {
       (t) =>
         (status === "all" || t.status === status) &&
         (!genre || t.genres.includes(genre)) &&
+        (!releaseYear || String(t.year) === releaseYear) &&
+        (!viewYear || String(t.view_year) === viewYear) &&
         (!onlyRecommended || t.recommended) &&
         (!onlyNewSeasons || newSeasons(t) > 0) &&
         (!q ||
           [t.title, t.original_title, ...t.actors, ...t.studios, ...t.directors, ...t.genres].some((s) => s.toLowerCase().includes(q))),
     );
     return sortTitles(filtered, sort);
-  }, [mine, query, status, genre, onlyRecommended, onlyNewSeasons, sort]);
+  }, [mine, query, status, genre, releaseYear, viewYear, onlyRecommended, onlyNewSeasons, sort]);
 
   const missingTmdb = mine.filter((t) => !t.tmdb_id).length;
   const scored = mine.filter((t) => t.score != null);
@@ -362,6 +378,36 @@ export default function CinemaKindPage() {
             {genres.map(([g, n]) => (
               <option key={g} value={g}>
                 {g} ({n})
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {yearOptions.release.length ? (
+          <select
+            value={releaseYear}
+            onChange={(e) => setReleaseYear(e.target.value)}
+            className={`rounded-full border px-3 py-1 text-xs ${releaseYear ? "border-[#1f1c17] bg-[#1f1c17] text-[#f8f4eb]" : "border-black/10 bg-white text-[#3b352d]"}`}
+            aria-label={tr("Release year")}
+          >
+            <option value="">{tr("Any release year")}</option>
+            {yearOptions.release.map(([y, n]) => (
+              <option key={y} value={y}>
+                {tr("Released {year}", { year: y })} ({n})
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {yearOptions.view.length ? (
+          <select
+            value={viewYear}
+            onChange={(e) => setViewYear(e.target.value)}
+            className={`rounded-full border px-3 py-1 text-xs ${viewYear ? "border-[#1f1c17] bg-[#1f1c17] text-[#f8f4eb]" : "border-black/10 bg-white text-[#3b352d]"}`}
+            aria-label={tr("Year watched")}
+          >
+            <option value="">{tr("Any year watched")}</option>
+            {yearOptions.view.map(([y, n]) => (
+              <option key={y} value={y}>
+                {tr("Watched in {year}", { year: y })} ({n})
               </option>
             ))}
           </select>

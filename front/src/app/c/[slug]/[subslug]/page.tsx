@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { categoryHref } from "@/lib/category-href";
 import { useT } from "@/lib/i18n";
 
 export default function SubcategoryPage() {
@@ -24,7 +25,7 @@ export default function SubcategoryPage() {
       </div>
 
       <Link
-        href={["investing", "cinematography", "library", "tasks"].includes(slug) ? `/${slug}` : `/c/${slug}`}
+        href={categoryHref(slug)}
         className="inline-flex rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-xs font-medium text-[#3b352d] hover:bg-[#faf8f2]"
       >
         {t("Back")}

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { categoryHref } from "@/lib/category-href";
+import { isCategoryVisible } from "@/lib/features";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { cinemaPageHref } from "@/features/cinema/nav";
@@ -12,15 +14,11 @@ import { useCategories, type Category, type Subcategory } from "@/state/categori
 
 const OPEN_KEY = "olivia.sidebar.open.v1";
 /** Categories that are a single page (no subpages to toggle). */
-const SINGLE_PAGE = new Set(["tasks"]);
+const SINGLE_PAGE = new Set(["tasks", "life"]);
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function categoryHref(slug: string) {
-  return ["investing", "cinematography", "library", "tasks"].includes(slug) ? `/${slug}` : `/c/${slug}`;
 }
 
 /** The category's own page first (so the title can toggle instead of navigate), then its pages. */
@@ -110,7 +108,7 @@ export function Sidebar() {
             ) : isLoading ? (
               <p className="px-2 pt-2 text-xs text-[#8f8676]">{t("Loading…")}</p>
             ) : (
-              categories.map((cat) => {
+              categories.filter((cat) => isCategoryVisible(cat.slug)).map((cat) => {
                 const href = categoryHref(cat.slug);
                 const inside = isActive(pathname, href) || pathname.startsWith(`/c/${cat.slug}/`);
                 const links = childLinks(cat, subcategoriesByCategoryId[cat.id] ?? []);

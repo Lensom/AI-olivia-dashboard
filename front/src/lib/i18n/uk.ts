@@ -1,6 +1,7 @@
 import { COMMON } from "@/lib/i18n/common";
 import { INVESTING } from "@/lib/i18n/investing";
 import { MEDIA } from "@/lib/i18n/media";
+import { PAGES } from "@/lib/i18n/pages";
 
 /**
  * Ukrainian dictionary, keyed by the English interface text. A string[] value holds the plural
@@ -10,6 +11,7 @@ export const UK: Record<string, string | string[]> = {
   ...COMMON,
   ...MEDIA,
   ...INVESTING,
+  ...PAGES,
 };
 
 /** English plural forms [one, other] for keys that take `n`. */
@@ -57,4 +59,9 @@ export const EN_PLURALS: Record<string, [string, string]> = {
   ],
   "Beat the index in {beat} of {n} years": ["Beat the index in {beat} of {n} year", "Beat the index in {beat} of {n} years"],
   "Clear {n} completed": ["Clear {n} completed", "Clear {n} completed"],
+  "Charts and insights for all titles or one type. {n} titles in view.": ["Charts and insights for all titles or one type. {n} title in view.", "Charts and insights for all titles or one type. {n} titles in view."],
+  "within ±1 point, {n} titles": ["within ±1 point, {n} title", "within ±1 point, {n} titles"],
+  // Life
+  "{n} subpages": ["{n} subpage", "{n} subpages"],
+  "Delete this table and its {n} rows?": ["Delete this table and its {n} row?", "Delete this table and its {n} rows?"],
 };

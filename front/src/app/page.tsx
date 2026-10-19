@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { RequireAuth } from "@/components/auth/require-auth";
+import { categoryHref } from "@/lib/category-href";
+import { isCategoryVisible } from "@/lib/features";
 import { useT } from "@/lib/i18n";
 import { useCategories } from "@/state/categories-store";
 
@@ -96,10 +98,8 @@ export default function Home() {
             </div>
           ) : null}
 
-          {categories.map((cat) => {
-            const href = ["investing", "cinematography", "library", "tasks"].includes(cat.slug)
-              ? `/${cat.slug}`
-              : `/c/${cat.slug}`;
+          {categories.filter((cat) => isCategoryVisible(cat.slug)).map((cat) => {
+            const href = categoryHref(cat.slug);
 
             return (
               <Link

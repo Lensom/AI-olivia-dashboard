@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { CINEMA_KINDS, cinemaKindMeta } from "@/features/cinema/nav";
 import type { CinemaTitle } from "@/features/cinema/types";
 import { Poster, ScoreBadge } from "@/features/cinema/ui";
-import { HBars, VBars } from "@/features/shared/bar-charts";
+import { CinemaAnalytics } from "@/features/cinema/overview-analytics";
 import { useT } from "@/lib/i18n";
 import { useCinema } from "@/state/cinema-store";
 
@@ -14,12 +14,6 @@ const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30
 function avgScore(list: CinemaTitle[]): number | null {
   const s = list.filter((t) => t.score != null);
   return s.length ? s.reduce((a, t) => a + (t.score ?? 0), 0) / s.length : null;
-}
-
-function countBy(list: CinemaTitle[], keys: (t: CinemaTitle) => (string | number)[]): Map<string, number> {
-  const m = new Map<string, number>();
-  for (const t of list) for (const k of keys(t)) m.set(String(k), (m.get(String(k)) ?? 0) + 1);
-  return m;
 }
 
 function PosterRow({ list, empty }: { list: CinemaTitle[]; empty: string }) {
@@ -50,15 +44,6 @@ export default function CinematographyOverview() {
 
   const s = useMemo(() => {
     const watched = items.filter((t) => t.status === "watched");
-    const years = items.map((t) => t.view_year).filter((y): y is number => y != null);
-    const yearRows: [string, number][] = [];
-    if (years.length) {
-      const counts = countBy(items, (t) => (t.view_year != null && t.status !== "planned" ? [t.view_year] : []));
-      for (let y = Math.min(...years); y <= Math.max(...years); y++) yearRows.push([String(y), counts.get(String(y)) ?? 0]);
-    }
-    const scoreCounts = countBy(items, (t) => (t.score != null ? [Math.round(t.score)] : []));
-    const genreRows = [...countBy(items, (t) => t.genres).entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
-    const actorRows = [...countBy(watched, (t) => t.actors).entries()].filter((r) => r[1] > 1).sort((a, b) => b[1] - a[1]).slice(0, 8);
     // You vs IMDb on the titles that have both.
     const both = items.filter((t) => t.score != null && t.imdb_rating != null);
     const vsImdb = both.length
@@ -72,11 +57,6 @@ export default function CinematographyOverview() {
       watching: items.filter((t) => t.status === "watching"),
       planned: items.filter((t) => t.status === "planned").length,
       thisYear: items.filter((t) => t.view_year === thisYear && t.status !== "planned").length,
-      yearRows,
-      scoreRows: Array.from({ length: 10 }, (_, i) => [String(i + 1), scoreCounts.get(String(i + 1)) ?? 0] as [string, number]),
-      scored: [...scoreCounts.values()].reduce((a, n) => a + n, 0),
-      genreRows,
-      actorRows,
       hours: Math.round(minutes / 60),
       vsImdb,
     };
@@ -151,30 +131,7 @@ export default function CinematographyOverview() {
         </section>
       ) : null}
 
-      <section className="grid grid-cols-1 gap-3 lg:grid-cols-2 [&>*]:min-w-0">
-        <div className={card}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Watched per year")}</h2>
-          <p className="mb-5 text-xs text-[#6f675b]">{tr("Titles by the year you watched them")}</p>
-          <VBars rows={s.yearRows} unit="{n} titles" empty="Add “year you watched it” to see this." />
-        </div>
-        <div className={card}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("How you score")}</h2>
-          <p className="mb-5 text-xs text-[#6f675b]">{tr("{n} graded titles by score, 1–10", { n: s.scored })}</p>
-          <VBars rows={s.scored ? s.scoreRows : []} unit="{n} titles" empty="Grade a title to see this." />
-        </div>
-        <div className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Top genres")}</h2>
-          {s.genreRows.length ? <HBars rows={s.genreRows} total={items.length} unit="{n} titles" /> : <p className="text-xs text-[#8f8676]">{tr("No genres yet.")}</p>}
-        </div>
-        <div className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Actors you watch most")}</h2>
-          {s.actorRows.length ? (
-            <HBars rows={s.actorRows} total={s.watched.length} unit="{n} watched titles" />
-          ) : (
-            <p className="text-xs text-[#8f8676]">{tr("Shows once an actor appears in two or more watched titles.")}</p>
-          )}
-        </div>
-      </section>
+      <CinemaAnalytics items={items} />
     </div>
   );
 }
