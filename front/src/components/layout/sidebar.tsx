@@ -68,7 +68,7 @@ export function Sidebar() {
 
   useEffect(() => {
     if (!user) return;
-    for (const cat of categories) void refreshSubcategories(cat.id);
+    for (const cat of categories) refreshSubcategories(cat.id).catch(() => {});
   }, [user, categories, refreshSubcategories]);
 
   function toggle(slug: string, open: boolean) {

@@ -105,7 +105,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       setIsSubcategoriesLoadingByCategoryId({});
       return;
     }
-    void refresh();
+    refresh().catch(() => {});
   }, [token, refresh]);
 
   return (

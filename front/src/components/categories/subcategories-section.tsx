@@ -35,7 +35,7 @@ export function SubcategoriesSection({ categorySlug }: SubcategoriesSectionProps
 
   useEffect(() => {
     if (!category) return;
-    void refreshSubcategories(category.id);
+    refreshSubcategories(category.id).catch(() => {});
   }, [category?.id, refreshSubcategories]);
 
   const subs = category ? (subcategoriesByCategoryId[category.id] ?? []) : [];

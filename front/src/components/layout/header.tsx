@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLang, useT, type Lang } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 
@@ -34,7 +35,8 @@ function LangSwitch() {
 }
 
 export function Header() {
-  const { user, logout } = useAuth();
+  const { token, user, status, logout } = useAuth();
+  const router = useRouter();
   const t = useT();
 
   return (
@@ -58,15 +60,18 @@ export function Header() {
             </span>
           ) : null}
 
-          {user ? (
+          {token ? (
             <button
-              onClick={logout}
+              onClick={() => {
+                logout();
+                router.replace("/login");
+              }}
               className="rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-xs font-medium text-[#3b352d] hover:bg-[#faf8f2]"
               type="button"
             >
               {t("Logout")}
             </button>
-          ) : (
+          ) : status === "loading" ? null : (
             <Link
               href="/login"
               className="rounded-full bg-[#1f1c17] px-3.5 py-1.5 text-xs font-medium text-[#f8f4eb] transition hover:bg-[#2c2923]"

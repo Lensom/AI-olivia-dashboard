@@ -13,14 +13,27 @@ function getDefaultApiBase(): string {
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? getDefaultApiBase();
 
+/** `status` 0 means the request never got an answer (server down, no network). */
 export type ApiError = {
   status: number;
   message: string;
 };
 
+/** Dispatched on window when a request sent with a token gets 401; `detail` is that token. */
+export const AUTH_EXPIRED_EVENT = "olivia:auth-expired";
+
+/** FastAPI errors are {"detail": "..."} or, for validation, {"detail": [{"msg": "..."}]}. */
 async function readError(res: Response): Promise<ApiError> {
   const text = await res.text().catch(() => "");
-  return { status: res.status, message: text || res.statusText };
+  let message = text || res.statusText;
+  try {
+    const detail = (JSON.parse(text) as { detail?: unknown }).detail;
+    if (typeof detail === "string") message = detail;
+    else if (Array.isArray(detail) && detail[0] && typeof detail[0].msg === "string") message = detail[0].msg;
+  } catch {
+    // Not JSON: keep the raw text.
+  }
+  return { status: res.status, message };
 }
 
 export async function apiFetch<T>(
@@ -33,8 +46,18 @@ export async function apiFetch<T>(
   if (!(opts.body instanceof FormData)) headers.set("Content-Type", "application/json");
   if (opts.token) headers.set("Authorization", `Bearer ${opts.token}`);
 
-  const res = await fetch(url, { ...opts, headers });
-  if (!res.ok) throw await readError(res);
+  let res: Response;
+  try {
+    res = await fetch(url, { ...opts, headers });
+  } catch {
+    throw { status: 0, message: "Can’t reach the server" } satisfies ApiError;
+  }
+  if (!res.ok) {
+    if (res.status === 401 && opts.token && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: opts.token }));
+    }
+    throw await readError(res);
+  }
   return (await res.json()) as T;
 }
 
