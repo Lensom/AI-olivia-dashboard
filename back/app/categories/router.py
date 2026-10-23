@@ -132,21 +132,20 @@ def _ensure_investing_defaults(conn: Connection, *, user_id: int, category_id: i
 
     # Same names and order as the frontend's Investing nav (front/src/features/investing/nav.ts).
     defaults = [
-        ("Total", "total"),
         ("Overview", "dashboard"),
         ("Portfolio", "table"),
+        ("Watchlist", "picking"),
         ("Finance", "finance"),
-        ("Allocation rules", "picking"),
         ("Activities", "activities"),
         ("Analytics", "analytics"),
         ("Notes", "notes"),
         ("Crypto", "crypto"),
+        ("Total", "total"),
     ]
     # Rows created with the old default names are renamed; names the user changed are left alone.
-    legacy_names = {"dashboard": "Dashboard", "table": "Holdings", "picking": "Picking"}
+    legacy_names = {"dashboard": ("Dashboard",), "table": ("Holdings",), "picking": ("Picking", "Allocation rules")}
     for name, slug in defaults:
-        old = legacy_names.get(slug)
-        if old:
+        for old in legacy_names.get(slug, ()):
             conn.execute(
                 "UPDATE subcategories SET name = %s WHERE category_id = %s AND slug = %s AND name = %s",
                 (name, category_id, slug, old),
@@ -161,15 +160,7 @@ def _ensure_investing_defaults(conn: Connection, *, user_id: int, category_id: i
         ).fetchone()
         if exists:
             continue
-        if slug == "total":
-            # Net worth sits above the Stocks pages, also for users whose menu existed before it.
-            first = conn.execute(
-                "SELECT COALESCE(MIN(sort_order), 10) FROM subcategories WHERE user_id = %s AND category_id = %s",
-                (user_id, category_id),
-            ).fetchone()
-            ord_val = int(first[0]) - 10 if first and first[0] is not None else 0
-        else:
-            ord_val = _next_subcategory_sort_order(conn, user_id=user_id, category_id=category_id)
+        ord_val = _next_subcategory_sort_order(conn, user_id=user_id, category_id=category_id)
         conn.execute(
             """
             INSERT INTO subcategories(user_id, category_id, name, slug, sort_order)

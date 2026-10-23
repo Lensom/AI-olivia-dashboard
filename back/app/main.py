@@ -9,6 +9,7 @@ import app.cinema.router as cinema_router_module
 import app.library.router as library_router_module
 from app.categories.router import router as categories_router
 from app.investing.router import router as investing_router
+from app.investing.watchlist import router as watchlist_router
 from app.tasks.router import router as tasks_router
 from app.pages.router import router as pages_router
 from app.db import create_pool, init_db
@@ -76,6 +77,7 @@ app.dependency_overrides[auth_router_module.get_settings] = get_settings
 app.include_router(auth_router_module.router, prefix=API_PREFIX)
 app.include_router(categories_router, prefix=API_PREFIX)
 app.include_router(investing_router, prefix=API_PREFIX)
+app.include_router(watchlist_router, prefix=API_PREFIX)
 app.dependency_overrides[cinema_router_module.get_tmdb_key] = lambda: settings.tmdb_api_key.strip()
 app.include_router(cinema_router_module.router, prefix=API_PREFIX)
 app.dependency_overrides[library_router_module.get_google_books_key] = lambda: settings.google_books_api_key.strip()

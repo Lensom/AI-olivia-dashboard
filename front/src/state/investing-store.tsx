@@ -120,7 +120,8 @@ type InvestingStore = {
   addActivity: (type: "buy" | "sell") => void;
   deleteActivity: (id: string) => void;
   updatePickingRow: (id: string, patch: Partial<InvestingPickingRow>) => void;
-  addPickingRow: () => void;
+  /** Adds one empty row, or one row per `init` entry (e.g. holdings not on the watchlist yet). */
+  addPickingRow: (init?: Partial<InvestingPickingRow>[]) => void;
   deletePickingRow: (id: string) => void;
   refreshPicking: () => Promise<void>;
   savePicking: () => Promise<void>;
@@ -972,14 +973,14 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
         setPickingDirty(true);
         setPickingRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
       },
-      addPickingRow: () => {
+      addPickingRow: (init) => {
         setPickingDirty(true);
         setPickingRows((prev) => [
-          {
+          ...(init?.length ? init : [{}]).map((patch, i) => ({
             id:
               typeof crypto !== "undefined" && "randomUUID" in crypto
                 ? crypto.randomUUID()
-                : `${Date.now()}`,
+                : `${Date.now()}${i}`,
             bucket: "value_blue_chips",
             name: "",
             ticker: "",
@@ -996,7 +997,8 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
             price_goal_1y: "",
             price_goal_5y: "",
             notes: "",
-          },
+            ...patch,
+          })),
           ...prev,
         ]);
       },

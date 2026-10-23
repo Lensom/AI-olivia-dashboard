@@ -2,6 +2,11 @@
 
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { formatUsd, parseUsd } from "@/features/investing/format";
+import { useSnapshots, type Period } from "@/features/investing/watchlist/data";
+import { DetailsPanel } from "@/features/investing/watchlist/details-panel";
+import { DipFinder } from "@/features/investing/watchlist/dip-finder";
+import { buySignal, num, RangeBar, signedPct, SignalPill, type Signal } from "@/features/investing/watchlist/signals";
+import { TickerLogo } from "@/features/investing/watchlist/ticker-logo";
 import {
   investingMetaBadge,
   investingPageStack,
@@ -11,7 +16,7 @@ import {
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
-import { useLocale, useT, type T } from "@/lib/i18n";
+import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useInvesting, type InvestingPickingRow } from "@/state/investing-store";
 
@@ -24,64 +29,6 @@ type BucketKey = (typeof BUCKETS)[number]["key"];
 const BUCKET_TITLE: Record<string, string> = Object.fromEntries(BUCKETS.map((b) => [b.key, b.title]));
 
 const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
-
-function num(s: string | undefined): number {
-  const raw = String(s ?? "").trim();
-  if (!raw) return NaN;
-  const n = parseUsd(raw);
-  return Number.isFinite(n) && /\d/.test(raw) ? n : NaN;
-}
-
-function signedPct(n: number, digits = 1): string {
-  return Number.isFinite(n) ? `${n > 0 ? "+" : ""}${n.toFixed(digits)}%` : "—";
-}
-
-type Signal = { rank: number; label: string; detail: string; cls: string; icon: string };
-
-/** Where the price sits against the user's buy zones; rank sorts the best opportunities first. */
-function buySignal(row: InvestingPickingRow, t: T): Signal {
-  const override = row.buy_right_now.trim();
-  if (override) return { rank: 2, label: override, detail: t("Manual note"), cls: "bg-[#f4efe4] text-[#3b352d]", icon: "✎" };
-  const px = num(row.current_price);
-  const strong = num(row.strong_buy_until);
-  const may = num(row.may_buy_until);
-  if (!Number.isFinite(px)) return { rank: 5, label: t("No price"), detail: t("Refresh quotes"), cls: "bg-[#f4efe4] text-[#8f8676]", icon: "…" };
-  if (Number.isFinite(strong) && px <= strong)
-    return { rank: 0, label: t("Strong buy"), detail: `${signedPct((px / strong - 1) * 100)} ${t("vs")} ${formatUsd(strong)}`, cls: "bg-emerald-50 text-emerald-800", icon: "▼" };
-  if (Number.isFinite(may) && px <= may)
-    return { rank: 1, label: t("May buy"), detail: `${signedPct((px / may - 1) * 100)} ${t("vs")} ${formatUsd(may)}`, cls: "bg-amber-50 text-amber-800", icon: "◐" };
-  const next = Number.isFinite(may) ? may : strong;
-  if (!Number.isFinite(next)) return { rank: 4, label: t("No zone set"), detail: t("Add buy prices in Edit"), cls: "bg-[#f4efe4] text-[#8f8676]", icon: "–" };
-  return { rank: 3, label: t("Wait"), detail: t("needs {pct} to {v}", { pct: signedPct((next / px - 1) * 100), v: formatUsd(next) }), cls: "bg-rose-50 text-rose-800", icon: "■" };
-}
-
-/** Price track: green = strong-buy zone, amber = may-buy zone, dot = current price. */
-function ZoneBar({ row }: { row: InvestingPickingRow }) {
-  const t = useT();
-  const px = num(row.current_price);
-  const strong = num(row.strong_buy_until);
-  const may = num(row.may_buy_until);
-  const levels = [px, strong, may].filter(Number.isFinite);
-  if (!Number.isFinite(px) || levels.length < 2) return <span className="text-xs text-[#b0a79a]">—</span>;
-  const lo = Math.min(...levels) * 0.85;
-  const hi = Math.max(...levels) * 1.08;
-  const x = (v: number) => `${((v - lo) / (hi - lo)) * 100}%`;
-  return (
-    <div
-      className="relative h-2.5 w-36 rounded-full bg-black/5"
-      title={`${t("Strong")} ≤ ${Number.isFinite(strong) ? formatUsd(strong) : "—"} · ${t("May")} ≤ ${Number.isFinite(may) ? formatUsd(may) : "—"} · ${t("Now")} ${formatUsd(px)}`}
-    >
-      {Number.isFinite(strong) ? <div className="absolute inset-y-0 left-0 rounded-l-full bg-emerald-400/80" style={{ width: x(strong) }} /> : null}
-      {Number.isFinite(may) ? (
-        <div
-          className="absolute inset-y-0 bg-amber-300/80"
-          style={{ left: Number.isFinite(strong) ? x(strong) : "0%", width: `calc(${x(may)} - ${Number.isFinite(strong) ? x(strong) : "0%"})` }}
-        />
-      ) : null}
-      <div className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#1f1c17]" style={{ left: x(px) }} />
-    </div>
-  );
-}
 
 function inputBaseClasses() {
   return "w-full min-w-[4.5rem] rounded-lg border border-black/10 bg-white/90 px-2 py-1 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20 focus:bg-white";
@@ -144,9 +91,24 @@ export default function InvestingPickingPage() {
     return { weight, byBucket };
   }, [holdings, pickingRows]);
 
+  // ---- Watchlist market data (view mode only, so typing a ticker in Edit doesn't refetch per key) ----
+  const tickers = useMemo(() => [...new Set(pickingRows.map((r) => r.ticker.trim().toUpperCase()).filter(Boolean))], [pickingRows]);
+  const { snapshots, loading: snapshotsLoading } = useSnapshots(mode === "view" ? tickers : [], token);
+
+  // Rows not saved yet have no quote from the server; the snapshot's price fills in until they are.
+  const pricedRows = useMemo(
+    () =>
+      pickingRows.map((r) => {
+        const snap = snapshots[r.ticker.trim().toUpperCase()];
+        if (r.current_price || snap?.price == null) return r;
+        return { ...r, current_price: snap.price.toFixed(2), day_change_pct: snap.change_pct != null ? `${snap.change_pct}%` : "" };
+      }),
+    [pickingRows, snapshots],
+  );
+
   const grouped = useMemo(() => {
     const groups = new Map<string, { row: InvestingPickingRow; signal: Signal; distance: number }[]>();
-    for (const row of pickingRows) {
+    for (const row of pricedRows) {
       const key = BUCKETS.some((b) => b.key === row.bucket) ? row.bucket : "value_blue_chips";
       const signal = buySignal(row, tr);
       const px = num(row.current_price);
@@ -163,7 +125,7 @@ export default function InvestingPickingPage() {
       );
     }
     return BUCKETS.map((b) => ({ bucket: b, items: groups.get(b.key) ?? [] }));
-  }, [pickingRows, mode, tr]);
+  }, [pricedRows, mode, tr]);
 
   const readyToBuy = useMemo(
     () => grouped.flatMap((g) => g.items).filter((i) => i.signal.rank <= 1),
@@ -218,10 +180,43 @@ export default function InvestingPickingPage() {
 
   const unassigned = portfolio.byBucket.get("unassigned");
 
+  const [period, setPeriod] = useState<Period>("YTD");
+  const [selected, setSelected] = useState<string | null>(null);
+  const flat = grouped.flatMap((g) => g.items);
+  const current = flat.find((i) => i.row.ticker.trim().toUpperCase() === selected) ?? flat.find((i) => i.row.ticker.trim()) ?? null;
+  const currentTicker = current?.row.ticker.trim().toUpperCase() ?? null;
+
+  // Holdings that aren't on the watchlist yet: one click adds them (funds go to ETF / REIT / Fund).
+  const missingHoldings = useMemo(() => {
+    const listed = new Set(tickers);
+    const seen = new Set<string>();
+    return holdings.filter((h) => {
+      const t = h.ticker.trim().toUpperCase();
+      if (!t || listed.has(t) || seen.has(t)) return false;
+      seen.add(t);
+      return true;
+    });
+  }, [holdings, tickers]);
+  function addHoldings() {
+    addPickingRow(
+      missingHoldings.map((h) => {
+        const ticker = h.ticker.trim().toUpperCase();
+        const industry = (h.industry ?? "").trim();
+        const name = (h.name ?? "").trim();
+        return {
+          ticker,
+          name: name.toUpperCase() === ticker ? "" : name,
+          industry: industry === "—" ? "" : industry,
+          bucket: industry.toUpperCase().startsWith("ETF") ? "etf_reit_fund" : "value_blue_chips",
+        };
+      }),
+    );
+  }
+
   return (
     <div className={investingPageStack}>
       <p className="text-sm text-[#655d51]">
-        {tr("Your buckets and buy zones. Each stock shows whether today’s price is in your strong-buy or may-buy zone, and each bucket shows how your portfolio compares with its target.")}
+        {tr("Stocks you follow, with your buy zones. The Dip Finder shows what fell the most, each stock shows whether today’s price is in your strong-buy or may-buy zone, and each bucket shows how your portfolio compares with its target.")}
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -237,6 +232,16 @@ export default function InvestingPickingPage() {
           >
             {isPickingLoading ? tr("Loading…") : tr("Refresh quotes")}
           </button>
+          {missingHoldings.length ? (
+            <button
+              type="button"
+              onClick={addHoldings}
+              title={missingHoldings.map((h) => h.ticker.trim().toUpperCase()).join(", ")}
+              className={investingToolbarBtn}
+            >
+              {tr("Add holdings ({n})", { n: missingHoldings.length })}
+            </button>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-full border border-black/10 bg-white p-1">
@@ -256,7 +261,7 @@ export default function InvestingPickingPage() {
           </div>
           {mode === "edit" ? (
             <>
-              <button type="button" onClick={addPickingRow} className={investingToolbarBtn}>
+              <button type="button" onClick={() => addPickingRow()} className={investingToolbarBtn}>
                 {tr("Add row")}
               </button>
               <button
@@ -362,90 +367,118 @@ export default function InvestingPickingPage() {
         </section>
       ) : null}
 
-      {mode === "view" ? (
-        <div className={investingTableScrollWrap}>
-          <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
-            <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
-              <tr>
-                <th className="px-3 py-2 font-medium">{tr("Stock")}</th>
-                <th className="px-3 py-2 text-right font-medium">{tr("Price")}</th>
-                <th className="px-3 py-2 font-medium">{tr("Signal")}</th>
-                <th className="px-3 py-2 font-medium">{tr("Buy zones")}</th>
-                <th className="px-3 py-2 text-right font-medium">{tr("Upside 1y / 5y")}</th>
-                <th className="px-3 py-2 text-right font-medium">{tr("P/E · Beta · Yield")}</th>
-                <th className="px-3 py-2 text-right font-medium">{tr("You own")}</th>
-                <th className="px-3 py-2 font-medium">{tr("Notes")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pickingRows.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-sm text-[#8f8676]">
-                    {tr("No stocks yet — switch to Edit, add a row with a ticker and your buy prices, then Autofill.")}
-                  </td>
-                </tr>
-              ) : null}
-              {grouped.map(({ bucket, items }) =>
-                items.length === 0 ? null : (
-                  <Fragment key={bucket.key}>
-                    <tr className="border-t border-black/10 bg-[#ebe6dc]">
-                      <td colSpan={8} className="px-3 py-2 text-xs font-semibold text-[#1f1c17]">
-                        {tr(bucket.title)} <span className="font-normal text-[#6f675b]">· {tr("{n} on the list", { n: items.length })}</span>
-                      </td>
+      {mode === "view" && pickingRows.length === 0 ? (
+        <p className={`${card} text-center text-sm text-[#8f8676]`}>
+          {tr("No stocks yet — switch to Edit, add a row with a ticker and your buy prices, then Autofill.")}
+        </p>
+      ) : mode === "view" ? (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px] [&>*]:min-w-0">
+          <div className="space-y-4">
+            <DipFinder
+              bars={tickers.map((t) => ({ ticker: t, value: snapshots[t]?.perf[period] }))}
+              period={period}
+              onPeriod={setPeriod}
+              selected={currentTicker}
+              onSelect={setSelected}
+              loading={snapshotsLoading}
+            />
+            <section className="overflow-hidden rounded-2xl border border-black/5 bg-white/90 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
+              <div className="flex items-baseline gap-2 px-5 py-4">
+                <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Stocks")}</h2>
+                <span className="rounded-full bg-[#f4efe4] px-2 py-0.5 text-[11px] font-medium text-[#6f675b]">{pickingRows.length}</span>
+                <span className="ml-auto text-[11px] text-[#8f8676]">{tr("best opportunities first")}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px] border-collapse text-left text-sm">
+                  <thead className="text-[11px] uppercase tracking-wide text-[#8f8676]">
+                    <tr className="border-t border-black/5">
+                      <th className="px-5 py-2 font-medium">{tr("Stock")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Price")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Today")}</th>
+                      <th className="px-3 py-2 font-medium">{tr("Signal")}</th>
+                      <th className="px-5 py-2 font-medium">{tr("52-week")}</th>
                     </tr>
-                    {items.map(({ row, signal }) => {
-                      const px = num(row.current_price);
-                      const day = num(row.day_change_pct);
-                      const own = portfolio.weight.get(row.ticker.trim().toUpperCase());
-                      return (
-                        <tr key={row.id} className="border-t border-black/5 align-top hover:bg-[#faf8f2]">
-                          <td className="px-3 py-2.5">
-                            <span className="font-semibold text-[#1f1c17]">{row.ticker || "—"}</span>
-                            <span className="block max-w-[220px] truncate text-[11px] text-[#8f8676]" title={`${row.name} · ${row.industry}`}>
-                              {[row.name, row.industry].filter((v) => v.trim()).join(" · ") || "—"}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
-                            <span className="text-[#1f1c17]">{Number.isFinite(px) ? formatUsd(px) : "—"}</span>
-                            <span className={`block text-[11px] ${day > 0 ? "text-emerald-700" : day < 0 ? "text-rose-700" : "text-[#8f8676]"}`}>
-                              {Number.isFinite(day) ? signedPct(day, 2) : ""}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${signal.cls}`}>
-                              <span aria-hidden>{signal.icon}</span>
-                              {signal.label}
-                            </span>
-                            <span className="block pt-0.5 text-[11px] text-[#8f8676]">{signal.detail}</span>
-                          </td>
-                          <td className="px-3 py-3">
-                            <ZoneBar row={row} />
-                            <span className="block pt-1 text-[11px] tabular-nums text-[#8f8676]">
-                              ≤{row.strong_buy_until || "—"} {tr("strong")} · ≤{row.may_buy_until || "—"} {tr("may")}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-[#3b352d]">
-                            {signedPct((num(row.price_goal_1y) / px - 1) * 100, 0)} / {signedPct((num(row.price_goal_5y) / px - 1) * 100, 0)}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-[#3b352d]">
-                            {row.pe || "—"} · {row.beta || "—"} · {row.div_yield ? `${row.div_yield}%` : "—"}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-[#3b352d]">
-                            {own != null ? `${own.toFixed(1)}%` : <span className="text-[#b0a79a]">—</span>}
-                          </td>
-                          <td className="max-w-[240px] px-3 py-2.5 text-xs text-[#6f675b]">
-                            <span className="line-clamp-2" title={row.notes}>
-                              {row.notes || "—"}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </Fragment>
-                ),
-              )}
-            </tbody>
-          </table>
+                  </thead>
+                  <tbody>
+                    {grouped.map(({ bucket, items }) =>
+                      items.length === 0 ? null : (
+                        <Fragment key={bucket.key}>
+                          <tr className="border-t border-black/10 bg-[#f4efe4]/70">
+                            <td colSpan={5} className="px-5 py-1.5 text-xs font-semibold text-[#1f1c17]">
+                              {tr(bucket.title)} <span className="font-normal text-[#6f675b]">· {tr("{n} on the list", { n: items.length })}</span>
+                            </td>
+                          </tr>
+                          {items.map(({ row, signal }) => {
+                            const t = row.ticker.trim().toUpperCase();
+                            const px = num(row.current_price);
+                            const day = num(row.day_change_pct);
+                            const own = portfolio.weight.get(t);
+                            const snap = snapshots[t];
+                            const active = current?.row.id === row.id;
+                            return (
+                              <tr
+                                key={row.id}
+                                onClick={() => setSelected(t)}
+                                className={`cursor-pointer border-t border-black/5 ${active ? "bg-[#eef4fc]" : "hover:bg-[#faf8f2]"}`}
+                              >
+                                <td className="px-5 py-2.5">
+                                  <button type="button" onClick={() => setSelected(t)} className="flex items-center gap-3 text-left" aria-pressed={active}>
+                                    <TickerLogo ticker={t} size={32} />
+                                    <span className="min-w-0">
+                                      <span className="block font-semibold text-[#1f1c17]">{row.ticker || "—"}</span>
+                                      <span className="block max-w-[180px] truncate text-[11px] text-[#8f8676]">{(row.name.trim().toUpperCase() !== t && row.name.trim()) || snap?.name || row.industry || "—"}</span>
+                                    </span>
+                                  </button>
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-[#1f1c17]">
+                                  {Number.isFinite(px) ? formatUsd(px) : "—"}
+                                  {own != null ? (
+                                    <span className="block text-[11px] font-normal text-[#8f8676]">
+                                      {tr("You own")} {own.toFixed(1)}%
+                                    </span>
+                                  ) : null}
+                                </td>
+                                <td className="px-3 py-2.5 text-right">
+                                  <span
+                                    className={`inline-block rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${day > 0 ? "bg-emerald-50 text-emerald-700" : day < 0 ? "bg-rose-50 text-rose-700" : "text-[#8f8676]"}`}
+                                  >
+                                    {Number.isFinite(day) ? signedPct(day, 1) : "—"}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2.5">
+                                  <SignalPill signal={signal} />
+                                  {/* How far from the zone; hints like "add buy prices" live in the details panel. */}
+                                  {signal.rank <= 3 ? <span className="block whitespace-nowrap pt-0.5 text-[11px] text-[#8f8676]">{signal.detail}</span> : null}
+                                </td>
+                                <td className="px-5 py-2.5">
+                                  <RangeBar low={snap?.low_52w} high={snap?.high_52w} price={px} strong={num(row.strong_buy_until)} may={num(row.may_buy_until)} />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </Fragment>
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <p className="border-t border-black/5 px-5 py-2 text-[11px] text-[#8f8676]">
+                {tr("52-week bar: green = your strong-buy zone, amber = may-buy zone, dot = today’s price.")}
+              </p>
+            </section>
+          </div>
+          <div className="h-fit xl:sticky xl:top-[72px]">
+            {current ? (
+              <DetailsPanel
+                row={current.row}
+                snapshot={currentTicker ? snapshots[currentTicker] : undefined}
+                signal={current.signal}
+                own={currentTicker ? portfolio.weight.get(currentTicker) : undefined}
+                token={token}
+                onEdit={() => setMode("edit")}
+              />
+            ) : null}
+          </div>
         </div>
       ) : (
         <div className={investingTableScrollWrap}>

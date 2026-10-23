@@ -12,7 +12,7 @@ const PAGES: Record<string, Omit<InvestingNavItem, "slug">> = {
   dashboard: { label: "Overview", href: "/investing/dashboard" },
   table: { label: "Portfolio", href: "/investing/holdings" },
   finance: { label: "Finance", href: "/investing/finance" },
-  picking: { label: "Allocation rules", href: "/investing/picking" },
+  picking: { label: "Watchlist", href: "/investing/picking" },
   activities: { label: "Activities", href: "/investing/activities" },
   analytics: { label: "Analytics", href: "/investing/analytics" },
   notes: { label: "Notes", href: "/investing/notes" },
@@ -21,15 +21,15 @@ const PAGES: Record<string, Omit<InvestingNavItem, "slug">> = {
 
 /** Used before subcategories load (and for any built-in page missing from the DB). */
 export const DEFAULT_INVESTING_ORDER = [
-  "total",
   "dashboard",
   "table",
-  "finance",
   "picking",
+  "finance",
   "activities",
   "analytics",
   "notes",
   "crypto",
+  "total",
 ] as const;
 
 export function isBuiltInInvestingPage(slug: string): boolean {
@@ -48,6 +48,7 @@ export function investingPageLabel(slug: string, fallback: string): string {
 /** Built-in pages in the user's order; any built-in page absent from `subs` is appended in default order. */
 export function investingNavItems(subs: Subcategory[]): InvestingNavItem[] {
   const ordered = subs.map((s) => s.slug).filter(isBuiltInInvestingPage);
-  for (const slug of DEFAULT_INVESTING_ORDER) if (!ordered.includes(slug)) ordered.push(slug);
+  for (const slug of DEFAULT_INVESTING_ORDER)
+    if (!ordered.includes(slug)) ordered.push(slug);
   return ordered.map((slug) => ({ slug, ...PAGES[slug]! }));
 }

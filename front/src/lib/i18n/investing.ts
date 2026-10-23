@@ -26,7 +26,8 @@ export const INVESTING: Record<string, string | string[]> = {
   // Investing home
   "Drag tiles (or use the arrows) to set the order. It applies to the sidebar and the Stocks tabs.":
     "Перетягуйте плитки (або тисніть стрілки), щоб задати порядок. Він застосовується до бічного меню й вкладок Акцій.",
-  "What needs your attention, and your investing pages in sidebar order.": "Що потребує уваги, і ваші сторінки інвестицій у порядку меню.",
+  "What needs your attention, and your investing pages in sidebar order.":
+    "Що потребує уваги, і ваші сторінки інвестицій у порядку меню.",
   Reorder: "Змінити порядок",
   "Investing pages": "Сторінки інвестицій",
   "Custom page": "Власна сторінка",
@@ -38,15 +39,20 @@ export const INVESTING: Record<string, string | string[]> = {
   "Add a custom page": "Додати власну сторінку",
   "Couldn't save the new order.": "Не вдалося зберегти новий порядок.",
   "Couldn't create the page.": "Не вдалося створити сторінку.",
-  "Net worth across stocks, crypto, savings and debts": "Капітал: акції, крипта, заощадження й борги",
-  "Today's moves, allocation, risk and rebalancing": "Зміни за день, розподіл, ризик і ребалансування",
+  "Net worth across stocks, crypto, savings and debts":
+    "Капітал: акції, крипта, заощадження й борги",
+  "Today's moves, allocation, risk and rebalancing":
+    "Зміни за день, розподіл, ризик і ребалансування",
   "Holdings table, import, targets": "Таблиця позицій, імпорт, цілі",
   "Deposits, fees and annualized return": "Внески, комісії та річна дохідність",
   "Buckets and buy zones": "Кошики й зони купівлі",
-  "Every buy and sell, import from broker": "Кожна купівля й продаж, імпорт від брокера",
+  "Every buy and sell, import from broker":
+    "Кожна купівля й продаж, імпорт від брокера",
   "Yearly returns vs the S&P 500": "Річна дохідність проти S&P 500",
-  "Your rules, checked against live numbers": "Ваші правила, перевірені на живих цифрах",
-  "BTC / ETH holdings, funding and split rule": "BTC / ETH, поповнення й правило розподілу",
+  "Your rules, checked against live numbers":
+    "Ваші правила, перевірені на живих цифрах",
+  "BTC / ETH holdings, funding and split rule":
+    "BTC / ETH, поповнення й правило розподілу",
   "{n} holdings": ["{n} позиція", "{n} позиції", "{n} позицій"],
   "{v} deposited": "{v} внесено",
   "{n} trades": ["{n} угода", "{n} угоди", "{n} угод"],
@@ -72,31 +78,50 @@ export const INVESTING: Record<string, string | string[]> = {
   "Save thresholds": "Зберегти пороги",
   "Reset to defaults": "Скинути до типових",
   "Checking your rules…": "Перевіряю ваші правила…",
-  "All clear — every rule is within its limit and this month is recorded.": "Усе гаразд — кожне правило в межах, і цей місяць записано.",
-  "Fees are {v}% of deposits — your limit is {max}%": "Комісії — {v}% від внесків, ваш ліміт — {max}%",
-  "Refill, buy and sell commissions together.": "Комісії за поповнення, купівлю й продаж разом.",
-  "Annualized return is {v}% — below your {min}% minimum": "Річна дохідність {v}% — нижче вашого мінімуму {min}%",
-  "ETF share is {v}% — your range is {min}–{max}%": "Частка ETF — {v}%, ваш діапазон — {min}–{max}%",
-  "{ticker} is {v}% of the portfolio — above your {max}% cap": "{ticker} — {v}% портфеля, більше за ваш ліміт {max}%",
+  "All clear — every rule is within its limit and this month is recorded.":
+    "Усе гаразд — кожне правило в межах, і цей місяць записано.",
+  "Fees are {v}% of deposits — your limit is {max}%":
+    "Комісії — {v}% від внесків, ваш ліміт — {max}%",
+  "Refill, buy and sell commissions together.":
+    "Комісії за поповнення, купівлю й продаж разом.",
+  "Annualized return is {v}% — below your {min}% minimum":
+    "Річна дохідність {v}% — нижче вашого мінімуму {min}%",
+  "ETF share is {v}% — your range is {min}–{max}%":
+    "Частка ETF — {v}%, ваш діапазон — {min}–{max}%",
+  "{ticker} is {v}% of the portfolio — above your {max}% cap":
+    "{ticker} — {v}% портфеля, більше за ваш ліміт {max}%",
   "Targets add up to {v}%, not 100%": "Цілі в сумі дають {v}%, а не 100%",
-  "Rebalance suggestions are off until they do.": "Поради з ребалансування вимкнено, доки так не буде.",
-  "{n} holdings off target by ≥ {pp} pp": ["{n} позиція відхилилась від цілі на ≥ {pp} п.п.", "{n} позиції відхилились від цілі на ≥ {pp} п.п.", "{n} позицій відхилились від цілі на ≥ {pp} п.п."],
-  "{group} is {v}% of your net worth — {pp} pp under its {goal}% goal": "{group} — {v}% капіталу, на {pp} п.п. нижче цілі {goal}%",
-  "{group} is {v}% of your net worth — {pp} pp over its {goal}% goal": "{group} — {v}% капіталу, на {pp} п.п. вище цілі {goal}%",
-  "{v} is sitting uninvested ({pct}% of the account)": "{v} лежать неінвестовані ({pct}% рахунку)",
-  "More than your {max}% cash limit — time to buy?": "Більше за ваш ліміт кешу {max}% — час купувати?",
-  "{ticker} is in your strong-buy zone": "{ticker} у вашій зоні активної купівлі",
+  "Rebalance suggestions are off until they do.":
+    "Поради з ребалансування вимкнено, доки так не буде.",
+  "{n} holdings off target by ≥ {pp} pp": [
+    "{n} позиція відхилилась від цілі на ≥ {pp} п.п.",
+    "{n} позиції відхилились від цілі на ≥ {pp} п.п.",
+    "{n} позицій відхилились від цілі на ≥ {pp} п.п.",
+  ],
+  "{group} is {v}% of your net worth — {pp} pp under its {goal}% goal":
+    "{group} — {v}% капіталу, на {pp} п.п. нижче цілі {goal}%",
+  "{group} is {v}% of your net worth — {pp} pp over its {goal}% goal":
+    "{group} — {v}% капіталу, на {pp} п.п. вище цілі {goal}%",
+  "{v} is sitting uninvested ({pct}% of the account)":
+    "{v} лежать неінвестовані ({pct}% рахунку)",
+  "More than your {max}% cash limit — time to buy?":
+    "Більше за ваш ліміт кешу {max}% — час купувати?",
+  "{ticker} is in your strong-buy zone":
+    "{ticker} у вашій зоні активної купівлі",
   "{ticker} is in your may-buy zone": "{ticker} у вашій зоні можливої купівлі",
-  "Save your Total page to start tracking net worth": "Збережіть сторінку «Разом», щоб почати відстежувати капітал",
+  "Save your Total page to start tracking net worth":
+    "Збережіть сторінку «Разом», щоб почати відстежувати капітал",
   "Record {month} on Total": "Запишіть {month} на сторінці «Разом»",
   "Enter your broker cash balance": "Внесіть залишок кешу в брокера",
-  "Until then, returns ignore uninvested cash.": "До того дохідність не враховує неінвестований кеш.",
+  "Until then, returns ignore uninvested cash.":
+    "До того дохідність не враховує неінвестований кеш.",
   "Record dividends you've received": "Запишіть отримані дивіденди",
   Savings: "Заощадження",
 
   // Overview (dashboard)
   "Loading portfolio…": "Завантаження портфеля…",
-  "No holdings yet — add them or import an XLSX on the Portfolio tab.": "Позицій ще немає — додайте їх або імпортуйте XLSX на вкладці «Портфель».",
+  "No holdings yet — add them or import an XLSX on the Portfolio tab.":
+    "Позицій ще немає — додайте їх або імпортуйте XLSX на вкладці «Портфель».",
   "Live prices": "Ціни наживо",
   "Last saved prices": "Останні збережені ціни",
   "portfolio saved {when}": "портфель збережено {when}",
@@ -104,13 +129,15 @@ export const INVESTING: Record<string, string | string[]> = {
   "Refresh market": "Оновити ринок",
   "Portfolio value": "Вартість портфеля",
   "{v} today": "{v} сьогодні",
-  "Today's change appears after quotes load": "Зміна за день з'явиться після завантаження котирувань",
+  "Today's change appears after quotes load":
+    "Зміна за день з'явиться після завантаження котирувань",
   "Total return": "Загальна дохідність",
   "on {v} topped": "на {v} внесених",
   "incl. {v} cash": "вкл. {v} кешу",
   "Positions vs cost: {v}": "Позиції проти собівартості: {v}",
   "Total return (vs cost basis)": "Загальна дохідність (від собівартості)",
-  "on {v} cost · add refills on Finance": "на {v} собівартості · додайте поповнення на «Фінансах»",
+  "on {v} cost · add refills on Finance":
+    "на {v} собівартості · додайте поповнення на «Фінансах»",
   Today: "Сьогодні",
   "{n} up": "{n} зросли",
   "{n} down": "{n} впали",
@@ -124,22 +151,28 @@ export const INVESTING: Record<string, string | string[]> = {
   "Est. monthly": "Оцінка на місяць",
   Positions: "Позиції",
   "Not recorded": "Не записано",
-  "{n} · {up} in profit · {down} in loss": "{n} · {up} у плюсі · {down} у мінусі",
+  "{n} · {up} in profit · {down} in loss":
+    "{n} · {up} у плюсі · {down} у мінусі",
   "Portfolio map": "Мапа портфеля",
-  "Each tile is a holding, sized by weight and colored by today's move.": "Кожна плитка — позиція: розмір за часткою, колір за зміною за день.",
+  "Each tile is a holding, sized by weight and colored by today's move.":
+    "Кожна плитка — позиція: розмір за часткою, колір за зміною за день.",
   "Today's movers": "Лідери дня",
-  "Session change and its $ effect on your position.": "Зміна за сесію та її вплив у $ на вашу позицію.",
+  "Session change and its $ effect on your position.":
+    "Зміна за сесію та її вплив у $ на вашу позицію.",
   "Winners & losers": "Лідери й аутсайдери",
-  "Total return on cost per holding.": "Загальна дохідність від собівартості для кожної позиції.",
+  "Total return on cost per holding.":
+    "Загальна дохідність від собівартості для кожної позиції.",
   Allocation: "Розподіл",
   "By holding and by industry.": "За позиціями й галузями.",
   "By holding": "За позиціями",
   "By industry": "За галузями",
   "Concentration risk": "Ризик концентрації",
   "Rebalance to target": "Ребалансування до цілі",
-  "What to buy or trim to match your target weights.": "Що докупити чи скоротити, щоб відповідати цільовим часткам.",
+  "What to buy or trim to match your target weights.":
+    "Що докупити чи скоротити, щоб відповідати цільовим часткам.",
   "Capital entries": "Записи капіталу",
-  "Deposits and portfolio total over time.": "Внески й вартість портфеля в часі.",
+  "Deposits and portfolio total over time.":
+    "Внески й вартість портфеля в часі.",
   "Add row": "Додати рядок",
   "Edit table": "Редагувати таблицю",
   Date: "Дата",
@@ -149,23 +182,27 @@ export const INVESTING: Record<string, string | string[]> = {
   Actions: "Дії",
   Other: "Інше",
   "Portfolio value over time": "Вартість портфеля в часі",
-  "From capital tracking entries (total value).": "З записів капіталу (загальна вартість).",
+  "From capital tracking entries (total value).":
+    "З записів капіталу (загальна вартість).",
   Capital: "Капітал",
   "On the Dashboard, add capital rows with a date (e.g. 15.03.2024 or 2024-03-15) and total value.":
     "На Огляді додайте рядки капіталу з датою (напр. 15.03.2024 або 2024-03-15) і загальною вартістю.",
   "{v}% of portfolio": "{v}% портфеля",
   today: "сьогодні",
   total: "загалом",
-  "Size = weight · color = today’s move. Hover a tile for details.": "Розмір = частка · колір = зміна за день. Наведіть на плитку для деталей.",
+  "Size = weight · color = today’s move. Hover a tile for details.":
+    "Розмір = частка · колір = зміна за день. Наведіть на плитку для деталей.",
   "Color scale from -3% to +3%": "Шкала кольору від −3% до +3%",
-  "No live quotes yet — use Refresh market on Portfolio.": "Котирувань ще немає — натисніть «Оновити ринок» на «Портфелі».",
+  "No live quotes yet — use Refresh market on Portfolio.":
+    "Котирувань ще немає — натисніть «Оновити ринок» на «Портфелі».",
   "Top gainers": "Найбільше зросли",
   "Nothing up today.": "Сьогодні нічого не зросло.",
   "Top losers": "Найбільше впали",
   "Nothing down today.": "Сьогодні нічого не впало.",
   "Biggest $ impact:": "Найбільший вплив у $:",
   Unclassified: "Без галузі",
-  "Unclassified: {tickers} — set Industry on Portfolio (expand row in Edit).": "Без галузі: {tickers} — задайте галузь на «Портфелі» (розгорніть рядок у режимі редагування).",
+  "Unclassified: {tickers} — set Industry on Portfolio (expand row in Edit).":
+    "Без галузі: {tickers} — задайте галузь на «Портфелі» (розгорніть рядок у режимі редагування).",
   "High concentration": "Висока концентрація",
   "Moderate concentration": "Помірна концентрація",
   "Well diversified": "Добре диверсифіковано",
@@ -176,8 +213,10 @@ export const INVESTING: Record<string, string | string[]> = {
   "of {n} positions": ["з {n} позиції", "з {n} позицій", "з {n} позицій"],
   "Effective holdings = 1 / Σ weight² — how many equal-sized positions your portfolio behaves like.":
     "Ефективна кількість = 1 / Σ частка² — скільком однаковим позиціям рівносильний ваш портфель.",
-  "Set Target % on the Portfolio tab to get buy / trim suggestions.": "Задайте цільовий % на вкладці «Портфель», щоб отримати поради купити / скоротити.",
-  "Targets sum to {v}%, not 100% — suggestions are approximate.": "Цілі в сумі дають {v}%, а не 100% — поради приблизні.",
+  "Set Target % on the Portfolio tab to get buy / trim suggestions.":
+    "Задайте цільовий % на вкладці «Портфель», щоб отримати поради купити / скоротити.",
+  "Targets sum to {v}%, not 100% — suggestions are approximate.":
+    "Цілі в сумі дають {v}%, а не 100% — поради приблизні.",
   Ticker: "Тікер",
   Current: "Поточна",
   Target: "Ціль",
@@ -188,15 +227,19 @@ export const INVESTING: Record<string, string | string[]> = {
   "Buy {v}": "Купити {v}",
   "Trim {v}": "Скоротити {v}",
   sh: "шт.",
-  "Drift within ±1 pp is treated as on target.": "Відхилення в межах ±1 п.п. вважається відповідністю цілі.",
+  "Drift within ±1 pp is treated as on target.":
+    "Відхилення в межах ±1 п.п. вважається відповідністю цілі.",
 
   // Portfolio (holdings)
-  "Every holding already has a name and industry.": "Кожна позиція вже має назву й галузь.",
-  "Filled {list} — review and press Save.": "Заповнено {list} — перевірте й натисніть «Зберегти».",
+  "Every holding already has a name and industry.":
+    "Кожна позиція вже має назву й галузь.",
+  "Filled {list} — review and press Save.":
+    "Заповнено {list} — перевірте й натисніть «Зберегти».",
   "No data for {list}.": "Немає даних для {list}.",
   "Autofill failed: {v}": "Автозаповнення не вдалося: {v}",
   "Unknown error": "Невідома помилка",
-  "Day % is today’s session move from market data — use Refresh market.": "День % — зміна за сьогоднішню сесію з ринкових даних — натисніть «Оновити ринок».",
+  "Day % is today’s session move from market data — use Refresh market.":
+    "День % — зміна за сьогоднішню сесію з ринкових даних — натисніть «Оновити ринок».",
   "Total value {v}": "Загальна вартість {v}",
   "Target sum {v}": "Сума цілей {v}",
   "Current sum {v}": "Поточна сума {v}",
@@ -204,19 +247,25 @@ export const INVESTING: Record<string, string | string[]> = {
   "synced {when}": "синхронізовано {when}",
   "Refreshing metrics…": "Оновлення показників…",
   "Refresh metrics": "Оновити показники",
-  "Columns: Ticker, Qty, Entry Price, Price, Value": "Колонки: Ticker, Qty, Entry Price, Price, Value",
+  "Columns: Ticker, Qty, Entry Price, Price, Value":
+    "Колонки: Ticker, Qty, Entry Price, Price, Value",
   "Importing…": "Імпорт…",
   "Import XLSX": "Імпорт XLSX",
-  "Fill empty names and industries from Finviz": "Заповнити порожні назви й галузі з Finviz",
+  "Fill empty names and industries from Finviz":
+    "Заповнити порожні назви й галузі з Finviz",
   "Autofill names & industry": "Автозаповнити назви й галузі",
   Reset: "Скинути",
-  "Unsaved changes — press Save to store them in the database.": "Незбережені зміни — натисніть «Зберегти», щоб записати їх у базу.",
+  "Unsaved changes — press Save to store them in the database.":
+    "Незбережені зміни — натисніть «Зберегти», щоб записати їх у базу.",
   "Go to Edit": "До редагування",
   "Imported: {updated} updated, {added} added. Review and press Save to store in the database.":
     "Імпортовано: {updated} оновлено, {added} додано. Перевірте й натисніть «Зберегти», щоб записати в базу.",
-  "New: {list} — use Autofill names & industry, then set targets.": "Нові: {list} — скористайтеся автозаповненням назв і галузей, потім задайте цілі.",
-  "Not in file (kept, delete if sold): {list}": "Немає у файлі (залишено, видаліть, якщо продано): {list}",
-  "Skipped (missing Qty or Entry Price): {list}": "Пропущено (немає Qty або Entry Price): {list}",
+  "New: {list} — use Autofill names & industry, then set targets.":
+    "Нові: {list} — скористайтеся автозаповненням назв і галузей, потім задайте цілі.",
+  "Not in file (kept, delete if sold): {list}":
+    "Немає у файлі (залишено, видаліть, якщо продано): {list}",
+  "Skipped (missing Qty or Entry Price): {list}":
+    "Пропущено (немає Qty або Entry Price): {list}",
   "Import failed: {v}": "Імпорт не вдався: {v}",
   "Search ticker, name, industry…": "Пошук тікера, назви, галузі…",
   "Search holdings": "Пошук позицій",
@@ -231,11 +280,15 @@ export const INVESTING: Record<string, string | string[]> = {
   Day: "День",
   Value: "Вартість",
   "P&L": "P&L",
-  "No holdings yet — Add row in Edit mode, or Import XLSX.": "Позицій ще немає — додайте рядок у режимі редагування або імпортуйте XLSX.",
-  "No holdings match this search or filter.": "Жодна позиція не відповідає пошуку чи фільтру.",
+  "No holdings yet — Add row in Edit mode, or Import XLSX.":
+    "Позицій ще немає — додайте рядок у режимі редагування або імпортуйте XLSX.",
+  "No holdings match this search or filter.":
+    "Жодна позиція не відповідає пошуку чи фільтру.",
   "Company name": "Назва компанії",
-  "Session change from quotes (Yahoo). Refresh market to update.": "Зміна за сесію з котирувань (Yahoo). Натисніть «Оновити ринок», щоб оновити.",
-  "Session change from quotes. Refresh market to update.": "Зміна за сесію з котирувань. Натисніть «Оновити ринок», щоб оновити.",
+  "Session change from quotes (Yahoo). Refresh market to update.":
+    "Зміна за сесію з котирувань (Yahoo). Натисніть «Оновити ринок», щоб оновити.",
+  "Session change from quotes. Refresh market to update.":
+    "Зміна за сесію з котирувань. Натисніть «Оновити ринок», щоб оновити.",
   "Current − target, percentage points": "Поточна − цільова, відсоткові пункти",
   Industry: "Галузь",
   "Cost basis": "Собівартість",
@@ -246,7 +299,11 @@ export const INVESTING: Record<string, string | string[]> = {
   "Set a target in Edit": "Задайте ціль у режимі редагування",
   "On target — hold": "У межах цілі — тримати",
   Research: "Дослідження",
-  "{n} positions · cost {v}": ["{n} позиція · собівартість {v}", "{n} позиції · собівартість {v}", "{n} позицій · собівартість {v}"],
+  "{n} positions · cost {v}": [
+    "{n} позиція · собівартість {v}",
+    "{n} позиції · собівартість {v}",
+    "{n} позицій · собівартість {v}",
+  ],
   "Targets should add up to 100%": "Цілі мають у сумі давати 100%",
 
   // Finance
@@ -257,23 +314,29 @@ export const INVESTING: Record<string, string | string[]> = {
   Reload: "Перезавантажити",
   "Add refill": "Додати поповнення",
   "Operating expenses, $": "Операційні витрати, $",
-  "Manual override is active (calculated: {v}).": "Діє ручне значення (розраховано: {v}).",
-  "Refills {r} · Buys {b} · Sells {s}": "Поповнення {r} · Купівлі {b} · Продажі {s}",
+  "Manual override is active (calculated: {v}).":
+    "Діє ручне значення (розраховано: {v}).",
+  "Refills {r} · Buys {b} · Sells {s}":
+    "Поповнення {r} · Купівлі {b} · Продажі {s}",
   "Current value": "Поточна вартість",
   "Holdings {h} + broker cash {c}": "Позиції {h} + кеш у брокера {c}",
-  "Live from holdings quotes (no broker cash entered).": "Наживо з котирувань позицій (кеш брокера не внесено).",
+  "Live from holdings quotes (no broker cash entered).":
+    "Наживо з котирувань позицій (кеш брокера не внесено).",
   "Total topped": "Усього внесено",
   "Sum of Invest column.": "Сума колонки «Внесок».",
   "Topped − fee": "Внесено − комісії",
-  "Total topped minus operating expenses.": "Усього внесено мінус операційні витрати.",
+  "Total topped minus operating expenses.":
+    "Усього внесено мінус операційні витрати.",
   "Total %": "Разом %",
   "(Current − topped) / topped.": "(Поточна − внесено) / внесено.",
   "Total, − fee %": "Разом, − комісії %",
-  "(Current − net after fees) / net after fees.": "(Поточна − чисті внески) / чисті внески.",
+  "(Current − net after fees) / net after fees.":
+    "(Поточна − чисті внески) / чисті внески.",
   "Net gain, $": "Чистий прибуток, $",
   "Current value − total topped.": "Поточна вартість − усього внесено.",
   "Annualized return (XIRR)": "Річна дохідність (XIRR)",
-  "Money-weighted: accounts for when each refill was made.": "Зважена за грошима: враховує, коли зроблено кожне поповнення.",
+  "Money-weighted: accounts for when each refill was made.":
+    "Зважена за грошима: враховує, коли зроблено кожне поповнення.",
   "Fees, % of topped": "Комісії, % від внесеного",
   "Operating expenses / total topped.": "Операційні витрати / усього внесено.",
   "{year} pace": "Темп {year}",
@@ -288,7 +351,8 @@ export const INVESTING: Record<string, string | string[]> = {
   "{n} days ago": ["{n} день тому", "{n} дні тому", "{n} днів тому"],
   "Yearly overview": "Огляд за роками",
   "Yearly summary": "Підсумок за рік",
-  "Invest amounts aggregated by calendar year.": "Суми внесків за календарними роками.",
+  "Invest amounts aggregated by calendar year.":
+    "Суми внесків за календарними роками.",
   "Sum of invest": "Сума внесків",
   Refills: "Поповнення",
   Commission: "Комісія",
@@ -298,7 +362,8 @@ export const INVESTING: Record<string, string | string[]> = {
   "Operating expenses override, $": "Ручні операційні витрати, $",
   "Leave empty to use all fees: refill commissions plus buy and sell commissions from Activities. Set a total only to match another source (e.g. a broker statement).":
     "Залиште порожнім, щоб врахувати всі комісії: за поповнення плюс за купівлю й продаж з «Операцій». Вказуйте суму лише для збігу з іншим джерелом (напр. звітом брокера).",
-  "Leave empty to use {v} (refills + buys + sells)": "Залиште порожнім, щоб використати {v} (поповнення + купівлі + продажі)",
+  "Leave empty to use {v} (refills + buys + sells)":
+    "Залиште порожнім, щоб використати {v} (поповнення + купівлі + продажі)",
   "Amount of investments by year": "Сума інвестицій за роками",
   "Deposits vs buys": "Внески проти купівель",
   "Where topped-up money went each year (buys and sales from Activities, in USD). Unspent = running topped − bought + sold − trade fees: cash not yet in positions.":
@@ -310,8 +375,10 @@ export const INVESTING: Record<string, string | string[]> = {
   "Net cash": "Чистий кеш",
   "Unspent (est.)": "Невитрачене (оцінка)",
   "No refills or activities yet.": "Поповнень чи операцій ще немає.",
-  "Negative unspent means buys exceed recorded refills — a refill or sale may be missing.": "Від'ємне невитрачене означає, що купівлі перевищують записані поповнення — можливо, бракує поповнення чи продажу.",
-  "Date (DD.MM.YYYY or YYYY-MM-DD), invest amount, commission in USD.": "Дата (ДД.ММ.РРРР або РРРР-ММ-ДД), сума внеску, комісія в USD.",
+  "Negative unspent means buys exceed recorded refills — a refill or sale may be missing.":
+    "Від'ємне невитрачене означає, що купівлі перевищують записані поповнення — можливо, бракує поповнення чи продажу.",
+  "Date (DD.MM.YYYY or YYYY-MM-DD), invest amount, commission in USD.":
+    "Дата (ДД.ММ.РРРР або РРРР-ММ-ДД), сума внеску, комісія в USD.",
   "Filter refills by year": "Фільтр поповнень за роком",
   Invest: "Внесок",
   "Commission, $": "Комісія, $",
@@ -324,14 +391,16 @@ export const INVESTING: Record<string, string | string[]> = {
   "Unsaved changes": "Незбережені зміни",
   "Couldn't save — try again.": "Не вдалося зберегти — спробуйте ще раз.",
   "Uninvested cash at the broker": "Неінвестований кеш у брокера",
-  "Counted in current value, total return and XIRR. Update it when you check your broker.": "Враховується в поточній вартості, загальній дохідності та XIRR. Оновлюйте, коли перевіряєте брокера.",
+  "Counted in current value, total return and XIRR. Update it when you check your broker.":
+    "Враховується в поточній вартості, загальній дохідності та XIRR. Оновлюйте, коли перевіряєте брокера.",
   "{v}% of the account (holdings + cash)": "{v}% рахунку (позиції + кеш)",
   "Cash amount": "Сума кешу",
   Currency: "Валюта",
   "Remove balance": "Прибрати залишок",
   "Add another currency": "Додати ще валюту",
   "Add cash balance": "Додати залишок кешу",
-  "Other currencies are converted at official NBU rates.": "Інші валюти конвертуються за офіційним курсом НБУ.",
+  "Other currencies are converted at official NBU rates.":
+    "Інші валюти конвертуються за офіційним курсом НБУ.",
   "Dividends received": "Отримані дивіденди",
   "Add dividend": "Додати дивіденд",
   "Last 12 months (net)": "За 12 місяців (чисті)",
@@ -343,27 +412,33 @@ export const INVESTING: Record<string, string | string[]> = {
   Gross: "Брутто",
   "Tax withheld": "Утримано податку",
   "Net, USD": "Нетто, USD",
-  "No dividends recorded yet — Add dividend for each payout your broker shows.": "Дивідендів ще не записано — додайте кожну виплату, яку показує брокер.",
+  "No dividends recorded yet — Add dividend for each payout your broker shows.":
+    "Дивідендів ще не записано — додайте кожну виплату, яку показує брокер.",
   "Delete dividend": "Видалити дивіденд",
   "By year (net):": "За роками (чисті):",
   "Dividends usually land in broker cash, so they’re tracked here as income and not added to current value a second time. Non-USD amounts are converted at the payment date’s rate when you save.":
     "Дивіденди зазвичай потрапляють у кеш брокера, тож тут вони обліковуються як дохід і не додаються до поточної вартості вдруге. Суми не в USD конвертуються за курсом на дату виплати під час збереження.",
 
   // Activities
-  "Every buy and sell. USD amounts and FX rates are calculated when you save.": "Кожна купівля й продаж. Суми в USD і курси розраховуються під час збереження.",
+  "Every buy and sell. USD amounts and FX rates are calculated when you save.":
+    "Кожна купівля й продаж. Суми в USD і курси розраховуються під час збереження.",
   "Broker trade export: Trade#, Time, Ticker, Direction, Price, Quantity, Amount, Fee, Profit":
     "Експорт угод брокера: Trade#, Time, Ticker, Direction, Price, Quantity, Amount, Fee, Profit",
   "Add purchase": "Додати купівлю",
   "Add sale": "Додати продаж",
-  "Unsaved changes — press Save to store them and recalculate USD amounts.": "Незбережені зміни — натисніть «Зберегти», щоб записати їх і перерахувати суми в USD.",
-  "Added {n} trades ({buys} buys, {sells} sells) at the top — review and press Save.": [
-    "Додано {n} угоду ({buys} купівель, {sells} продажів) угорі — перевірте й натисніть «Зберегти».",
-    "Додано {n} угоди ({buys} купівель, {sells} продажів) угорі — перевірте й натисніть «Зберегти».",
-    "Додано {n} угод ({buys} купівель, {sells} продажів) угорі — перевірте й натисніть «Зберегти».",
-  ],
-  "No new trades — everything in this file is already recorded.": "Нових угод немає — усе з цього файлу вже записано.",
+  "Unsaved changes — press Save to store them and recalculate USD amounts.":
+    "Незбережені зміни — натисніть «Зберегти», щоб записати їх і перерахувати суми в USD.",
+  "Added {n} trades ({buys} buys, {sells} sells) at the top — review and press Save.":
+    [
+      "Додано {n} угоду ({buys} купівель, {sells} продажів) угорі — перевірте й натисніть «Зберегти».",
+      "Додано {n} угоди ({buys} купівель, {sells} продажів) угорі — перевірте й натисніть «Зберегти».",
+      "Додано {n} угод ({buys} купівель, {sells} продажів) угорі — перевірте й натисніть «Зберегти».",
+    ],
+  "No new trades — everything in this file is already recorded.":
+    "Нових угод немає — усе з цього файлу вже записано.",
   "Already recorded, skipped: {n}": "Уже записані, пропущено: {n}",
-  "Currency exchanges (e.g. RUR/USD), skipped: {n}": "Обміни валют (напр. RUR/USD), пропущено: {n}",
+  "Currency exchanges (e.g. RUR/USD), skipped: {n}":
+    "Обміни валют (напр. RUR/USD), пропущено: {n}",
   "Couldn’t read {n}:": "Не вдалося прочитати {n}:",
   "Search ticker, name, category…": "Пошук тікера, назви, категорії…",
   "Search activities": "Пошук операцій",
@@ -386,12 +461,14 @@ export const INVESTING: Record<string, string | string[]> = {
   Count: "Кількість",
   Amount: "Сума",
   "Gains/Losses": "Прибуток/Збиток",
-  "No trades yet — switch to Edit and add a purchase.": "Угод ще немає — перейдіть у режим редагування й додайте купівлю.",
+  "No trades yet — switch to Edit and add a purchase.":
+    "Угод ще немає — перейдіть у режим редагування й додайте купівлю.",
   "No trades match these filters.": "Жодна угода не відповідає фільтрам.",
   Buy: "Купівля",
   Sell: "Продаж",
   Company: "Компанія",
-  "Only sales have realized gains/losses": "Зафіксований прибуток/збиток мають лише продажі",
+  "Only sales have realized gains/losses":
+    "Зафіксований прибуток/збиток мають лише продажі",
   "Amber border = missing ticker or a date that isn’t DD.MM.YYYY. New rows appear at the top and stay visible whatever the filters.":
     "Жовта рамка = немає тікера або дата не у форматі ДД.ММ.РРРР. Нові рядки з'являються вгорі й видимі за будь-яких фільтрів.",
   "By ticker ({n})": "За тікером ({n})",
@@ -403,7 +480,8 @@ export const INVESTING: Record<string, string | string[]> = {
   "Purchase fees": "Комісії купівель",
   Sales: "Продажі",
   "Sale fees": "Комісії продажів",
-  "Sales − purchases − fees + realized P&L": "Продажі − купівлі − комісії + зафіксований P&L",
+  "Sales − purchases − fees + realized P&L":
+    "Продажі − купівлі − комісії + зафіксований P&L",
   "Net cash flow": "Чистий грошовий потік",
   "No yearly data yet.": "Даних за роками ще немає.",
 
@@ -413,18 +491,25 @@ export const INVESTING: Record<string, string | string[]> = {
   "How the portfolio has performed over the years against the market, where its risk and income come from, and what trading has cost. Current allocation and today’s moves are on":
     "Як портфель показав себе за роки порівняно з ринком, звідки його ризик і дохід і скільки коштувала торгівля. Поточний розподіл і зміни за день — на сторінці",
   "Average annual return": "Середня річна дохідність",
-  "{bench} {v} over the same years ({span})": "{bench} {v} за ті самі роки ({span})",
+  "{bench} {v} over the same years ({span})":
+    "{bench} {v} за ті самі роки ({span})",
   "vs {bench}": "проти {bench}",
   yr: "рік",
-  "Beat the index in {beat} of {n} years": ["Обігнали індекс у {beat} з {n} року", "Обігнали індекс у {beat} з {n} років", "Обігнали індекс у {beat} з {n} років"],
+  "Beat the index in {beat} of {n} years": [
+    "Обігнали індекс у {beat} з {n} року",
+    "Обігнали індекс у {beat} з {n} років",
+    "Обігнали індекс у {beat} з {n} років",
+  ],
   "Best year": "Найкращий рік",
   "index {v}": "індекс {v}",
   "No history yet": "Історії ще немає",
   "Worst year": "Найгірший рік",
   "Annual return vs the market": "Річна дохідність проти ринку",
-  "Your return each year next to {bench} with dividends reinvested.": "Ваша дохідність щороку поруч із {bench} з реінвестованими дивідендами.",
+  "Your return each year next to {bench} with dividends reinvested.":
+    "Ваша дохідність щороку поруч із {bench} з реінвестованими дивідендами.",
   "Value vs money invested": "Вартість проти вкладених грошей",
-  "Year-end value against everything you’ve put in. The gap between the lines is your gain.": "Вартість на кінець року проти всього, що ви вклали. Різниця між лініями — ваш прибуток.",
+  "Year-end value against everything you’ve put in. The gap between the lines is your gain.":
+    "Вартість на кінець року проти всього, що ви вклали. Різниця між лініями — ваш прибуток.",
   "Year by year": "Рік за роком",
   Deposited: "Внесено",
   "Total invested": "Усього вкладено",
@@ -433,9 +518,12 @@ export const INVESTING: Record<string, string | string[]> = {
   Difference: "Різниця",
   "Your return per year treats that year’s deposits as made on Jan 1 (same as the 1Y column in Capital entries on Overview).":
     "Річна дохідність вважає внески того року зробленими 1 січня (як колонка 1Р у записах капіталу на Огляді).",
-  "{year} is a partial year (you started mid-year), so the cards above leave it out.": "{year} — неповний рік (ви почали посеред року), тож картки вище його не враховують.",
-  "Year to date uses current holdings plus broker cash (enter it on Finance).": "З початку року — за поточними позиціями плюс кеш брокера (внесіть його на «Фінансах»).",
-  "Add year-end rows in Capital entries on Overview to see performance over time.": "Додайте рядки на кінець року в записах капіталу на Огляді, щоб бачити результат у часі.",
+  "{year} is a partial year (you started mid-year), so the cards above leave it out.":
+    "{year} — неповний рік (ви почали посеред року), тож картки вище його не враховують.",
+  "Year to date uses current holdings plus broker cash (enter it on Finance).":
+    "З початку року — за поточними позиціями плюс кеш брокера (внесіть його на «Фінансах»).",
+  "Add year-end rows in Capital entries on Overview to see performance over time.":
+    "Додайте рядки на кінець року в записах капіталу на Огляді, щоб бачити результат у часі.",
   "Risk & income by holding": "Ризик і дохід за позиціями",
   "Beta: how much a holding moves with the market (1.0 = same as the market). Contribution = weight × beta, and the contributions add up to the portfolio’s beta.":
     "Бета: наскільки позиція рухається разом із ринком (1.0 = як ринок). Внесок = частка × бета; внески в сумі дають бету портфеля.",
@@ -448,20 +536,25 @@ export const INVESTING: Record<string, string | string[]> = {
   "Div. yield": "Дивід. дохідн.",
   "Income / yr": "Дохід / рік",
   "Share of income": "Частка доходу",
-  "High beta: swings ~1.5× the market or more": "Висока бета: коливається ~1,5× від ринку або більше",
+  "High beta: swings ~1.5× the market or more":
+    "Висока бета: коливається ~1,5× від ринку або більше",
   "Beta and trailing 12-month yield from Finviz. Income is an estimate: value × yield. Beta ≥ 1.5 is highlighted.":
     "Бета й дохідність за 12 місяців — з Finviz. Дохід — оцінка: вартість × дохідність. Бета ≥ 1,5 виділена.",
   "Buy vs sell volume by year": "Обсяг купівель і продажів за роками",
-  "Gross amounts from activity log (USD).": "Валові суми з журналу операцій (USD).",
-  "No buy/sell amounts by year yet.": "Сум купівель/продажів за роками ще немає.",
+  "Gross amounts from activity log (USD).":
+    "Валові суми з журналу операцій (USD).",
+  "No buy/sell amounts by year yet.":
+    "Сум купівель/продажів за роками ще немає.",
   "Trading results by year": "Результати торгівлі за роками",
-  "Profit locked in by selling, and what trades cost.": "Прибуток, зафіксований продажами, і скільки коштували угоди.",
+  "Profit locked in by selling, and what trades cost.":
+    "Прибуток, зафіксований продажами, і скільки коштували угоди.",
   "Fees % of volume": "Комісії % від обсягу",
   "Your portfolio": "Ваш портфель",
   "Money invested": "Вкладені гроші",
   "Annual return by year": "Річна дохідність за роками",
   You: "Ви",
-  "Portfolio value vs money invested": "Вартість портфеля проти вкладених грошей",
+  "Portfolio value vs money invested":
+    "Вартість портфеля проти вкладених грошей",
   Invested: "Вкладено",
   Gain: "Прибуток",
   "Total by month": "Разом за місяцями",
@@ -482,13 +575,17 @@ export const INVESTING: Record<string, string | string[]> = {
   "needs {pct} to {v}": "потрібно {pct} до {v}",
   Strong: "Активно",
   May: "Можна",
-  "Nothing to fill: every field already has a value.": "Нічого заповнювати: кожне поле вже має значення.",
-  "Autofill failed — try again.": "Автозаповнення не вдалося — спробуйте ще раз.",
+  "Nothing to fill: every field already has a value.":
+    "Нічого заповнювати: кожне поле вже має значення.",
+  "Autofill failed — try again.":
+    "Автозаповнення не вдалося — спробуйте ще раз.",
   "Your buckets and buy zones. Each stock shows whether today’s price is in your strong-buy or may-buy zone, and each bucket shows how your portfolio compares with its target.":
     "Ваші кошики й зони купівлі. Для кожної акції видно, чи сьогоднішня ціна в зоні активної або можливої купівлі, а для кожного кошика — як портфель відповідає його цілі.",
-  "Fill empty name, industry, P/E, EPS, beta and yield from Finviz": "Заповнити порожні назву, галузь, P/E, EPS, бету й дохідність з Finviz",
+  "Fill empty name, industry, P/E, EPS, beta and yield from Finviz":
+    "Заповнити порожні назву, галузь, P/E, EPS, бету й дохідність з Finviz",
   "Autofill fundamentals": "Автозаповнити показники",
-  "Unsaved changes — press Save to keep them.": "Незбережені зміни — натисніть «Зберегти», щоб їх зберегти.",
+  "Unsaved changes — press Save to keep them.":
+    "Незбережені зміни — натисніть «Зберегти», щоб їх зберегти.",
   "{n} over the {max}-position limit": "на {n} більше за ліміт {max} позицій",
   "{v} pp above target": "на {v} п.п. вище цілі",
   "{v} pp below target": "на {v} п.п. нижче цілі",
@@ -498,9 +595,11 @@ export const INVESTING: Record<string, string | string[]> = {
   "{n} of {max} positions": "{n} з {max} позицій",
   "Not in a bucket": "Поза кошиками",
   "stocks you hold": "акції, які ви тримаєте",
-  "{list} — add them as rows in Edit to assign a bucket.": "{list} — додайте їх рядками в режимі редагування, щоб призначити кошик.",
+  "{list} — add them as rows in Edit to assign a bucket.":
+    "{list} — додайте їх рядками в режимі редагування, щоб призначити кошик.",
   "Every holding belongs to a bucket.": "Кожна позиція належить до кошика.",
-  "Funds (industry “ETF …”) count as ETF / REIT / Fund automatically.": "Фонди (галузь «ETF …») автоматично належать до ETF / REIT / Фонд.",
+  "Funds (industry “ETF …”) count as ETF / REIT / Fund automatically.":
+    "Фонди (галузь «ETF …») автоматично належать до ETF / REIT / Фонд.",
   "In your buy zone now": "Зараз у вашій зоні купівлі",
   Stock: "Акція",
   Signal: "Сигнал",
@@ -526,23 +625,29 @@ export const INVESTING: Record<string, string | string[]> = {
 
   // Notes
   "Nothing to preview yet.": "Ще нічого переглядати.",
-  "Couldn’t save — check connection": "Не вдалося зберегти — перевірте з'єднання",
+  "Couldn’t save — check connection":
+    "Не вдалося зберегти — перевірте з'єднання",
   "Saved {when}": "Збережено {when}",
   "Not saved yet": "Ще не збережено",
   "Your investing rules and plans. Changes save automatically; the panel on the right shows your current numbers to check the rules against.":
     "Ваші інвестиційні правила й плани. Зміни зберігаються автоматично; панель праворуч показує поточні цифри для перевірки правил.",
   "Save now": "Зберегти зараз",
-  "Write your investing rules…\n\n* Bullets start with * or -\nSection titles end with :": "Запишіть свої інвестиційні правила…\n\n* Пункти починаються з * або -\nЗаголовки розділів закінчуються на :",
+  "Write your investing rules…\n\n* Bullets start with * or -\nSection titles end with :":
+    "Запишіть свої інвестиційні правила…\n\n* Пункти починаються з * або -\nЗаголовки розділів закінчуються на :",
   "Investing notes": "Нотатки з інвестицій",
-  "Use * or - for bullets, # for headings, **bold** for emphasis. Ctrl/⌘ + S saves immediately.": "* або - для пунктів, # для заголовків, **жирний** для акценту. Ctrl/⌘ + S зберігає одразу.",
+  "Use * or - for bullets, # for headings, **bold** for emphasis. Ctrl/⌘ + S saves immediately.":
+    "* або - для пунктів, # для заголовків, **жирний** для акценту. Ctrl/⌘ + S зберігає одразу.",
   "Your numbers": "Ваші цифри",
-  "Live values to check your rules against. Click to open.": "Живі значення для перевірки правил. Натисніть, щоб відкрити.",
+  "Live values to check your rules against. Click to open.":
+    "Живі значення для перевірки правил. Натисніть, щоб відкрити.",
   "Account value": "Вартість рахунку",
   "incl. {v} broker cash": "вкл. {v} кешу в брокера",
   "ETF share": "Частка ETF",
-  "Holdings whose industry starts with “ETF”": "Позиції, галузь яких починається з «ETF»",
+  "Holdings whose industry starts with “ETF”":
+    "Позиції, галузь яких починається з «ETF»",
   "Fees, % of deposits": "Комісії, % від внесків",
-  "Refill + buy + sell fees / total topped": "Комісії поповнень + купівель + продажів / усього внесено",
+  "Refill + buy + sell fees / total topped":
+    "Комісії поповнень + купівель + продажів / усього внесено",
   "Money-weighted, since first deposit": "Зважена за грошима, з першого внеску",
 
   // Total
@@ -552,7 +657,8 @@ export const INVESTING: Record<string, string | string[]> = {
     "Усе, що у вас є, одним числом: акції й крипта наживо з застосунку, банківські рахунки й готівка в будь-якій валюті за офіційним курсом НБУ, мінус борги. Записуйте раз на місяць, щоб будувати історію.",
   "Rates: NBU {date}": "Курси: НБУ {date}",
   "with your overrides": "з вашими змінами",
-  "Store today’s net worth as this month’s total": "Зберегти сьогоднішній капітал як підсумок цього місяця",
+  "Store today’s net worth as this month’s total":
+    "Зберегти сьогоднішній капітал як підсумок цього місяця",
   "Update {month}": "Оновити {month}",
   "Record {month}": "Записати {month}",
   "Pre-filled from your spreadsheet: the accounts and monthly totals Jan 2025 – Sep 2026. Stocks and Crypto are live from the app. Check the numbers (Edit), then press Save.":
@@ -582,7 +688,8 @@ export const INVESTING: Record<string, string | string[]> = {
   LIVE: "НАЖИВО",
   "from {where}": "з {where}",
   "Portfolio + cash": "Портфель + кеш",
-  "No rate for this currency — add an override": "Немає курсу для цієї валюти — додайте свій",
+  "No rate for this currency — add an override":
+    "Немає курсу для цієї валюти — додайте свій",
   "no rate": "немає курсу",
   "Net worth = stocks + savings + crypto + owed to me − I owe. Shares are of assets (debts excluded).":
     "Капітал = акції + заощадження + крипта + мені винні − я винен. Частки — від активів (без боргів).",
@@ -597,15 +704,19 @@ export const INVESTING: Record<string, string | string[]> = {
   "Exchange rates": "Курси валют",
   "Official NBU rates for {date}.": "Офіційні курси НБУ на {date}.",
   "Official NBU rates.": "Офіційні курси НБУ.",
-  "Override one only if you need a different rate.": "Змінюйте лише, якщо потрібен інший курс.",
+  "Override one only if you need a different rate.":
+    "Змінюйте лише, якщо потрібен інший курс.",
   override: "змінено",
   "USD per 1": "USD за 1",
   "{c} override, USD per 1": "Свій курс {c}, USD за 1",
-  "Override = USD per 1 unit. Leave empty to use NBU.": "Свій курс = USD за 1 одиницю. Залиште порожнім, щоб брати НБУ.",
+  "Override = USD per 1 unit. Leave empty to use NBU.":
+    "Свій курс = USD за 1 одиницю. Залиште порожнім, щоб брати НБУ.",
   "Net worth by month": "Капітал за місяцями",
-  "Use “Record {month}” once a month; it stores today’s net worth with its breakdown.": "Тисніть «Записати {month}» раз на місяць: це збереже сьогоднішній капітал із розбивкою.",
+  "Use “Record {month}” once a month; it stores today’s net worth with its breakdown.":
+    "Тисніть «Записати {month}» раз на місяць: це збереже сьогоднішній капітал із розбивкою.",
   "Add month": "Додати місяць",
-  "No months yet — press Record to add this month.": "Місяців ще немає — натисніть «Записати», щоб додати цей місяць.",
+  "No months yet — press Record to add this month.":
+    "Місяців ще немає — натисніть «Записати», щоб додати цей місяць.",
   Month: "Місяць",
   Change: "Зміна",
   "Recorded from the page with a breakdown": "Записано зі сторінки з розбивкою",
@@ -617,11 +728,16 @@ export const INVESTING: Record<string, string | string[]> = {
   "Waiting for prices": "Очікую ціни",
   "on {v} funded": "на {v} поповнень",
   "Spent on coins": "Витрачено на монети",
-  "{n} purchase days": ["{n} день купівель", "{n} дні купівель", "{n} днів купівель"],
+  "{n} purchase days": [
+    "{n} день купівель",
+    "{n} дні купівель",
+    "{n} днів купівель",
+  ],
   "Lost to fees / spread": "Втрачено на комісії / спред",
   "{v}% of funding never reached a coin": "{v}% поповнень не дійшли до монет",
   "Add funding rows": "Додайте рядки поповнень",
-  "No coins yet — add them on Portfolio.": "Монет ще немає — додайте їх на «Портфелі».",
+  "No coins yet — add them on Portfolio.":
+    "Монет ще немає — додайте їх на «Портфелі».",
   "{v}% of crypto": "{v}% крипти",
   "{v} coins": "{v} монет",
   "Price now": "Ціна зараз",
@@ -638,15 +754,18 @@ export const INVESTING: Record<string, string | string[]> = {
   "Edit rule": "Редагувати правило",
   "On target.": "У межах цілі.",
   "{coin} is over-weight by {pp} pp.": "{coin} перевищує частку на {pp} п.п.",
-  "To move toward the rule, a $100 deposit would go": "Щоб наблизитися до правила, внесок $100 розподілився б так:",
+  "To move toward the rule, a $100 deposit would go":
+    "Щоб наблизитися до правила, внесок $100 розподілився б так:",
   "Total return compares today’s value with the USD that arrived from funding, so fees and exchange spread count against it. Profit / loss per coin uses your average buy price from purchase history.":
     "Загальна дохідність порівнює сьогоднішню вартість із доларами, що надійшли з поповнень, тож комісії й обмінний спред ідуть у мінус. Прибуток / збиток для монети рахується від середньої ціни купівлі з історії.",
   "Add coin": "Додати монету",
   Coin: "Монета",
   Quantity: "Кількість",
-  "No coins yet — switch to Edit and add BTC or ETH.": "Монет ще немає — перейдіть у режим редагування й додайте BTC або ETH.",
+  "No coins yet — switch to Edit and add BTC or ETH.":
+    "Монет ще немає — перейдіть у режим редагування й додайте BTC або ETH.",
   "price {v}": "ціна {v}",
-  "No coins — Add coin. Prices use the TICKER-USD pair automatically.": "Монет немає — додайте монету. Ціни автоматично беруться з пари TICKER-USD.",
+  "No coins — Add coin. Prices use the TICKER-USD pair automatically.":
+    "Монет немає — додайте монету. Ціни автоматично беруться з пари TICKER-USD.",
   "Avg buy and P&L come from BTC / ETH purchases on Funding & buys. Other coins show value only.":
     "Середня купівля й P&L беруться з купівель BTC / ETH на «Поповненнях і покупках». Для інших монет показується лише вартість.",
   Funded: "Поповнено",
@@ -673,8 +792,10 @@ export const INVESTING: Record<string, string | string[]> = {
   "Add purchase row": "Додати купівлю",
   Refresh: "Оновити",
   "New deposit split": "Розподіл нового внеску",
-  "Your target BTC / ETH mix. Percentages needn’t add to 100% — they’re used as a ratio.": "Ваша цільова структура BTC / ETH. Відсотки не мусять давати 100% — вони використовуються як пропорція.",
-  "Total {v}% — preview uses ratio {btc}:{eth}.": "Разом {v}% — у попередньому перегляді пропорція {btc}:{eth}.",
+  "Your target BTC / ETH mix. Percentages needn’t add to 100% — they’re used as a ratio.":
+    "Ваша цільова структура BTC / ETH. Відсотки не мусять давати 100% — вони використовуються як пропорція.",
+  "Total {v}% — preview uses ratio {btc}:{eth}.":
+    "Разом {v}% — у попередньому перегляді пропорція {btc}:{eth}.",
   "BTC note (free text)": "Нотатка BTC (довільний текст)",
   "e.g. $87.50 goes to BTC": "напр. $87.50 іде в BTC",
   "ETH note": "Нотатка ETH",
@@ -684,7 +805,45 @@ export const INVESTING: Record<string, string | string[]> = {
   "Fixed split ({btc}/{eth})": "Фіксований розподіл ({btc}/{eth})",
   "BTC share after: {v}%": "Частка BTC після: {v}%",
   "Toward the rule": "Ближче до правила",
-  "Add BTC and ETH on Portfolio to get a rebalancing suggestion.": "Додайте BTC і ETH на «Портфелі», щоб отримати пораду з ребалансування.",
+  "Add BTC and ETH on Portfolio to get a rebalancing suggestion.":
+    "Додайте BTC і ETH на «Портфелі», щоб отримати пораду з ребалансування.",
   "Your BTC share is {now}% now vs {rule}% in the rule. “Toward the rule” puts the deposit into the under-weight coin first.":
     "Ваша частка BTC зараз {now}% проти {rule}% у правилі. «Ближче до правила» спершу вкладає внесок у монету з меншою часткою.",
+  // Watchlist
+  Watchlist: "Список спостереження",
+  "Stocks you follow, with your buy zones. The Dip Finder shows what fell the most, each stock shows whether today’s price is in your strong-buy or may-buy zone, and each bucket shows how your portfolio compares with its target.":
+    "Акції, за якими ви стежите, і ваші зони купівлі. «Пошук просідань» показує, що впало найбільше, кожна акція — чи сьогоднішня ціна у зоні «активно купувати» або «можна купувати», а кожен кошик — як ваш портфель відповідає цілі.",
+  "best opportunities first": "спершу найкращі можливості",
+  "52-week": "52 тижні",
+  "52-week bar: green = your strong-buy zone, amber = may-buy zone, dot = today’s price.":
+    "Смуга 52 тижнів: зелене — зона «активно купувати», жовте — «можна купувати», крапка — сьогоднішня ціна.",
+  "Price trend": "Динаміка ціни",
+  "No news found.": "Новин не знайдено.",
+  Trend: "Динаміка",
+  "No price history.": "Немає історії цін.",
+  "Assets (AUM)": "Активи (AUM)",
+  "Market cap": "Капіталізація",
+  "From 52-week high": "Від 52-тижневого максимуму",
+  "Expense ratio": "Комісія фонду",
+  "Dividend yield": "Дивідендна дохідність",
+  "Forward P/E": "Прогнозний P/E",
+  "Revenue growth": "Зростання виручки",
+  "Analyst consensus": "Консенсус аналітиків",
+  "Analyst target": "Ціль аналітиків",
+  "Strong buy · {v}": "Активно купувати · {v}",
+  "Buy · {v}": "Купувати · {v}",
+  "Hold · {v}": "Тримати · {v}",
+  "Sell · {v}": "Продавати · {v}",
+  "Add holdings ({n})": "Додати з портфеля ({n})",
+  "Strong sell · {v}": "Активно продавати · {v}",
+  "52-week range": "Діапазон за 52 тижні",
+  "Your buy zones": "Ваші зони купівлі",
+  "Company news": "Новини компанії",
+  "Dip Finder": "Пошук просідань",
+  "Price change over the period — red bars are the dips":
+    "Зміна ціни за період — червоні стовпці це просідання",
+  Period: "Період",
+  "No price history for these tickers yet.":
+    "Для цих тікерів ще немає історії цін.",
+  "No {period} data: {list}": "Немає даних за {period}: {list}",
 };
