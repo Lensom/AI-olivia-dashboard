@@ -89,4 +89,16 @@ export const COMMON: Record<string, string | string[]> = {
   "Enter a valid email and a password of at least 8 characters.": "Введіть правильну пошту й пароль щонайменше з 8 символів.",
   "Enter a valid email and password.": "Введіть правильну пошту й пароль.",
   "Something went wrong — try again.": "Щось пішло не так — спробуйте ще раз.",
+  // Home and navigation
+  "Good night": "Доброї ночі",
+  "Good morning": "Доброго ранку",
+  "Good afternoon": "Добрий день",
+  "Good evening": "Добрий вечір",
+  "Here’s where everything stands.": "Ось як усе виглядає зараз.",
+  "Read in total": "Прочитано загалом",
+  "Signed in as": "Ви увійшли як",
+  "Open menu": "Відкрити меню",
+  Menu: "Меню",
+  "Your account": "Ваш акаунт",
+  "Close menu": "Закрити меню",
 };

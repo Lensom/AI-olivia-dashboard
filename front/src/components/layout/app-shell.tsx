@@ -15,9 +15,10 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="flex min-h-screen flex-col bg-[#f6f3ea]">
       <AuthProvider>
-        <Header />
         <SessionScope>
           <CategoriesProvider>
+            {/* Inside the providers: the mobile menu in the header shows the category tree. */}
+            <Header />
             <InvestingProvider>
               <BrokerProvider>
                 <div className="mx-auto flex w-full max-w-[1760px] flex-1 gap-5 px-4 py-7 md:px-5 md:py-8">
