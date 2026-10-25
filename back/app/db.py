@@ -5,7 +5,17 @@ from psycopg_pool import ConnectionPool
 
 def create_pool(database_url: str) -> ConnectionPool:
     # Neon uses Postgres; SSL is typically required and included in the URL.
-    return ConnectionPool(conninfo=database_url, min_size=1, max_size=10, open=True, timeout=5)
+    # Neon closes idle connections (compute suspends): check each one before handing it out and
+    # retire idle ones early, so a request never gets a dead connection.
+    return ConnectionPool(
+        conninfo=database_url,
+        min_size=1,
+        max_size=10,
+        open=True,
+        timeout=5,
+        check=ConnectionPool.check_connection,
+        max_idle=240,
+    )
 
 
 def init_db(pool: ConnectionPool) -> None:
@@ -182,6 +192,18 @@ def init_db(pool: ConnectionPool) -> None:
                 user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                 data JSONB NOT NULL DEFAULT '{}'::jsonb,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        # Latest Gemini analysis per ticker (app/investing/analysis.py).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS investing_ai_analyses (
+                user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                ticker TEXT NOT NULL,
+                data JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (user_id, ticker)
             );
             """
         )

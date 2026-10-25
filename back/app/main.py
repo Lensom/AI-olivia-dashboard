@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 import app.auth.router as auth_router_module
+import app.investing.analysis as analysis_router_module
 import app.cinema.router as cinema_router_module
 import app.library.router as library_router_module
 from app.categories.router import router as categories_router
@@ -13,6 +14,7 @@ from app.investing.watchlist import router as watchlist_router
 from app.tasks.router import router as tasks_router
 from app.pages.router import router as pages_router
 from app.db import create_pool, init_db
+from app.llm.client import DEFAULT_FALLBACK_MODELS, DEFAULT_MODEL, LLMClient
 
 
 class Settings(BaseSettings):
@@ -23,6 +25,9 @@ class Settings(BaseSettings):
     auth_token_ttl_seconds: int = 60 * 60 * 24 * 7  # 7 days
     tmdb_api_key: str = ""  # Cinematography autofill; v3 API key or v4 read access token
     google_books_api_key: str = ""  # Library: optional, better covers/details for Ukrainian editions
+    gemini_api_key: str = ""  # Investing: AI stock analysis
+    gemini_model: str = DEFAULT_MODEL  # tried first
+    gemini_fallback_models: str = ",".join(DEFAULT_FALLBACK_MODELS)  # comma-separated, tried in order when the first fails
     cors_origins: str = (
         "http://localhost:3000,"
         "http://127.0.0.1:3000,"
@@ -83,6 +88,16 @@ app.include_router(cinema_router_module.router, prefix=API_PREFIX)
 app.dependency_overrides[library_router_module.get_google_books_key] = lambda: settings.google_books_api_key.strip()
 app.include_router(library_router_module.router, prefix=API_PREFIX)
 app.include_router(tasks_router, prefix=API_PREFIX)
+_llm = (
+    LLMClient(
+        api_key=settings.gemini_api_key.strip(),
+        models=[settings.gemini_model, *settings.gemini_fallback_models.split(",")],
+    )
+    if settings.gemini_api_key.strip()
+    else None
+)
+app.dependency_overrides[analysis_router_module.get_llm] = lambda: _llm
+app.include_router(analysis_router_module.router, prefix=API_PREFIX)
 app.include_router(pages_router, prefix=API_PREFIX)
 
 

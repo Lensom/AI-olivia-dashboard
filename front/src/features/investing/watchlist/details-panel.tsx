@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatUsd } from "@/features/investing/format";
+import { AiAnalysis } from "@/features/investing/watchlist/ai-analysis";
 import {
   CHART_RANGES,
   consensusLabel,
@@ -233,6 +234,10 @@ export function DetailsPanel({
           <Metric name={t("You own")} value={own != null ? `${own.toFixed(1)}%` : "—"} />
         </div>
         {row.notes.trim() ? <p className="mt-2 whitespace-pre-line text-xs text-[#6f675b]">{row.notes}</p> : null}
+      </div>
+
+      <div className={section}>
+        <AiAnalysis ticker={ticker} token={token} own={own} />
       </div>
 
       <div className={section}>

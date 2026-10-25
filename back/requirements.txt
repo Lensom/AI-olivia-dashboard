@@ -6,3 +6,4 @@ psycopg[binary]
 psycopg-pool
 openpyxl
 python-multipart
+google-genai

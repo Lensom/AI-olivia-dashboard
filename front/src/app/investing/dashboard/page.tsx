@@ -3,11 +3,13 @@
 import { useMemo, useState } from "react";
 import { dividendsLast12mUsd } from "@/features/investing/broker-section";
 import { useLocale, useT } from "@/lib/i18n";
+import { useAuth } from "@/state/auth-store";
 import { useBroker } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
 import { formatInvestingAxisDate, formatUsd, parseInvestingDateMs, parsePercent, parseUsd } from "@/features/investing/format";
 import { CapitalValueLineChart } from "@/features/investing/charts/capital-value-line-chart";
 import { DonutChart } from "@/features/investing/charts/donut-chart";
+import { PortfolioAiReview } from "@/features/investing/dashboard/ai-review";
 import { buildPositions, buildTotals } from "@/features/investing/dashboard/derive";
 import {
   CATEGORICAL,
@@ -54,6 +56,7 @@ export default function InvestingDashboardPage() {
     isCapitalEntriesSaving,
   } = useInvesting();
   const { cashUsd, dividends } = useBroker();
+  const { token } = useAuth();
   const t = useT();
   const locale = useLocale();
   const [nowMs] = useState(() => Date.now());
@@ -264,6 +267,8 @@ export default function InvestingDashboardPage() {
           </>
         )}
       </section>
+
+      <PortfolioAiReview token={token} />
 
       {/* Today */}
       <section className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-3">
