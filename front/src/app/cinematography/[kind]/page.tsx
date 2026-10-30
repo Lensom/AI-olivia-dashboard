@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { AddDialog } from "@/features/cinema/add-dialog";
+import { downloadCsv } from "@/features/cinema/export";
 import { cinemaKindBySlug } from "@/features/cinema/nav";
 import { errorText, TitleDialog } from "@/features/cinema/title-dialog";
 import {
@@ -260,6 +261,17 @@ export default function CinemaKindPage() {
               if (f) void onImportFile(f);
             }}
           />
+          {visible.length ? (
+            <button
+              type="button"
+              onClick={() => downloadCsv(visible, `${meta.slug}-${new Date().toISOString().slice(0, 10)}.csv`)}
+              className={investingToolbarBtn}
+              title={tr("The titles shown, with the current filters and sort")}
+            >
+              {tr("Export CSV")}
+              {visible.length !== mine.length ? ` (${visible.length})` : ""}
+            </button>
+          ) : null}
           {tmdbEnabled && mine.length ? (
             <button type="button" onClick={() => setFill((f) => ({ ...f, open: !f.open }))} className={investingToolbarBtn}>
               {tr("Fill from TMDB")}

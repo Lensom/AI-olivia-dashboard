@@ -22,6 +22,9 @@ from psycopg.types.json import Json
 from app.auth.router import get_current_user, get_conn
 from app.auth.schemas import UserResponse
 from app.cinema.schemas import (
+    CinemaAiring,
+    CinemaCollection,
+    CinemaCollectionPart,
     CinemaData,
     CinemaDetails,
     CinemaImdbRating,
@@ -197,14 +200,10 @@ def _details(key: str, language: str, media: Literal["movie", "tv"], tmdb_id: in
     if media == "movie":
         studios = companies[:3]
         directors = [c["name"] for c in (d.get("credits") or {}).get("crew") or [] if c.get("job") == "Director"]
-        runtime = d.get("runtime") or None
-        seasons = None
     else:
         networks = [n["name"] for n in d.get("networks") or [] if n.get("name")]
         studios = list(dict.fromkeys(networks[:2] + companies[:2]))
         directors = [c["name"] for c in d.get("created_by") or [] if c.get("name")]
-        runtime = (d.get("episode_run_time") or [None])[0]
-        seasons = d.get("number_of_seasons") or None
 
     return CinemaDetails(
         tmdb_id=tmdb_id,
@@ -219,10 +218,75 @@ def _details(key: str, language: str, media: Literal["movie", "tv"], tmdb_id: in
         poster=_img(d.get("poster_path"), "w342"),
         backdrop=_img(d.get("backdrop_path"), "w780"),
         overview=overview,
-        runtime=runtime,
-        seasons=seasons,
         tmdb_rating=round(float(d["vote_average"]), 1) if d.get("vote_average") else None,
         **_imdb_fields(d.get("imdb_id") or (d.get("external_ids") or {}).get("imdb_id") or ""),
+        **_airing_fields(d, media, _season_episodes(key, language, d) if media == "tv" else None).model_dump(),
+    )
+
+
+def _season_episodes(key: str, language: str, d: dict) -> dict[int, list[dict]]:
+    """Episodes of every regular season of a series (TMDB appends up to 20 seasons per request)."""
+    numbers = sorted(int(s["season_number"]) for s in d.get("seasons") or [] if (s.get("season_number") or 0) > 0)
+    out: dict[int, list[dict]] = {}
+    for i in range(0, len(numbers), 20):
+        chunk = numbers[i : i + 20]
+        try:
+            res = _tmdb_get(key, f"/tv/{d['id']}", {"language": language, "append_to_response": ",".join(f"season/{n}" for n in chunk)})
+        except HTTPException:
+            break
+        for n in chunk:
+            out[n] = (res.get(f"season/{n}") or {}).get("episodes") or []
+    return out
+
+
+def _median(values: list[int]) -> int | None:
+    vals = sorted(v for v in values if v)
+    return vals[len(vals) // 2] if vals else None
+
+
+def _airing_fields(d: dict, media: Literal["movie", "tv"], episodes: dict[int, list[dict]] | None = None) -> CinemaAiring:
+    """Seasons, aired episodes and their minutes, the next episode or premiere and the franchise, from TMDB details
+    (plus, for a series, its seasons' episodes from _season_episodes)."""
+    today = date.today().isoformat()
+    if media == "movie":
+        release = d.get("release_date") or ""
+        collection = d.get("belongs_to_collection") or {}
+        return CinemaAiring(
+            runtime=d.get("runtime") or None,
+            next_air_date=release if release > today else "",
+            air_status=d.get("status") or "",
+            collection_id=collection.get("id") or None,
+            collection_name=collection.get("name") or "",
+        )
+    regular = sorted((s for s in d.get("seasons") or [] if (s.get("season_number") or 0) > 0), key=lambda s: s["season_number"])
+    nxt = d.get("next_episode_to_air") or {}
+    first_air = d.get("first_air_date") or ""
+    # Real runtimes of the episodes that have aired. A season's typical episode fills in a missing runtime,
+    # so a long finale or a short special counts as what it is instead of skewing every episode.
+    aired = {
+        int(s["season_number"]): [e for e in (episodes or {}).get(int(s["season_number"]), []) if e.get("air_date") and e["air_date"] <= today]
+        for s in regular
+    }
+    typical = _median([int(e.get("runtime") or 0) for eps in aired.values() for e in eps]) or (d.get("episode_run_time") or [None])[0]
+    if episodes:
+        season_episodes = [len(aired[int(s["season_number"])]) for s in regular]
+        season_minutes = []
+        for s in regular:
+            eps = aired[int(s["season_number"])]
+            fill = _median([int(e.get("runtime") or 0) for e in eps]) or typical or 0
+            season_minutes.append(sum(int(e.get("runtime") or 0) or fill for e in eps))
+    else:
+        season_episodes = [int(s.get("episode_count") or 0) for s in regular]
+        season_minutes = []
+    return CinemaAiring(
+        # TMDB lists a season before it airs: only seasons that have started count as released.
+        seasons=sum(1 for s in regular if s.get("air_date") and s["air_date"] <= today) or d.get("number_of_seasons") or None,
+        season_episodes=season_episodes,
+        season_minutes=season_minutes,
+        runtime=typical or None,
+        next_air_date=nxt.get("air_date") or (first_air if first_air > today else ""),
+        next_episode=f"S{nxt['season_number']}E{nxt['episode_number']}" if nxt.get("season_number") and nxt.get("episode_number") else "",
+        air_status=d.get("status") or "",
     )
 
 
@@ -569,3 +633,67 @@ def imdb_ratings(
         )
         for tid, iid in ids.items()
     }
+
+
+@router.post("/airing", response_model=dict[str, CinemaAiring])
+def airing(
+    payload: list[CinemaTitle],
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+    tmdb_key: Annotated[str, Depends(get_tmdb_key)],
+):
+    """Fresh seasons, next episode / premiere and franchise per title id, for up to 60 TMDB-linked titles."""
+    if not tmdb_key:
+        return {}
+    language = _language(conn, user.id)
+
+    def one(t: CinemaTitle) -> tuple[str, CinemaAiring | None]:
+        media: Literal["movie", "tv"] = "tv" if t.tmdb_media == "tv" else "movie"
+        try:
+            d = _tmdb_get(tmdb_key, f"/{media}/{t.tmdb_id}", {"language": language})
+            return t.id, _airing_fields(d, media, _season_episodes(tmdb_key, language, d) if media == "tv" else None)
+        except HTTPException:
+            return t.id, None
+
+    linked = [t for t in payload if t.tmdb_id and t.tmdb_media][:60]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        return {tid: a for tid, a in pool.map(one, linked) if a is not None}
+
+
+@router.post("/collections", response_model=list[CinemaCollection])
+def collections(
+    payload: list[int],
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+    tmdb_key: Annotated[str, Depends(get_tmdb_key)],
+):
+    """The films of each TMDB collection (franchise), in release order; unknown ids are left out."""
+    if not tmdb_key:
+        return []
+    language = _language(conn, user.id)
+
+    def one(cid: int) -> CinemaCollection | None:
+        try:
+            d = _tmdb_get(tmdb_key, f"/collection/{cid}", {"language": language})
+        except HTTPException:
+            return None
+        parts = [
+            CinemaCollectionPart(
+                tmdb_id=int(p["id"]),
+                title=p.get("title") or "",
+                original_title=p.get("original_title") or "",
+                year=_year(p.get("release_date")),
+                release_date=p.get("release_date") or "",
+                poster=_img(p.get("poster_path"), "w185"),
+                animation=_ANIMATION_GENRE in (p.get("genre_ids") or []),
+            )
+            for p in d.get("parts") or []
+            if p.get("id")
+        ]
+        parts.sort(key=lambda p: p.release_date or "9999")
+        # TMDB names them "Дюна | Колекція" / "Dune Collection": the franchise's name is enough.
+        name = re.sub(r"\s*(\|\s*)?(колекція|collection)\s*$", "", d.get("name") or "", flags=re.I).strip() or d.get("name") or ""
+        return CinemaCollection(id=cid, name=name, poster=_img(d.get("poster_path"), "w185"), parts=parts)
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        return [c for c in pool.map(one, list(dict.fromkeys(payload))[:60]) if c is not None]

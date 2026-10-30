@@ -40,7 +40,11 @@ export const cinemaKindBySlug = (slug: string) => CINEMA_KINDS.find((k) => k.slu
 export const cinemaKindMeta = (kind: CinemaKind) => CINEMA_KINDS.find((k) => k.kind === kind)!;
 
 /** Pages that aren't a kind of title. */
-export const CINEMA_EXTRA_PAGES = [{ slug: "tops", label: "Tops" }];
+export const CINEMA_EXTRA_PAGES = [
+  { slug: "achievements", label: "Achievements" },
+  { slug: "franchises", label: "Franchises" },
+  { slug: "tops", label: "Tops" },
+];
 
 export const isBuiltInCinemaPage = (slug: string) =>
   CINEMA_KINDS.some((k) => k.slug === slug) || CINEMA_EXTRA_PAGES.some((p) => p.slug === slug);

@@ -3,10 +3,16 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CINEMA_KINDS, cinemaKindMeta } from "@/features/cinema/nav";
-import type { CinemaTitle } from "@/features/cinema/types";
+import { watchedMinutes, type CinemaTitle } from "@/features/cinema/types";
 import { Poster, ScoreBadge } from "@/features/cinema/ui";
+import { AchievementsCard } from "@/features/cinema/achievements";
+import { CinemaAiPicks } from "@/features/cinema/ai-picks";
+import { downloadCsv } from "@/features/cinema/export";
+import { Franchises } from "@/features/cinema/franchises";
 import { CinemaAnalytics } from "@/features/cinema/overview-analytics";
-import { useT } from "@/lib/i18n";
+import { TonightPicker } from "@/features/cinema/tonight";
+import { investingToolbarBtn } from "@/features/investing/ui/investing-classes";
+import { useLocale, useT } from "@/lib/i18n";
 import { useCinema } from "@/state/cinema-store";
 
 const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
@@ -40,6 +46,7 @@ function PosterRow({ list, empty }: { list: CinemaTitle[]; empty: string }) {
 export default function CinematographyOverview() {
   const { items, isLoaded, loadError } = useCinema();
   const tr = useT();
+  const locale = useLocale();
   const [thisYear] = useState(() => new Date().getFullYear());
 
   const s = useMemo(() => {
@@ -49,7 +56,7 @@ export default function CinematographyOverview() {
     const vsImdb = both.length
       ? { n: both.length, mine: both.reduce((a, t) => a + (t.score ?? 0), 0) / both.length, imdb: both.reduce((a, t) => a + (t.imdb_rating ?? 0), 0) / both.length }
       : null;
-    const minutes = watched.reduce((a, t) => a + (t.tmdb_media === "movie" && t.runtime ? t.runtime : 0), 0);
+    const minutes = items.filter((t) => t.view_year === thisYear).reduce((a, t) => a + watchedMinutes(t), 0);
     return {
       watched,
       avg: avgScore(items),
@@ -73,11 +80,18 @@ export default function CinematographyOverview() {
       sub: s.vsImdb ? tr("IMDb {v} on the same {n} titles", { v: s.vsImdb.imdb.toFixed(1), n: s.vsImdb.n }) : tr("your grades, out of 10"),
     },
     { label: tr("Recommended"), value: String(s.recommended.length), sub: tr("ticked as worth watching") },
-    { label: tr("Watched in {year}", { year: thisYear }), value: String(s.thisYear), sub: s.hours ? tr("~{n} h of films in total", { n: s.hours }) : tr("by year watched") },
+    { label: tr("Watched in {year}", { year: thisYear }), value: String(s.thisYear), sub: s.hours ? tr("~{n} h of watching this year", { n: s.hours.toLocaleString(locale) }) : tr("by year watched") },
   ];
 
   return (
     <div className="space-y-5">
+      {items.length ? (
+        <div className="-mb-2 flex justify-end">
+          <button type="button" onClick={() => downloadCsv(items, `cinematography-${new Date().toISOString().slice(0, 10)}.csv`)} className={investingToolbarBtn}>
+            {tr("Export all to CSV")}
+          </button>
+        </div>
+      ) : null}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((x) => (
           <div key={x.label} className={card}>
@@ -131,7 +145,15 @@ export default function CinematographyOverview() {
         </section>
       ) : null}
 
+      <AchievementsCard />
+
+      <TonightPicker />
+
+      <CinemaAiPicks />
+
       <CinemaAnalytics items={items} />
+
+      <Franchises />
     </div>
   );
 }

@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CINEMA_KINDS, cinemaKindMeta } from "@/features/cinema/nav";
-import { isSeries, newSeasons, type CinemaKind, type CinemaTitle } from "@/features/cinema/types";
+import { isSeries, newSeasons, watchedMinutes, type CinemaKind, type CinemaTitle } from "@/features/cinema/types";
 import { Poster, ScoreBadge } from "@/features/cinema/ui";
 import { HBars, VBars } from "@/features/shared/bar-charts";
-import { useT } from "@/lib/i18n";
+import { useLocale, useT } from "@/lib/i18n";
 
 const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
 const BAR = "#2a78d6";
@@ -80,7 +80,9 @@ const Empty = ({ text }: { text: string }) => {
 /** Charts and insights over all titles or one kind (Films, Series…), chosen with the chips on top. */
 export function CinemaAnalytics({ items }: { items: CinemaTitle[] }) {
   const t = useT();
+  const locale = useLocale();
   const [scope, setScope] = useState<CinemaKind | "all">("all");
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const kindsPresent = CINEMA_KINDS.filter((k) => items.some((x) => x.kind === k.kind));
 
   const a = useMemo(() => {
@@ -107,8 +109,19 @@ export function CinemaAnalytics({ items }: { items: CinemaTitle[] }) {
     const avgDiff = paired.length ? paired.reduce((s, p) => s + p.diff, 0) / paired.length : null;
     const agree = paired.length ? paired.filter((p) => Math.abs(p.diff) <= 1).length / paired.length : null;
 
-    const minutes = watched.reduce((s, x) => s + (x.tmdb_media === "movie" && x.runtime ? x.runtime : 0), 0);
-    const filmsWithRuntime = watched.filter((x) => x.tmdb_media === "movie" && x.runtime).length;
+    const isFilm = (x: CinemaTitle) => x.tmdb_media === "movie" || (!x.tmdb_media && !isSeries(x.kind));
+    const filmMinutes = watched.filter(isFilm).reduce((s, x) => s + watchedMinutes(x), 0);
+    const seriesMinutes = seen.filter((x) => !isFilm(x)).reduce((s, x) => s + watchedMinutes(x), 0);
+    const filmsWithRuntime = watched.filter((x) => isFilm(x) && x.runtime).length;
+    const hoursPerYear = new Map<number, number>();
+    for (const x of seen) if (x.view_year != null) hoursPerYear.set(x.view_year, (hoursPerYear.get(x.view_year) ?? 0) + watchedMinutes(x) / 60);
+    const hourRows: [string, number][] = yearRows.map(([y]) => [y, Math.round(hoursPerYear.get(Number(y)) ?? 0)]);
+
+    // Announced episodes and premieres for what you follow or plan to watch, soonest first.
+    const upcoming = pool
+      .filter((x) => x.next_air_date && x.next_air_date >= today && x.status !== "dropped")
+      .sort((p, q) => p.next_air_date.localeCompare(q.next_air_date))
+      .slice(0, 8);
 
     return {
       total: pool.length,
@@ -135,11 +148,15 @@ export function CinemaAnalytics({ items }: { items: CinemaTitle[] }) {
         .slice(0, 8),
       plannedCount: pool.filter((x) => x.status === "planned").length,
       behind: pool.filter((x) => isSeries(x.kind) && newSeasons(x) > 0).sort((p, q) => newSeasons(q) - newSeasons(p)).slice(0, 8),
-      hours: Math.round(minutes / 60),
-      avgRuntime: filmsWithRuntime ? Math.round(minutes / filmsWithRuntime) : null,
+      hours: Math.round((filmMinutes + seriesMinutes) / 60),
+      filmHours: Math.round(filmMinutes / 60),
+      seriesHours: Math.round(seriesMinutes / 60),
+      hourRows: hourRows.some((r) => r[1] > 0) ? hourRows : [],
+      upcoming,
+      avgRuntime: filmsWithRuntime ? Math.round(filmMinutes / filmsWithRuntime) : null,
       dropped: pool.filter((x) => x.status === "dropped").length,
     };
-  }, [items, scope, t]);
+  }, [items, scope, t, today]);
 
   const chip = (active: boolean) =>
     `rounded-full border px-3 py-1 text-xs font-medium transition ${
@@ -180,9 +197,11 @@ export function CinemaAnalytics({ items }: { items: CinemaTitle[] }) {
             sub: t("within ±1 point, {n} titles", { n: a.paired }),
           },
           {
-            label: t("Time on films"),
-            value: a.hours ? t("{n} h", { n: a.hours }) : "—",
-            sub: a.avgRuntime ? t("avg film {n} min", { n: a.avgRuntime }) : t("runtime comes from TMDB"),
+            label: t("Time watched, all years"),
+            value: a.hours ? t("{n} h", { n: a.hours.toLocaleString(locale) }) : "—",
+            sub: a.hours
+              ? t("films {f} h · series {s} h", { f: a.filmHours.toLocaleString(locale), s: a.seriesHours.toLocaleString(locale) })
+              : t("runtime comes from TMDB"),
           },
           {
             label: t("Watchlist"),
@@ -203,6 +222,13 @@ export function CinemaAnalytics({ items }: { items: CinemaTitle[] }) {
           <h3 className="text-sm font-semibold text-[#1f1c17]">{t("Watched per year")}</h3>
           <p className="mb-5 text-xs text-[#6f675b]">{t("Titles by the year you watched them")}</p>
           <VBars rows={a.yearRows} unit="{n} titles" empty="Add “year you watched it” to see this." />
+        </div>
+        <div className={card}>
+          <h3 className="text-sm font-semibold text-[#1f1c17]">{t("Hours per year")}</h3>
+          <p className="mb-5 text-xs text-[#6f675b]">
+            {a.avgRuntime ? t("Films and series by the year you watched them · avg film {n} min", { n: a.avgRuntime }) : t("Films and series by the year you watched them")}
+          </p>
+          <VBars rows={a.hourRows} unit="{n} h" empty="Needs runtimes from TMDB and “year you watched it”." />
         </div>
         <div className={card}>
           <h3 className="text-sm font-semibold text-[#1f1c17]">{t("How you score")}</h3>
@@ -319,6 +345,35 @@ export function CinemaAnalytics({ items }: { items: CinemaTitle[] }) {
             </ul>
           ) : (
             <Empty text="All caught up — or add seasons watched to your series." />
+          )}
+        </div>
+        <div className={card}>
+          <h3 className="text-sm font-semibold text-[#1f1c17]">{t("Coming soon")}</h3>
+          <p className="mb-2 text-xs text-[#6f675b]">{t("Next episodes and premieres of what you follow or plan to watch")}</p>
+          {a.upcoming.length ? (
+            <ul>
+              {a.upcoming.map((x) => {
+                const days = Math.round((Date.parse(x.next_air_date) - Date.parse(today)) / 86_400_000);
+                return (
+                  <MiniRow
+                    key={x.id}
+                    t={x}
+                    right={
+                      <>
+                        <span className="text-[#3b352d]">
+                          {x.next_episode || t("Premiere")} · {new Date(x.next_air_date).toLocaleDateString(locale, { day: "numeric", month: "short" })}
+                        </span>
+                        <span className="block text-[11px] text-[#8f8676]">
+                          {days === 0 ? t("today") : days === 1 ? t("tomorrow") : t("in {n} days", { n: days })}
+                        </span>
+                      </>
+                    }
+                  />
+                );
+              })}
+            </ul>
+          ) : (
+            <Empty text="Nothing announced yet. Dates come from TMDB and refresh daily." />
           )}
         </div>
       </div>

@@ -186,6 +186,8 @@ def _ensure_cinema_defaults(conn: Connection, *, user_id: int, category_id: int)
         ("Animated series", "animated-series"),
         ("Anime", "anime"),
         ("TV shows", "tv-shows"),
+        ("Achievements", "achievements"),
+        ("Franchises", "franchises"),
         ("Tops", "tops"),
     ]
     # "TV shows" used to be the series page: it becomes "Series", and tv-shows is now for TV shows proper.

@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 import app.auth.router as auth_router_module
 import app.investing.analysis as analysis_router_module
 import app.cinema.router as cinema_router_module
+from app.cinema.ai import router as cinema_ai_router
 import app.library.router as library_router_module
 from app.categories.router import router as categories_router
 from app.investing.router import router as investing_router
@@ -98,6 +99,7 @@ _llm = (
 )
 app.dependency_overrides[analysis_router_module.get_llm] = lambda: _llm
 app.include_router(analysis_router_module.router, prefix=API_PREFIX)
+app.include_router(cinema_ai_router, prefix=API_PREFIX)
 app.include_router(pages_router, prefix=API_PREFIX)
 
 

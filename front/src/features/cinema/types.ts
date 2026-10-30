@@ -35,6 +35,34 @@ export type CinemaTitle = {
   imdb_votes: number | null;
   notes: string;
   added_at: string;
+  /** Aired episodes per regular season, [0] = season 1 (TMDB). */
+  season_episodes: number[];
+  /** Minutes of those episodes, from their real runtimes (a long finale counts as long). */
+  season_minutes: number[];
+  /** ISO date of the next episode (series) or the premiere (unreleased film); "" when none is announced. */
+  next_air_date: string;
+  /** "S3E1"; empty for films. */
+  next_episode: string;
+  /** TMDB status: Returning Series, Ended, Released, In Production… */
+  air_status: string;
+  /** TMDB collection (franchise) a film belongs to. */
+  collection_id: number | null;
+  collection_name: string;
+  /** ISO date of the last background refresh of the fields above. */
+  tmdb_synced: string;
+};
+
+/** What POST /cinema/airing returns per title. */
+export type CinemaAiring = Pick<
+  CinemaTitle,
+  "seasons" | "season_episodes" | "season_minutes" | "runtime" | "next_air_date" | "next_episode" | "air_status" | "collection_id" | "collection_name"
+>;
+
+export type CinemaCollection = {
+  id: number;
+  name: string;
+  poster: string;
+  parts: { tmdb_id: number; title: string; original_title: string; year: number | null; release_date: string; poster: string; animation: boolean }[];
 };
 
 /** A ranked list you curate on the Tops page (shared with Library). */
@@ -71,6 +99,13 @@ export type CinemaDetails = Pick<
   | "imdb_id"
   | "imdb_rating"
   | "imdb_votes"
+  | "season_episodes"
+  | "season_minutes"
+  | "next_air_date"
+  | "next_episode"
+  | "air_status"
+  | "collection_id"
+  | "collection_name"
 > & { tmdb_id: number; tmdb_media: TmdbMedia };
 
 export const STATUSES: { value: CinemaStatus; label: string; dot: string; pill: string }[] = [
@@ -117,6 +152,14 @@ export function blankTitle(kind: CinemaKind, title = ""): CinemaTitle {
     imdb_votes: null,
     notes: "",
     added_at: new Date().toISOString().slice(0, 10),
+    season_episodes: [],
+    season_minutes: [],
+    next_air_date: "",
+    next_episode: "",
+    air_status: "",
+    collection_id: null,
+    collection_name: "",
+    tmdb_synced: "",
   };
 }
 
@@ -146,6 +189,14 @@ export function applyDetails(t: CinemaTitle, d: CinemaDetails, replaceLists: boo
     imdb_id: d.imdb_id || t.imdb_id,
     imdb_rating: d.imdb_rating ?? t.imdb_rating,
     imdb_votes: d.imdb_votes ?? t.imdb_votes,
+    season_episodes: d.season_episodes?.length ? d.season_episodes : t.season_episodes,
+    season_minutes: d.season_minutes?.length ? d.season_minutes : t.season_minutes,
+    next_air_date: d.next_air_date ?? t.next_air_date,
+    next_episode: d.next_episode ?? t.next_episode,
+    air_status: d.air_status || t.air_status,
+    collection_id: d.collection_id ?? t.collection_id,
+    collection_name: d.collection_name || t.collection_name,
+    tmdb_synced: new Date().toISOString().slice(0, 10),
   };
 }
 
@@ -177,6 +228,18 @@ export const isSeries = (kind: CinemaKind) => kind !== "film" && kind !== "carto
 /** Released seasons you haven't watched yet (0 when caught up or unknown). */
 export const newSeasons = (t: Pick<CinemaTitle, "seasons" | "watched_seasons">) =>
   t.seasons != null && t.watched_seasons != null ? Math.max(0, t.seasons - t.watched_seasons) : 0;
+
+/**
+ * Minutes you've spent on a title: a watched film's runtime, or the aired minutes of the seasons of a
+ * series you've watched (all of them when it's marked watched without a season). 0 when unknown.
+ */
+export function watchedMinutes(t: CinemaTitle): number {
+  if (t.status === "planned" || t.status === "dropped") return 0;
+  if (t.tmdb_media === "movie" || (!t.tmdb_media && !isSeries(t.kind))) return t.status === "watched" ? (t.runtime ?? 0) : 0;
+  const minutes = t.season_minutes?.length ? t.season_minutes : (t.season_episodes ?? []).map((n) => n * (t.runtime ?? 0));
+  const upTo = t.watched_seasons ?? (t.status === "watched" ? minutes.length : 0);
+  return minutes.slice(0, upTo).reduce((s, n) => s + n, 0);
+}
 
 export const formatVotes = (n: number | null) =>
   n == null ? "" : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : String(n);

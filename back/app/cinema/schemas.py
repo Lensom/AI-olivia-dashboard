@@ -36,6 +36,15 @@ class CinemaTitle(BaseModel):
     imdb_votes: int | None = None
     notes: str = ""
     added_at: str = ""  # ISO date
+    # Kept fresh by POST /cinema/airing (see _airing_fields in router.py).
+    season_episodes: list[int] = Field(default_factory=list)  # aired episodes per regular season, [0] = season 1
+    season_minutes: list[int] = Field(default_factory=list)  # minutes of those episodes, from their real runtimes
+    next_air_date: str = ""  # ISO: next episode (series) or premiere (unreleased film)
+    next_episode: str = ""  # "S3E1"; empty for films
+    air_status: str = ""  # TMDB status: Returning Series, Ended, Released, In Production…
+    collection_id: int | None = None  # TMDB collection (franchise) the film belongs to
+    collection_name: str = ""
+    tmdb_synced: str = ""  # ISO date of the last airing refresh
 
 
 class CinemaListEntry(BaseModel):
@@ -100,6 +109,46 @@ class CinemaDetails(BaseModel):
     imdb_id: str = ""
     imdb_rating: float | None = None
     imdb_votes: int | None = None
+    season_episodes: list[int] = Field(default_factory=list)
+    season_minutes: list[int] = Field(default_factory=list)
+    next_air_date: str = ""
+    next_episode: str = ""
+    air_status: str = ""
+    collection_id: int | None = None
+    collection_name: str = ""
+
+
+class CinemaAiring(BaseModel):
+    """What changes over time for a title: seasons, the next episode, release status."""
+
+    seasons: int | None = None
+    season_episodes: list[int] = Field(default_factory=list)
+    season_minutes: list[int] = Field(default_factory=list)
+    runtime: int | None = None
+    next_air_date: str = ""
+    next_episode: str = ""
+    air_status: str = ""
+    collection_id: int | None = None
+    collection_name: str = ""
+
+
+class CinemaCollectionPart(BaseModel):
+    tmdb_id: int
+    title: str
+    original_title: str = ""
+    year: int | None = None
+    release_date: str = ""  # ISO; empty when not announced
+    poster: str = ""
+    animation: bool = False
+
+
+class CinemaCollection(BaseModel):
+    """A TMDB collection (franchise): its films in release order."""
+
+    id: int
+    name: str
+    poster: str = ""
+    parts: list[CinemaCollectionPart] = Field(default_factory=list)
 
 
 class CinemaImdbRating(BaseModel):
