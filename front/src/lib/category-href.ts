@@ -3,8 +3,7 @@ const ROUTES: Record<string, string> = {
   investing: "/investing",
   cinematography: "/cinematography",
   library: "/library",
-  tasks: "/tasks",
-  life: "/pages",
+  life: "/life",
 };
 
 export const categoryHref = (slug: string) => ROUTES[slug] ?? `/c/${slug}`;

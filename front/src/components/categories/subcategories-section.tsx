@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { cinemaPageHref } from "@/features/cinema/nav";
 import { libraryPageHref } from "@/features/library/nav";
+import { lifePageHref } from "@/features/life/nav";
 import { investingPageHref } from "@/features/investing/nav";
 import { useT } from "@/lib/i18n";
 import { useCategories } from "@/state/categories-store";
@@ -16,6 +17,7 @@ function hrefForSubcategory(categorySlug: string, subSlug: string) {
   if (categorySlug === "investing") return investingPageHref(subSlug);
   if (categorySlug === "cinematography") return cinemaPageHref(subSlug);
   if (categorySlug === "library") return libraryPageHref(subSlug);
+  if (categorySlug === "life") return lifePageHref(subSlug);
   return `/c/${categorySlug}/${subSlug}`;
 }
 

@@ -158,18 +158,26 @@ Books, comics, manga and magazines, replacing the Notion reading table. The cate
 
 ## Features: Life
 
-> **Hidden for now:** Life is switched off in `front/src/lib/features.ts` (`HIDDEN_CATEGORIES`). Remove `"life"` there to bring it back; the code, API and data are unchanged.
+The **Life** category (slug `life`, `/life`) holds two pages, **Tasks** (`/life/tasks`) and **Games** (`/life/games`), with tabs between them; `/life` opens Tasks, and the old `/tasks` and `/games` addresses redirect. The pages are created as Life's default subcategories (`back/app/categories/router.py`, `front/src/features/life/nav.ts`). On Home, the Life card shows tasks to do, in progress, and games finished this year.
 
-A Notion-like space at `/pages` (category **Life**, slug `life`) for everything else: learning, goals, family, plans, purchases.
+### Pages (hidden for now)
+
+> Switched off with `LIFE_PAGES_ENABLED` in `front/src/lib/features.ts`; the code, API and data are unchanged.
+
+A Notion-like space at `/pages` for everything else: learning, goals, family, plans, purchases.
 
 - **Page tree** on the left: pages nest as deep as you like. Hover a page for **+** (add a subpage) and **⋯** (add a subpage or table, delete). Drag a page onto another to nest it, or onto its top or bottom edge to reorder. Expanded folders are remembered.
 - **Articles** use [BlockNote](https://www.blocknotejs.org/): type `/` for headings, bulleted / numbered / check lists, quotes, toggles, code, tables and images. Select text for bold, italic and links; drag the ⋮⋮ handle to move blocks. Menus follow the EN / UA switch. **⋯ → Import Markdown** reads a Notion export (the first `# heading` becomes the title); **Export as Markdown** downloads the page.
 - **Tables** work like Notion databases: typed columns (Title, Text, Number, Checkbox, Category, Link, Date), several tables on one page sharing the same columns (e.g. *Загальне* and *Техніка*), a **Sum** under every number column, and reordering of rows and columns. **Import CSV** reads a Notion export: an empty table takes the file's columns and types, with the ✓ column first.
 - Each page has an icon (emoji picker, or paste any emoji), breadcrumbs and subpage links. Everything autosaves; saves for a page run in order, so the last edit always wins.
 
-## Features: Tasks
+### Tasks
 
-A simple task board at `/tasks` (category **Tasks**, slug `tasks`): **To do, Hold, In progress, Completed**. Type a title and press Enter to add a task to To do. Drag cards between columns or within one to reorder; hover a card for ‹ › (move without dragging), ✎ (rename, or double-click the title) and ✕ (delete). **Clear N completed** removes finished tasks. Every change saves immediately.
+A simple task board at `/life/tasks`: **To do, Hold, In progress, Completed**. Type a title and press Enter to add a task to To do. Drag cards between columns or within one to reorder; hover a card for ‹ › (move without dragging), ✎ (rename, or double-click the title) and ✕ (delete). **Clear N completed** removes finished tasks. Every change saves immediately.
+
+### Games
+
+A list of the games you've finished at `/life/games`: a title and the year you finished it (optional). Add one with the form at the top (the year defaults to this one). Sort **A–Z** or **By year** (grouped, newest first, games without a year last), search by title, and hover a row for ✎ (edit, or double-click) and ✕ (delete). Every change saves immediately.
 
 ## Deploy (Vercel)
 
@@ -225,6 +233,7 @@ All endpoints are under the `/api` prefix (e.g. `/api/investing/holdings`); the 
 | Cinematography | `GET/PUT /cinema`, `GET /cinema/search?q=&kind=`, `GET /cinema/details?media=&tmdb_id=`, `GET /cinema/match?title=&year=&kind=`, `POST /cinema/match-many`, `POST /cinema/imdb-ratings`, `POST /cinema/import` |
 | Library | `GET/PUT /library`, `GET /library/search?q=&kind=`, `GET /library/details?source=&source_id=`, `POST /library/match-many`, `POST /library/import`, `POST /library/wikidata`, `POST /library/series?lang=`, `GET/POST /library/ai?lang=` |
 | Tasks | `GET/PUT /tasks` |
+| Games | `GET/PUT /games` |
 | Life | `GET/POST /pages`, `GET/PATCH/DELETE /pages/{id}` (PATCH moves too: `parent_id`, `sort_order`) |
 | Sections | `GET/PUT` on `/investing/holdings`, `/refills`, `/activities`, `/capital-entries`, `/picking`, `/notes`, `/crypto`, `/total`, `/broker` (cash, dividends, attention thresholds) |
 

@@ -170,6 +170,15 @@ def init_db(pool: ConnectionPool) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS life_pages_user_parent ON life_pages(user_id, parent_id)")
         conn.execute(
             """
+            CREATE TABLE IF NOT EXISTS game_lists (
+                user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS task_boards (
                 user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                 data JSONB NOT NULL DEFAULT '{}'::jsonb,

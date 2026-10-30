@@ -3,12 +3,12 @@
 import { notFound } from "next/navigation";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { PageTree } from "@/features/pages/page-tree";
-import { isCategoryVisible } from "@/lib/features";
+import { LIFE_PAGES_ENABLED } from "@/lib/features";
 import { PagesProvider } from "@/state/pages-store";
 
 export default function LifeLayout({ children }: { children: React.ReactNode }) {
   // Hidden for now (see lib/features.ts).
-  if (!isCategoryVisible("life")) notFound();
+  if (!LIFE_PAGES_ENABLED) notFound();
   return (
     <RequireAuth>
       <PagesProvider>

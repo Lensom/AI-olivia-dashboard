@@ -251,6 +251,32 @@ def _ensure_library_defaults(conn: Connection, *, user_id: int, category_id: int
     conn.commit()
 
 
+def _ensure_life_defaults(conn: Connection, *, user_id: int, category_id: int) -> None:
+    category = conn.execute(
+        "SELECT slug FROM categories WHERE id = %s AND user_id = %s",
+        (category_id, user_id),
+    ).fetchone()
+    if not category or category[0] != "life":
+        return
+    # Same names and order as the frontend's Life nav (front/src/features/life/nav.ts).
+    defaults = [("Tasks", "tasks"), ("Games", "games")]
+    for name, slug in defaults:
+        exists = conn.execute(
+            "SELECT 1 FROM subcategories WHERE category_id = %s AND slug = %s",
+            (category_id, slug),
+        ).fetchone()
+        if exists:
+            continue
+        conn.execute(
+            """
+            INSERT INTO subcategories(user_id, category_id, name, slug, sort_order)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (user_id, category_id, name, slug, _next_subcategory_sort_order(conn, user_id=user_id, category_id=category_id)),
+        )
+    conn.commit()
+
+
 @router.get("/{category_id}/subcategories", response_model=list[SubcategoryResponse])
 def list_subcategories(
     category_id: int,
@@ -261,6 +287,7 @@ def list_subcategories(
     _ensure_investing_defaults(conn, user_id=user.id, category_id=category_id)
     _ensure_cinema_defaults(conn, user_id=user.id, category_id=category_id)
     _ensure_library_defaults(conn, user_id=user.id, category_id=category_id)
+    _ensure_life_defaults(conn, user_id=user.id, category_id=category_id)
     _backfill_subcategory_sort_orders_if_all_zero(conn, user_id=user.id, category_id=category_id)
     rows = conn.execute(
         """

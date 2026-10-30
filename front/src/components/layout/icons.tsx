@@ -53,6 +53,13 @@ export const LeafIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const GamepadIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 7h10a5 5 0 0 1 4.6 7l-1 2.3a2.3 2.3 0 0 1-3.8.6L14.5 14h-5l-2.3 2.9a2.3 2.3 0 0 1-3.8-.6l-1-2.3A5 5 0 0 1 7 7Z" />
+    <path d="M8 9.5v3M6.5 11h3M15.5 10h.01M17.5 12h.01" />
+  </Svg>
+);
+
 export const FolderIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z" />
@@ -90,6 +97,7 @@ export const CATEGORY_LOOK: Record<string, { Icon: (p: IconProps) => React.React
   cinematography: { Icon: FilmIcon, tile: "bg-rose-100 text-rose-700" },
   investing: { Icon: ChartIcon, tile: "bg-emerald-100 text-emerald-700" },
   life: { Icon: LeafIcon, tile: "bg-lime-100 text-lime-800" },
+  games: { Icon: GamepadIcon, tile: "bg-violet-100 text-violet-700" },
 };
 
 export const categoryLook = (slug: string) => CATEGORY_LOOK[slug] ?? { Icon: FolderIcon, tile: "bg-[#efe9dc] text-[#6f675b]" };

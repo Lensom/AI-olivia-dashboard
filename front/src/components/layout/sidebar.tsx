@@ -10,12 +10,13 @@ import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { cinemaPageHref } from "@/features/cinema/nav";
 import { libraryPageHref } from "@/features/library/nav";
+import { lifePageHref } from "@/features/life/nav";
 import { investingNavItems, isBuiltInInvestingPage } from "@/features/investing/nav";
 import { useCategories, type Category, type Subcategory } from "@/state/categories-store";
 
 const OPEN_KEY = "olivia.sidebar.open.v1";
 /** Categories that are a single page (no subpages to toggle). */
-const SINGLE_PAGE = new Set(["tasks", "life"]);
+const SINGLE_PAGE = new Set(["tasks"]);
 
 const rowBase = "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-medium transition";
 const rowActive = "bg-[#1f1c17]/[0.06] text-[#1f1c17]";
@@ -37,6 +38,10 @@ export function childLinks(cat: Category, subs: Subcategory[]): { key: string; n
         .filter((s) => !isBuiltInInvestingPage(s.slug))
         .map((s) => ({ key: String(s.id), name: s.name, href: `/c/${cat.slug}/${s.slug}` })),
     ];
+  }
+  if (cat.slug === "life") {
+    // No overview: just its pages (/life opens the first one).
+    return subs.map((s) => ({ key: String(s.id), name: s.name, href: lifePageHref(s.slug) }));
   }
   const own = { key: "home", name: ["cinematography", "library"].includes(cat.slug) ? "Overview" : "All pages", href: categoryHref(cat.slug), exact: true };
   return [

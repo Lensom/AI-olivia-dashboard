@@ -20,6 +20,7 @@ type Stat = { value: string; label: string; tone?: "up" | "down" };
 
 type Summaries = {
   tasks?: { status: string }[];
+  games?: { year: number | null }[];
   cinema?: { status: string; view_year: number | null }[];
   library?: { status: string; finish_date: string }[];
 };
@@ -37,6 +38,7 @@ function useSummaries(token: string | null): Summaries {
         })
         .catch(() => {});
     load("tasks", "/tasks", (r: { tasks: { status: string }[] }) => r.tasks);
+    load("games", "/games", (r: { games: { year: number | null }[] }) => r.games);
     load("cinema", "/cinema", (r: { items: { status: string; view_year: number | null }[] }) => r.items);
     load("library", "/library", (r: { items: { status: string; finish_date: string }[] }) => r.items);
     return () => {
@@ -198,13 +200,13 @@ export default function Home() {
   const n = (v: number) => v.toLocaleString(locale);
 
   function statsFor(slug: string): Stat[] | null | undefined {
-    if (slug === "tasks") {
-      if (!data.tasks) return null;
+    if (slug === "life") {
+      if (!data.tasks || !data.games) return null;
       const c = (s: string) => data.tasks!.filter((x) => x.status === s).length;
       return [
         { value: n(c("todo")), label: t("To do") },
         { value: n(c("in_progress")), label: t("In progress") },
-        { value: n(c("completed")), label: t("Completed") },
+        { value: n(data.games.filter((x) => x.year === year).length), label: t("Games in {year}", { year }) },
       ];
     }
     if (slug === "cinematography") {
