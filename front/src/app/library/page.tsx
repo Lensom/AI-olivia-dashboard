@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Poster } from "@/features/cinema/ui";
+import { LibraryAchievementsCard } from "@/features/library/achievements";
+import { LibraryAiPicks } from "@/features/library/ai-picks";
 import { LIBRARY_KINDS, libraryKindMeta } from "@/features/library/nav";
 import type { LibraryItem } from "@/features/library/types";
+import { LibrarySeriesCard } from "@/features/library/series";
 import { Stars } from "@/features/library/ui";
 import { HBars, VBars } from "@/features/shared/bar-charts";
 import { useLocale, useT } from "@/lib/i18n";
@@ -142,12 +145,18 @@ export default function LibraryOverview() {
         })}
       </section>
 
+      <LibraryAchievementsCard />
+
       {s.reading.length ? (
         <section className={card}>
           <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Reading now")}</h2>
           <CoverRow list={s.reading} empty="" />
         </section>
       ) : null}
+
+      <LibraryAiPicks />
+
+      <LibrarySeriesCard />
 
       <section className={card}>
         <div className="mb-3 flex items-baseline justify-between">

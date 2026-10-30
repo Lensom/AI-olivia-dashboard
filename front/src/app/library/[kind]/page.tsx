@@ -84,6 +84,7 @@ export default function LibraryKindPage() {
   const [genre, setGenre] = useState("");
   const [finishedYear, setFinishedYear] = useState("");
   const [onlyRecommended, setOnlyRecommended] = useState(false);
+  const [onlyMissing, setOnlyMissing] = useState(false);
   const [sort, setSort] = useState<SortKey>("score");
   const [view, setView] = useState<"table" | "covers">("table");
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -115,11 +116,12 @@ export default function LibraryKindPage() {
           (!genre || t.genres.includes(genre)) &&
           (!finishedYear || t.finish_date.startsWith(finishedYear)) &&
           (!onlyRecommended || t.recommended) &&
+          (!onlyMissing || !t.source_id) &&
           (!q || [t.title, t.original_title, ...t.authors, ...t.genres, t.publisher].some((s) => s.toLowerCase().includes(q))),
       ),
       sort,
     );
-  }, [mine, query, status, genre, finishedYear, onlyRecommended, sort]);
+  }, [mine, query, status, genre, finishedYear, onlyRecommended, onlyMissing, sort]);
 
   if (!meta) {
     return (
@@ -308,7 +310,8 @@ export default function LibraryKindPage() {
             {tr("Matched by title and author on {where}. Your score, status, date, ✓ and notes are never changed.", {
               where: googleEnabled ? "Google Books + Open Library" : "Open Library",
             })}
-            {googleEnabled ? "" : " " + tr("Ukrainian titles rarely match there; adding GOOGLE_BOOKS_API_KEY to back/.env helps a lot.")}
+            {" " + tr("Translated titles no catalogue knows get a second try under their original title, found by Wikidata or Gemini.")}
+            {googleEnabled ? "" : " " + tr("Adding GOOGLE_BOOKS_API_KEY to back/.env helps with Ukrainian editions.")}
           </p>
           <label className="mt-2 flex items-center gap-2 text-xs text-[#3b352d]">
             <input
@@ -353,6 +356,17 @@ export default function LibraryKindPage() {
         <button type="button" onClick={() => setOnlyRecommended((v) => !v)} className={chip(onlyRecommended)} aria-pressed={onlyRecommended}>
           ✓ {tr("Recommended")}
         </button>
+        {mine.some((t) => !t.source_id) || onlyMissing ? (
+          <button
+            type="button"
+            onClick={() => setOnlyMissing((v) => !v)}
+            className={chip(onlyMissing)}
+            aria-pressed={onlyMissing}
+            title={tr("Not matched in a catalogue: no cover, pages or description")}
+          >
+            {tr("No details")} {mine.filter((t) => !t.source_id).length}
+          </button>
+        ) : null}
         {genres.length ? (
           <select value={genre} onChange={(e) => setGenre(e.target.value)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label={tr("Genre")}>
             <option value="">{tr("All genres")}</option>

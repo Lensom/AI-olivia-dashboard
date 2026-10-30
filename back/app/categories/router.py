@@ -225,7 +225,15 @@ def _ensure_library_defaults(conn: Connection, *, user_id: int, category_id: int
     if not category or category[0] != "library":
         return
     # Same names and order as the frontend's Library nav (front/src/features/library/nav.ts).
-    defaults = [("Books", "books"), ("Comics", "comics"), ("Manga", "manga"), ("Magazines", "magazines"), ("Tops", "tops")]
+    defaults = [
+        ("Books", "books"),
+        ("Comics", "comics"),
+        ("Manga", "manga"),
+        ("Magazines", "magazines"),
+        ("Achievements", "achievements"),
+        ("Book series", "series"),
+        ("Tops", "tops"),
+    ]
     for name, slug in defaults:
         exists = conn.execute(
             "SELECT 1 FROM subcategories WHERE category_id = %s AND slug = %s",

@@ -17,7 +17,11 @@ export const LIBRARY_KINDS: {
   { kind: "magazine", slug: "magazines", label: "Magazines", singular: "magazine", description: "Magazines and issues", add: "Add magazine", count: "{n} magazines" },
 ];
 
-export const LIBRARY_EXTRA_PAGES = [{ slug: "tops", label: "Tops" }];
+export const LIBRARY_EXTRA_PAGES = [
+  { slug: "achievements", label: "Achievements" },
+  { slug: "series", label: "Book series" },
+  { slug: "tops", label: "Tops" },
+];
 
 export const libraryKindBySlug = (slug: string) => LIBRARY_KINDS.find((k) => k.slug === slug);
 

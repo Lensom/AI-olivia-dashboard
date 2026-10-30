@@ -13,13 +13,17 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from psycopg import Connection
 from psycopg.types.json import Json
+from pydantic import BaseModel, Field
 
 from app.auth.router import get_current_user, get_conn
 from app.auth.schemas import UserResponse
 from app.cinema.router import _FALSE, _TRUE, _cell, _list
+from app.investing.analysis import _run, get_llm
 from app.investing.router import _read_import_table
+from app.library import wikidata
 from app.library.schemas import (
     LibraryData,
     LibraryDetails,
@@ -29,6 +33,7 @@ from app.library.schemas import (
     LibraryMatchRequest,
     LibraryResponse,
 )
+from app.llm.client import LLMClient
 
 
 router = APIRouter(prefix="/library", tags=["library"])
@@ -71,6 +76,12 @@ def _year(value: object) -> int | None:
     return int(m.group(0)) if m else None
 
 
+def _clean_title(title: str) -> str:
+    """Drop edition notes catalogues tack on: "Essentialism (Korean Edition)", "… [12 stories]"."""
+    title = re.sub(r"\s*(\[[^\]]*\]|\([^)]*\bedition\)|\([^)]*\bвидання\))\s*$", "", title, flags=re.I)
+    return title.strip().rstrip(" :;,/").strip() or title
+
+
 def _clean_genres(subjects: list[str]) -> list[str]:
     # Open Library subjects mix genres with tags like "form:manga volume" or "New York Times bestseller".
     out: list[str] = []
@@ -98,7 +109,7 @@ def _ol_doc(d: dict, kind: str) -> LibraryDetails:
     return LibraryDetails(
         source="openlibrary",
         source_id=d.get("key") or "",
-        title=d.get("title") or "",
+        title=_clean_title(d.get("title") or ""),
         authors=(d.get("author_name") or [])[:3],
         year=d.get("first_publish_year"),
         pages=d.get("number_of_pages_median"),
@@ -160,7 +171,7 @@ def _gb_volume(v: dict) -> LibraryDetails:
     return LibraryDetails(
         source="google",
         source_id=v.get("id") or "",
-        title=info.get("title") or "",
+        title=_clean_title(info.get("title") or ""),
         authors=(info.get("authors") or [])[:3],
         year=_year(info.get("publishedDate")),
         pages=info.get("pageCount") or None,
@@ -220,32 +231,12 @@ def _search(gkey: str, q: str, kind: str, author: str = "") -> list[LibraryDetai
     return sorted(unique, key=lambda r: not any(h in " ".join(r.genres).lower() for h in hints))[:12]
 
 
-_BOOK_WORDS = ("роман", "книга", "повість", "збірка", "манга", "комікс", "novel", "book", "manga", "comic", "series of")
-_NOT_BOOK_WORDS = ("фільм", "film", "серіал", "телефільм", "відеогра", "video game", "сторінка значень", "disambiguation")
-
-
 def _wikidata_english(title: str) -> tuple[str, str] | None:
     """English title and author of a book known by its Ukrainian (or Russian) name, via Wikidata.
     Open Library lists works under their original names, so "Зелена миля" is found as "The Green Mile"."""
-    api = "https://www.wikidata.org/w/api.php?"
     try:
-        hits = _get_json(api + urlencode({"action": "wbsearchentities", "search": title, "language": "uk", "uselang": "uk",
-                                          "type": "item", "limit": 7, "format": "json"})).get("search") or []
-        book = next((h for h in hits if any(w in (h.get("description") or "").lower() for w in _BOOK_WORDS)
-                     and not any(w in (h.get("description") or "").lower() for w in _NOT_BOOK_WORDS)), None)
-        if not book:
-            return None
-        entity = _get_json(api + urlencode({"action": "wbgetentities", "ids": book["id"], "props": "labels|claims",
-                                            "languages": "en", "format": "json"}))["entities"][book["id"]]
-        en_title = ((entity.get("labels") or {}).get("en") or {}).get("value") or ""
-        author_ids = [c["mainsnak"]["datavalue"]["value"]["id"] for c in (entity.get("claims") or {}).get("P50", [])
-                      if c.get("mainsnak", {}).get("datavalue")]
-        en_author = ""
-        if author_ids:
-            people = _get_json(api + urlencode({"action": "wbgetentities", "ids": author_ids[0], "props": "labels",
-                                                "languages": "en", "format": "json"}))["entities"]
-            en_author = ((people[author_ids[0]].get("labels") or {}).get("en") or {}).get("value") or ""
-        return (en_title, en_author) if en_title else None
+        qid = wikidata.find_book(title)
+        return wikidata.english_title(qid) if qid else None
     except (HTTPException, KeyError, TypeError):
         return None
 
@@ -267,6 +258,9 @@ def _best_match(gkey: str, title: str, authors: list[str], kind: str, _translate
     return found
 
 
+_STUDY_AID = re.compile(r"cram101|study guide|summary of|summary &|textbook outlines?|workbook for|analysis of|sparknotes|cliffsnotes", re.I)
+
+
 def _pick(gkey: str, results: list[LibraryDetails], title: str, author: str, kind: str) -> LibraryDetails | None:
     want = _norm(title)
     surname = _norm(author.split()[-1]) if author.split() else ""
@@ -284,6 +278,10 @@ def _pick(gkey: str, results: list[LibraryDetails], title: str, author: str, kin
             r.source_votes or 0,
         )
 
+    # Study guides and summaries carry the book's title and author too ("Cram101 … Flow"): never pick them.
+    results = [r for r in results if not _STUDY_AID.search(r.title)]
+    if not results:
+        return None
     best = max(results, key=fit)
     if not any(fit(best)[:4]):
         return None  # neither the title, the format nor the author fits: better no match than a wrong one
@@ -358,13 +356,43 @@ def book_details(
     return _details(gkey, source, source_id, kind)
 
 
+class _Original(BaseModel):
+    id: str
+    title: str = Field(description="The work's original title, or its best-known English title, as Open Library lists it; empty if you don't know the book.")
+    author: str = Field(description="First author in Latin script, as Open Library spells it; empty if unknown.")
+
+
+class _Originals(BaseModel):
+    books: list[_Original]
+
+
+async def _originals(llm: LLMClient, items: list[LibraryMatchRequest]) -> dict[str, tuple[str, str]]:
+    """Gemini's guess at the original title and author of translated editions; {} when it can't help."""
+    rows = [{"id": t.id, "title": t.title, "authors": t.authors} for t in items]
+    prompt = f"""These are books (or comics, manga) as titled in a Ukrainian reader's library, mostly translated editions.
+For each, give the original title of the work (or its best-known English title for translations from other
+languages) and the author's name in Latin script, so it can be found on Open Library.
+Leave `title` empty for a book you don't recognise; never invent one. Keep every `id` as given.
+
+{json.dumps(rows, ensure_ascii=False, indent=1)}"""
+    try:
+        result = await _run(llm, prompt, _Originals, label="library-originals", context={},
+                            system="You are a librarian who knows world literature and its Ukrainian and Russian translations.")
+    except HTTPException:
+        return {}
+    return {b.id: (b.title.strip(), b.author.strip()) for b in result.value.books if b.title.strip()}
+
+
 @router.post("/match-many", response_model=list[LibraryDetails | None])
-def match_many(
+async def match_many(
     payload: list[LibraryMatchRequest],
     user: Annotated[UserResponse, Depends(get_current_user)],
     gkey: Annotated[str, Depends(get_google_books_key)],
+    llm: Annotated[LLMClient | None, Depends(get_llm)],
 ):
-    """Best match for up to 20 items at once (used by "Fill covers & details"), in the same order."""
+    """Best match for up to 20 items at once (used by "Fill covers & details"), in the same order.
+    Titles no catalogue knows (translated editions, mostly) get a second try under the original title from Gemini."""
+    items = payload[:20]
 
     def one(t: LibraryMatchRequest) -> LibraryDetails | None:
         try:
@@ -374,8 +402,27 @@ def match_many(
         except HTTPException:
             return None
 
-    with ThreadPoolExecutor(max_workers=3) as pool:  # Open Library and Wikidata ask clients to stay gentle
-        return list(pool.map(one, payload[:20]))
+    def many(rows: list, fn) -> list:
+        with ThreadPoolExecutor(max_workers=3) as pool:  # Open Library and Wikidata ask clients to stay gentle
+            return list(pool.map(fn, rows))
+
+    found = await run_in_threadpool(many, items, one)
+    misses = [t for t, d in zip(items, found) if d is None and not t.source_id]
+    if misses and llm is not None:
+        originals = await _originals(llm, misses)
+
+        def retry(t: LibraryMatchRequest) -> LibraryDetails | None:
+            title, author = originals.get(t.id, ("", ""))
+            if not title or _norm(title) == _norm(t.title):
+                return None
+            try:
+                return _best_match(gkey, title, [author] if author else [], t.kind, _translated=True)
+            except HTTPException:
+                return None
+
+        again = dict(zip((t.id for t in misses), await run_in_threadpool(many, misses, retry)))
+        found = [d if d is not None else again.get(t.id) for t, d in zip(items, found)]
+    return found
 
 
 # --- Import (Notion CSV / spreadsheet) ----------------------------------------------------------

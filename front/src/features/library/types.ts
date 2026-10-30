@@ -32,7 +32,27 @@ export type LibraryItem = {
   source_votes: number | null;
   notes: string;
   added_at: string;
+  /** Wikidata entity of the work, and the series it belongs to (looked up in the background). */
+  wikidata_id: string;
+  series_id: string;
+  series_name: string;
+  /** ISO date of the last Wikidata lookup. */
+  wikidata_synced: string;
 };
+
+/** Mirrors LibraryWikidata / LibrarySeries in back/app/library/schemas.py. */
+export type LibraryWikidata = Pick<LibraryItem, "id" | "wikidata_id" | "series_id" | "series_name">;
+export type LibrarySeriesPart = {
+  wikidata_id: string;
+  title: string;
+  original_title: string;
+  author: string;
+  year: number | null;
+  index: string;
+  cover: string;
+  ol_id: string;
+};
+export type LibrarySeries = { id: string; name: string; parts: LibrarySeriesPart[] };
 
 export type LibraryDetails = Pick<
   LibraryItem,
@@ -77,6 +97,10 @@ export function blankItem(kind: LibraryKind, title = ""): LibraryItem {
     source_votes: null,
     notes: "",
     added_at: new Date().toISOString().slice(0, 10),
+    wikidata_id: "",
+    series_id: "",
+    series_name: "",
+    wikidata_synced: "",
   };
 }
 
@@ -102,6 +126,8 @@ export function applyBookDetails(t: LibraryItem, d: LibraryDetails, replaceLists
     source_id: d.source_id,
     source_rating: d.source_rating ?? t.source_rating,
     source_votes: d.source_votes ?? t.source_votes,
+    // Another work: look its series up again.
+    wikidata_synced: d.source_id === t.source_id ? t.wikidata_synced : "",
   };
 }
 

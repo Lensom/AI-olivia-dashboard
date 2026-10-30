@@ -36,6 +36,11 @@ class LibraryItem(BaseModel):
     source_votes: int | None = None
     notes: str = ""
     added_at: str = ""
+    # Wikidata: the book's entity and the series it belongs to (see library/series.py)
+    wikidata_id: str = ""
+    series_id: str = ""
+    series_name: str = ""
+    wikidata_synced: str = ""  # ISO date of the last lookup
 
 
 class LibraryData(BaseModel):
@@ -80,3 +85,38 @@ class LibraryMatchRequest(BaseModel):
 class LibraryImportResponse(BaseModel):
     rows: list[LibraryItem]
     skipped: int = 0
+
+
+class LibraryWikidataRequest(BaseModel):
+    id: str
+    title: str
+    original_title: str = ""
+    authors: list[str] = Field(default_factory=list)
+    source: LibrarySource = ""
+    source_id: str = ""
+
+
+class LibraryWikidata(BaseModel):
+    """A book's Wikidata entity and its series; empty strings when none was found."""
+
+    id: str
+    wikidata_id: str = ""
+    series_id: str = ""
+    series_name: str = ""
+
+
+class LibrarySeriesPart(BaseModel):
+    wikidata_id: str
+    title: str  # in the reader's language when Wikidata has it
+    original_title: str = ""  # English
+    author: str = ""
+    year: int | None = None
+    index: str = ""  # number in the series, when Wikidata gives one
+    cover: str = ""
+    ol_id: str = ""  # Open Library work key (/works/OL…W), to add it in one click
+
+
+class LibrarySeries(BaseModel):
+    id: str
+    name: str
+    parts: list[LibrarySeriesPart]

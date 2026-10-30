@@ -46,6 +46,7 @@ The frontend calls the API on port 8000 of the same host the page was opened fro
 | `AUTH_TOKEN_TTL_SECONDS` | no | How long a login lasts. Default `604800` (7 days). |
 | `CORS_ORIGINS` | no | Comma-separated allowed origins, or `*`. Defaults cover `localhost:3000/3001` and the LAN IP. |
 | `APP_NAME`, `APP_VERSION` | no | Shown in `/health` and the API docs. |
+| `WIKIDATA_CONTACT` | no | Library series: a URL or email put in the Wikidata User-Agent. Wikimedia allows 200 requests a minute to identified clients and only 10 to the rest. Defaults to this repository's URL. |
 | `GOOGLE_BOOKS_API_KEY` | no | Library: adds Google Books to search and matching, which lists Ukrainian editions far better than Open Library. Free in Google Cloud console → APIs → Books API. Without it, Library uses Open Library plus Wikidata. |
 | `TMDB_API_KEY` | no | Enables Cinematography search, posters and auto-filled genres / actors / studios. Free at themoviedb.org → Settings → API; a v3 API key or a v4 read access token both work. Without it, titles are added by hand. |
 
@@ -145,11 +146,14 @@ Your ratings of films, series, cartoons, animated series, anime and TV shows, re
 
 Books, comics, manga and magazines, replacing the Notion reading table. The category is called **Library** (slug `library`), and its pages appear automatically.
 
-- **Overview** (`/library`): totals, average stars, read this year vs last year, pages read, what you're reading now, recommendations, recently finished, books finished per year, star distribution, top genres and the authors you read most.
+- **Overview** (`/library`): totals, average stars, read this year vs last year, pages read, what you're reading now, achievements, AI picks, book series closest to complete, recommendations, recently finished, books finished per year, star distribution, top genres and the authors you read most.
 - **Books / Comics / Manga / Magazines** (`/library/books`, `/comics`, `/manga`, `/magazines`): a table (✓, Title, Genre, Status, Score ★1–5, Author, Finished, Pages or Volumes, Readers' rating) or a cover grid. Filters: status, genre, recommended, year finished; sorts: score, date finished, title, author, published, pages, recently added. Comics and Manga track **volumes read / out**.
 - **Add**: search by title or author, pick a result, and the cover, author, pages, year, publisher, description and readers' rating fill in. You can also add by hand.
 - **Import CSV / XLSX** (Notion: ••• → Export → Markdown & CSV): recognises Title, Genre (`Jenre`) / Жанр, Status (Прочитано → Read, and so on), Score (`⭐⭐⭐⭐`, 1–5 or a 10-point score), Author / Автор, Finish date (`March 2, 2025`, ISO, `02.03.2025`), Pages, Volumes, Notes, Type and the checkbox column.
-- **Fill covers & details**: matches by title and author on Open Library (plus Google Books with a key). Ukrainian titles are translated through Wikidata first ("Зелена миля" → *The Green Mile*). Your score, status, date, ✓ and notes are never changed. A title with no match can be found from its edit window with the English title; a wrong match can be fixed with **Wrong book? Re-match**.
+- **Fill covers & details**: matches by title and author on Open Library (plus Google Books with a key). Ukrainian titles are translated through Wikidata first ("Зелена миля" → *The Green Mile*); whatever is still unmatched gets a second try under the original title from Gemini ("Як насправді влаштований світ" → *How the World Really Works*). Catalogue study guides and summaries are never picked, and edition notes such as "(Korean Edition)" are dropped. The **No details** filter shows the books still without a match. Your score, status, date, ✓ and notes are never changed. A title with no match can be found from its edit window with the English title; a wrong match can be fixed with **Wrong book? Re-match**.
+- **AI picks for you** (overview): Gemini reads your taste from your scores (favourite genres and authors, how you score compared with the catalogue's readers) and suggests 10–12 books you haven't read. Each one is matched on Open Library / Google Books and can be added to Want to read in one click. Needs `GEMINI_API_KEY` and at least 5 scored books; the last answer is saved.
+- **Achievements** (`/library/achievements`): 18 achievements in six groups (books, pages, variety, scores, authors, book series) with bronze, silver and gold thresholds, the same board as Cinematography's. Thresholds are in `front/src/features/library/achievements.tsx`.
+- **Book series** (`/library/series`): series from Wikidata ("part of the series") that have a book in your library, as achievements, like Cinematography's franchises: Harry Potter 1–7, the Poirot novels, Sherlock Holmes. Each card has a progress ring, a sticker-album strip of the books in reading order (numbered series by number, the rest by publication) and **+ Want** for missing ones, filled from Open Library. Each book's Wikidata entity and series are looked up in the background (new books once, the rest monthly) and stored on the book; a series' book list is cached for a week.
 - **Tops** (`/library/tops`): the same board as Cinematography's (your ranked lists plus automatic tops by genre, author, year read, decade published or kind).
 
 ## Features: Life
@@ -190,7 +194,7 @@ back/
     cinema/              # /cinema endpoints: titles, TMDB search/details/match, Notion import
     tasks/               # /tasks endpoints: the task board (GET/PUT)
     pages/               # /pages endpoints: Life pages (tree, content, move, delete)
-    library/             # /library endpoints: books, Open Library / Google Books / Wikidata lookup, Notion import
+    library/             # /library endpoints: books, Open Library / Google Books / Wikidata lookup, Notion import, series, AI picks
     investing/
       router.py          # all /investing endpoints + market data fetchers
       schemas.py         # request/response models
@@ -203,7 +207,7 @@ front/
     features/investing/  # charts, dashboard widgets, nav (page names/links), stats helpers
     features/cinema/     # Cinematography nav, types, dialogs, tags/poster UI
     features/library/    # Library nav, types, dialogs, stars UI
-    features/shared/     # Tops board and bar charts shared by Cinematography and Library
+    features/shared/     # Tops board, bar charts and achievements shared by Cinematography and Library
     state/               # React context stores (auth, categories, investing, crypto, broker, cinema, library)
     lib/api.ts           # fetch wrapper (base URL, auth header, JSON / FormData)
 ```
@@ -219,7 +223,7 @@ All endpoints are under the `/api` prefix (e.g. `/api/investing/holdings`); the 
 | Imports | `POST /investing/holdings/import`, `POST /investing/activities/import` (parse a file and return rows; nothing is saved) |
 | Market data | `GET /investing/quotes`, `/profiles`, `/fundamentals` (all `?tickers=`), `GET /investing/benchmark?symbol=SPY`, `GET /investing/rates`, `GET/PUT /investing/metrics` |
 | Cinematography | `GET/PUT /cinema`, `GET /cinema/search?q=&kind=`, `GET /cinema/details?media=&tmdb_id=`, `GET /cinema/match?title=&year=&kind=`, `POST /cinema/match-many`, `POST /cinema/imdb-ratings`, `POST /cinema/import` |
-| Library | `GET/PUT /library`, `GET /library/search?q=&kind=`, `GET /library/details?source=&source_id=`, `POST /library/match-many`, `POST /library/import` |
+| Library | `GET/PUT /library`, `GET /library/search?q=&kind=`, `GET /library/details?source=&source_id=`, `POST /library/match-many`, `POST /library/import`, `POST /library/wikidata`, `POST /library/series?lang=`, `GET/POST /library/ai?lang=` |
 | Tasks | `GET/PUT /tasks` |
 | Life | `GET/POST /pages`, `GET/PATCH/DELETE /pages/{id}` (PATCH moves too: `parent_id`, `sort_order`) |
 | Sections | `GET/PUT` on `/investing/holdings`, `/refills`, `/activities`, `/capital-entries`, `/picking`, `/notes`, `/crypto`, `/total`, `/broker` (cash, dividends, attention thresholds) |

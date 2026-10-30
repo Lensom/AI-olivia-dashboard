@@ -50,7 +50,7 @@ export type Franchise = {
   nextPart: FranchisePart | null;
 };
 
-function tierOf(watched: number, released: number): FranchiseTier {
+export function tierOf(watched: number, released: number): FranchiseTier {
   if (!watched) return "locked";
   if (watched >= released) return "gold";
   return watched * 2 >= released ? "silver" : "bronze";
@@ -112,8 +112,8 @@ export function useFranchises(): { franchises: Franchise[]; isLoading: boolean }
 /** Closest to complete first (fewest films left), then the biggest. */
 export const byProgress = (a: Franchise, b: Franchise) => a.left - b.left || b.watched / b.released - a.watched / a.released || b.released - a.released;
 
-/** The collection poster in a progress ring, with the tier medal on it. */
-export function FranchiseBadge({ f, size = 84 }: { f: Franchise; size?: number }) {
+/** The collection poster in a progress ring, with the tier medal on it (also used for book series). */
+export function FranchiseBadge({ f, size = 84 }: { f: Pick<Franchise, "name" | "poster" | "tier" | "watched" | "released">; size?: number }) {
   const t = useT();
   const tier = TIERS[f.tier];
   const stroke = 5;

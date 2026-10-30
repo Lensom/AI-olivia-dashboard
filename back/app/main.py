@@ -9,6 +9,9 @@ import app.investing.analysis as analysis_router_module
 import app.cinema.router as cinema_router_module
 from app.cinema.ai import router as cinema_ai_router
 import app.library.router as library_router_module
+from app.library.ai import router as library_ai_router
+import app.library.wikidata as library_wikidata_module
+from app.library.series import router as library_series_router
 from app.categories.router import router as categories_router
 from app.investing.router import router as investing_router
 from app.investing.watchlist import router as watchlist_router
@@ -26,6 +29,8 @@ class Settings(BaseSettings):
     auth_token_secret: str = "dev-secret-change-me"
     auth_token_ttl_seconds: int = 60 * 60 * 24 * 7  # 7 days
     tmdb_api_key: str = ""  # Cinematography autofill; v3 API key or v4 read access token
+    # Library series (Wikidata): a URL or email for the User-Agent, which raises Wikimedia's rate limit 20×
+    wikidata_contact: str = "https://github.com/Lensom/stocks"
     google_books_api_key: str = ""  # Library: optional, better covers/details for Ukrainian editions
     gemini_api_key: str = ""  # Investing: AI stock analysis
     gemini_model: str = DEFAULT_MODEL  # tried first
@@ -90,6 +95,8 @@ app.dependency_overrides[cinema_router_module.get_tmdb_key] = lambda: settings.t
 app.include_router(cinema_router_module.router, prefix=API_PREFIX)
 app.dependency_overrides[library_router_module.get_google_books_key] = lambda: settings.google_books_api_key.strip()
 app.include_router(library_router_module.router, prefix=API_PREFIX)
+library_wikidata_module.CONTACT = settings.wikidata_contact.strip()
+app.include_router(library_series_router, prefix=API_PREFIX)
 app.include_router(tasks_router, prefix=API_PREFIX)
 _llm = (
     LLMClient(
@@ -102,6 +109,7 @@ _llm = (
 app.dependency_overrides[analysis_router_module.get_llm] = lambda: _llm
 app.include_router(analysis_router_module.router, prefix=API_PREFIX)
 app.include_router(cinema_ai_router, prefix=API_PREFIX)
+app.include_router(library_ai_router, prefix=API_PREFIX)
 app.include_router(pages_router, prefix=API_PREFIX)
 
 
