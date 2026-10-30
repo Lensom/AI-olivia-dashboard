@@ -17,9 +17,9 @@ export function AppShell({ children }: AppShellProps) {
       <AuthProvider>
         <SessionScope>
           <CategoriesProvider>
-            {/* Inside the providers: the mobile menu in the header shows the category tree. */}
-            <Header />
             <InvestingProvider>
+              {/* Inside the providers: the mobile menu shows the category tree, and search finds your tickers. */}
+              <Header />
               <BrokerProvider>
                 <div className="mx-auto flex w-full max-w-[1760px] flex-1 gap-5 px-4 py-7 md:px-5 md:py-8">
                   <Sidebar />

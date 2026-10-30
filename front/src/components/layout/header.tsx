@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { GlobalSearch } from "@/components/layout/global-search";
 import { CloseIcon, MenuIcon } from "@/components/layout/icons";
 import { SidebarNav } from "@/components/layout/sidebar";
 import { useLang, useT, type Lang } from "@/lib/i18n";
@@ -172,7 +173,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-black/5 bg-[#f6f3ea]/80 backdrop-blur-lg">
       <div className="mx-auto flex w-full max-w-[1760px] items-center justify-between gap-3 px-4 py-3 md:px-5">
-        <div className="flex items-center gap-2.5">
+        <div className="flex shrink-0 items-center gap-2.5">
           {token ? <MobileNav /> : null}
           <Link href="/" className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1f1c17] text-xs font-semibold text-[#f8f4eb]">OL</div>
@@ -183,7 +184,12 @@ export function Header() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Centred between the logo and the language switch; an icon button on phones. */}
+        <div className="flex min-w-0 flex-1 justify-end sm:justify-center">
+          <GlobalSearch />
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
           <LangSwitch />
           {token ? (
             <AccountMenu

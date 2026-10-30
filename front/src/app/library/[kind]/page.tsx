@@ -18,6 +18,7 @@ import {
   type LibraryStatus,
 } from "@/features/library/types";
 import { ReadersRating, ReadStatusPill, Stars } from "@/features/library/ui";
+import { useLinkedItem } from "@/features/shared/linked-item";
 import {
   investingMetaBadge,
   investingPrimarySaveActive,
@@ -95,6 +96,9 @@ export default function LibraryKindPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const mine = useMemo(() => (meta ? items.filter((t) => t.kind === meta.kind) : []), [items, meta]);
+  // A book opened from global search (?open=<id>).
+  const { linked, dismiss } = useLinkedItem(mine);
+  const editing = dialog?.mode === "edit" ? dialog : linked ? { mode: "edit" as const, item: linked, isNew: false } : null;
   const genres = useMemo(() => {
     const c = new Map<string, number>();
     for (const t of mine) for (const g of t.genres) c.set(g, (c.get(g) ?? 0) + 1);
@@ -521,14 +525,17 @@ export default function LibraryKindPage() {
           onOpenExisting={(t) => setDialog({ mode: "edit", item: t, isNew: false })}
         />
       ) : null}
-      {dialog?.mode === "edit" ? (
+      {editing ? (
         <BookDialog
-          key={dialog.item.id}
-          initial={dialog.item}
-          isNew={dialog.isNew}
-          onClose={() => setDialog(null)}
+          key={editing.item.id}
+          initial={editing.item}
+          isNew={editing.isNew}
+          onClose={() => {
+            setDialog(null);
+            dismiss();
+          }}
           onSave={saveItem}
-          onDelete={dialog.isNew ? undefined : () => update((list) => list.filter((x) => x.id !== dialog.item.id))}
+          onDelete={editing.isNew ? undefined : () => update((list) => list.filter((x) => x.id !== editing.item.id))}
         />
       ) : null}
     </div>

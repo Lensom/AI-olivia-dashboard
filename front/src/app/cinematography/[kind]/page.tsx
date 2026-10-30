@@ -18,6 +18,7 @@ import {
   type CinemaTitle,
 } from "@/features/cinema/types";
 import { ImdbRating, Poster, ScoreBadge, SeasonsWatched, StatusPill, Tags } from "@/features/cinema/ui";
+import { useLinkedItem } from "@/features/shared/linked-item";
 import {
   investingMetaBadge,
   investingPrimarySaveActive,
@@ -85,6 +86,9 @@ export default function CinemaKindPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const mine = useMemo(() => (meta ? items.filter((t) => t.kind === meta.kind) : []), [items, meta]);
+  // A title opened from global search (?open=<id>).
+  const { linked, dismiss } = useLinkedItem(mine);
+  const editing = dialog?.mode === "edit" ? dialog : linked ? { mode: "edit" as const, title: linked, isNew: false } : null;
   const genres = useMemo(() => {
     const counts = new Map<string, number>();
     for (const t of mine) for (const g of t.genres) counts.set(g, (counts.get(g) ?? 0) + 1);
@@ -559,15 +563,18 @@ export default function CinemaKindPage() {
           onOpenExisting={(t) => setDialog({ mode: "edit", title: t, isNew: false })}
         />
       ) : null}
-      {dialog?.mode === "edit" ? (
+      {editing ? (
         <TitleDialog
-          key={dialog.title.id}
-          initial={dialog.title}
-          isNew={dialog.isNew}
+          key={editing.title.id}
+          initial={editing.title}
+          isNew={editing.isNew}
           tmdbEnabled={tmdbEnabled}
-          onClose={() => setDialog(null)}
+          onClose={() => {
+            setDialog(null);
+            dismiss();
+          }}
           onSave={saveTitle}
-          onDelete={dialog.isNew ? undefined : () => update((list) => list.filter((x) => x.id !== dialog.title.id))}
+          onDelete={editing.isNew ? undefined : () => update((list) => list.filter((x) => x.id !== editing.title.id))}
         />
       ) : null}
     </div>

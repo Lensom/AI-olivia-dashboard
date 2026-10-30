@@ -19,6 +19,13 @@ export const COMMON: Record<string, string | string[]> = {
   Library: "Бібліотека",
   Tasks: "Завдання",
   Games: "Ігри",
+  // Global search
+  Search: "Пошук",
+  "Search films, books, games, stocks…": "Пошук фільмів, книжок, ігор, акцій…",
+  "Type a title, author, ticker or page name. ↑↓ to choose, Enter to open.": "Введіть назву, автора, тікер чи сторінку. ↑↓ — вибір, Enter — відкрити.",
+  "Nothing found.": "Нічого не знайдено.",
+  "Films and series": "Фільми й серіали",
+  "In your portfolio": "У портфелі",
   "Games completed": "Пройдені ігри",
   "{n} games": ["{n} гра", "{n} гри", "{n} ігор"],
   "Game you finished": "Гра, яку ви пройшли",

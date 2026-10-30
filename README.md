@@ -56,6 +56,10 @@ The **EN / UA** switch in the header changes the whole interface. The choice is 
 
 English text is the key: components call `useT()` from `front/src/lib/i18n.tsx`, e.g. `t("Add task")` or `t("{n} titles", { n })`. The Ukrainian dictionary lives in `front/src/lib/i18n/` (`common.ts`, `media.ts`, `investing.ts`). A value can be an array of plural forms `[one, few, many]`, and a missing entry falls back to English.
 
+## Global search
+
+The search box in the header (between the logo and the EN / UA switch; an icon on phones) opens with a click, **Ctrl K** / **⌘K** or **/**. It finds pages and subpages, your stocks (portfolio and watchlist), films and series, books (by title, original title or author), games and tasks, grouped and best match first; ↑↓ to choose, Enter to open. A film or book opens its edit window on its list page (`?open=<id>`), a game opens Games filtered to it. Lists are loaded when the search opens and kept for two minutes (`front/src/components/layout/global-search.tsx`).
+
 ## Features: Investing
 
 The **Investing** page (`/investing`) starts with **Needs attention**: rules you've broken (fees over your limit, return under your minimum, ETF share out of range, a position over its cap, holdings or net-worth groups drifting from target), opportunities (a stock in its buy zone, idle broker cash) and to-dos (record this month on Total, enter broker cash, record dividends). Each item links to the page that fixes it; the limits are editable under **Thresholds**. Below it, every investing page is a tile with a live figure. **Reorder** lets you drag tiles (or use arrows) to change the order of the sidebar and the Stocks tabs; you can also add custom pages there. Page names and links are defined once in `front/src/features/investing/nav.ts`.

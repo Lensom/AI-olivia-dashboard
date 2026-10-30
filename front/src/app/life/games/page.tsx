@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { investingPrimarySaveActive } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
@@ -78,7 +79,7 @@ function GameRow({ game, onSave, onDelete }: { game: Game; onSave: (g: Game) => 
   );
 }
 
-export default function GamesPage() {
+function GamesPage({ initialQuery }: { initialQuery: string }) {
   const { token } = useAuth();
   const t = useT();
   const locale = useLocale();
@@ -87,7 +88,7 @@ export default function GamesPage() {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [year, setYear] = useState(() => String(new Date().getFullYear()));
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [sort, setSort] = useState<Sort>("title");
   const latest = useRef<Game[]>([]);
 
@@ -241,5 +242,19 @@ export default function GamesPage() {
         )}
       </div>
     </RequireAuth>
+  );
+}
+
+/** `?q=` (from global search) pre-fills the search box. */
+function GamesRoute() {
+  const q = useSearchParams().get("q") ?? "";
+  return <GamesPage key={q} initialQuery={q} />;
+}
+
+export default function GamesRoutePage() {
+  return (
+    <Suspense>
+      <GamesRoute />
+    </Suspense>
   );
 }
