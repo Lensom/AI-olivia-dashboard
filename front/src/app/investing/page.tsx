@@ -19,6 +19,7 @@ const DESCRIPTION: Record<string, string> = {
   picking: "Buckets and buy zones",
   activities: "Every buy and sell, import from broker",
   analytics: "Yearly returns vs the S&P 500",
+  calendar: "Earnings and ex-dividend dates ahead",
   notes: "Your rules, checked against live numbers",
   crypto: "BTC / ETH holdings, funding and split rule",
 };

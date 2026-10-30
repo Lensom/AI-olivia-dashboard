@@ -4,7 +4,7 @@ import type { AttentionRules } from "@/state/broker-store";
 import type { T } from "@/lib/i18n";
 import type { InvestingPickingRow } from "@/state/investing-store";
 
-export type AttentionKind = "warn" | "opportunity" | "todo";
+export type AttentionKind = "warn" | "opportunity" | "event" | "todo";
 export type AttentionItem = { id: string; kind: AttentionKind; title: string; detail?: string; href: string };
 
 export type AttentionInput = {
@@ -185,6 +185,6 @@ export function attentionItems(x: AttentionInput, t: T): AttentionItem[] {
     out.push({ id: "dividends-setup", kind: "todo", title: t("Record dividends you've received"), href: "/investing/finance" });
   }
 
-  const order: Record<AttentionKind, number> = { warn: 0, opportunity: 1, todo: 2 };
+  const order: Record<AttentionKind, number> = { warn: 0, opportunity: 1, event: 2, todo: 3 };
   return out.sort((a, b) => order[a.kind] - order[b.kind]);
 }

@@ -15,6 +15,7 @@ const PAGES: Record<string, Omit<InvestingNavItem, "slug">> = {
   picking: { label: "Watchlist", href: "/investing/picking" },
   activities: { label: "Activities", href: "/investing/activities" },
   analytics: { label: "Analytics", href: "/investing/analytics" },
+  calendar: { label: "Calendar", href: "/investing/calendar" },
   notes: { label: "Notes", href: "/investing/notes" },
   crypto: { label: "Crypto", href: "/investing/crypto" },
 };
@@ -27,6 +28,7 @@ export const DEFAULT_INVESTING_ORDER = [
   "finance",
   "activities",
   "analytics",
+  "calendar",
   "notes",
   "crypto",
   "total",

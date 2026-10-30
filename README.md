@@ -77,6 +77,7 @@ Net worth in one number, replacing a monthly spreadsheet:
 | **Allocation rules** | `/investing/picking` | Buckets (ETF / REIT / Fund, Value / Blue chips) with their target share and position limit checked against the portfolio. Each stock gets a **Strong buy / May buy / Wait** signal from your buy zones, upside to price goals, and **Autofill fundamentals** (P/E, EPS, beta, yield). |
 | **Activities** | `/investing/activities` | One trade log (newest first) with View/Edit modes, search, buy/sell and year filters, a summary of what's shown, a per-ticker breakdown and yearly totals. **Import XLSX** from a broker export. |
 | **Analytics** | `/investing/analytics` | Yearly return vs the S&P 500 (SPY, dividends reinvested), value vs money invested, a year-by-year table, risk & income by holding (beta contribution, dividend income) and trading results by year. |
+| **Calendar** | `/investing/calendar` | Earnings reports (before the open / after the close) and ex-dividend dates for holdings and the watchlist, grouped by day. Dividends expected in the next 30 days and 12 months for your shares, and dividend income by month. Dates come from Finviz. Future ex-dates are projected from each ticker's Yahoo dividend history and marked "≈ estimated". Holdings' events in the coming week also show in **Needs attention**. |
 | **Notes** | `/investing/notes` | Investing rules with autosave, Write/Preview, and a panel of live numbers (ETF share, fees %, XIRR, largest position) to check the rules against. |
 
 ### Crypto (`/investing/crypto`)

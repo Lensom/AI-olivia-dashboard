@@ -138,6 +138,7 @@ def _ensure_investing_defaults(conn: Connection, *, user_id: int, category_id: i
         ("Finance", "finance"),
         ("Activities", "activities"),
         ("Analytics", "analytics"),
+        ("Calendar", "calendar"),
         ("Notes", "notes"),
         ("Crypto", "crypto"),
         ("Total", "total"),

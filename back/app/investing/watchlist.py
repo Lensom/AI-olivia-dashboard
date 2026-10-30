@@ -66,6 +66,9 @@ class WatchlistSnapshot(BaseModel):
     high_52w: float | None = None
     low_52w: float | None = None
     perf: dict[str, float] = Field(default_factory=dict)
+    earnings: str = ""  # Finviz text, e.g. "Nov 02 AMC" (no year); used by app/investing/events.py
+    dividend_ex_date: str = ""  # Finviz text, e.g. "Aug 10, 2026": the latest announced ex-dividend date
+    dividend_est: float | None = None  # expected dividend per share over the next year
 
 
 class WatchlistSnapshotsResponse(BaseModel):
@@ -153,6 +156,9 @@ def _fetch_snapshot(ticker: str) -> WatchlistSnapshot | None:
         high_52w=_num(_cell(html, "52W High")),
         low_52w=_num(_cell(html, "52W Low")),
         perf={k: v for k, label in PERF_LABELS.items() if (v := _num(_cell(html, label))) is not None},
+        earnings=_cell(html, "Earnings").replace("-", "").strip(),
+        dividend_ex_date=_cell(html, "Dividend Ex-Date").replace("-", "").strip(),
+        dividend_est=_num(_cell(html, "Dividend Est.")),
     )
     if not (snap.name or snap.perf):
         snap = None

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { attentionItems, type AttentionKind } from "@/features/investing/attention";
+import { calendarEvents, eventAttention, useTickerEvents } from "@/features/investing/events";
 import { parseCryptoAmount, yahooCryptoPair } from "@/features/investing/crypto-format";
 import { parseUsd } from "@/features/investing/format";
 import { feeBreakdown, xirrFromRefills } from "@/features/investing/funding-stats";
@@ -25,6 +26,7 @@ type TotalDoc = {
 const KIND_STYLE: Record<AttentionKind, { icon: string; label: string; cls: string }> = {
   warn: { icon: "⚠", label: "Rule", cls: "bg-amber-50 text-amber-900 border-amber-200" },
   opportunity: { icon: "★", label: "Opportunity", cls: "bg-emerald-50 text-emerald-900 border-emerald-200" },
+  event: { icon: "◷", label: "Event", cls: "bg-violet-50 text-violet-900 border-violet-200" },
   todo: { icon: "○", label: "To do", cls: "bg-sky-50 text-sky-900 border-sky-200" },
 };
 
@@ -50,6 +52,8 @@ export function AttentionStrip() {
   const [rates, setRates] = useState<Record<string, number>>({ USD: 1 });
   const [nowMs] = useState(() => Date.now());
   const [showAll, setShowAll] = useState(false);
+  // Reports and ex-dividend dates of the holdings in the coming week (watchlist events stay on the Calendar page).
+  const { events } = useTickerEvents(token, holdings.map((h) => h.ticker));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<AttentionRules>(rules);
   const [saving, setSaving] = useState(false);
@@ -112,7 +116,9 @@ export function AttentionStrip() {
       };
     }
 
-    return attentionItems({
+    const today = new Date(nowMs).toISOString().slice(0, 10);
+    const upcoming = eventAttention(calendarEvents(events, holdings, [], today), today, t, locale);
+    const ruleItems = attentionItems({
       rules,
       holdings,
       pickingRows,
@@ -123,13 +129,17 @@ export function AttentionStrip() {
       xirrPct: xirr == null ? null : xirr * 100,
       total: totalInput,
     }, t);
-  }, [holdings, refills, activitiesSummary, operatingExpensesUsd, cashUsd, cash, dividends, pickingRows, rules, total, rates, cryptoValue, nowMs, t, locale]);
+    // Events sit after rules and opportunities, before the monthly to-dos.
+    const firstTodo = ruleItems.findIndex((i) => i.kind === "todo");
+    return firstTodo < 0 ? [...ruleItems, ...upcoming] : [...ruleItems.slice(0, firstTodo), ...upcoming, ...ruleItems.slice(firstTodo)];
+  }, [holdings, refills, activitiesSummary, operatingExpensesUsd, cashUsd, cash, dividends, pickingRows, rules, total, rates, cryptoValue, nowMs, t, locale, events]);
 
   const loading = !isLoaded || total === undefined || holdings.length === 0;
   const visible = showAll ? items : items.slice(0, 6);
   const counts = items.reduce<Record<AttentionKind, number>>((a, i) => ({ ...a, [i.kind]: a[i.kind] + 1 }), {
     warn: 0,
     opportunity: 0,
+    event: 0,
     todo: 0,
   });
 
@@ -150,7 +160,8 @@ export function AttentionStrip() {
           {t("Needs attention")}{" "}
           {!loading ? (
             <span className="font-normal text-[#8f8676]">
-              · {t("{n} rules", { n: counts.warn })} · {t("{n} opportunities", { n: counts.opportunity })} · {t("{n} to do", { n: counts.todo })}
+              · {t("{n} rules", { n: counts.warn })} · {t("{n} opportunities", { n: counts.opportunity })}
+              {counts.event ? ` · ${t("{n} events", { n: counts.event })}` : ""} · {t("{n} to do", { n: counts.todo })}
             </span>
           ) : null}
         </h2>
