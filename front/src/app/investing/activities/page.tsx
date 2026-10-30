@@ -11,6 +11,7 @@ import {
   investingTableScrollWrap,
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
+import { AddActivityDialog } from "@/features/investing/activity-dialog";
 import { InvestingSubsectionHeader } from "@/features/investing/ui/investing-subsection-header";
 import {
   useInvesting,
@@ -70,7 +71,6 @@ export default function InvestingActivitiesPage() {
     isActivitiesSaving,
     isActivitiesDirty,
     updateActivity,
-    addActivity,
     deleteActivity,
     saveActivities,
     importActivities,
@@ -111,6 +111,7 @@ export default function InvestingActivitiesPage() {
   const [yearFilter, setYearFilter] = useState<number | "all">("all");
   const [isTickersOpen, setTickersOpen] = useState(false);
   const [isYearlyOpen, setYearlyOpen] = useState(false);
+  const [addType, setAddType] = useState<"buy" | "sell" | null>(null);
 
   useEffect(() => {
     if (!isActivitiesDirty) return;
@@ -208,6 +209,7 @@ export default function InvestingActivitiesPage() {
 
   return (
     <div className={investingPageStack}>
+      {addType ? <AddActivityDialog key={addType} initialType={addType} onClose={() => setAddType(null)} /> : null}
       <p className="text-sm text-[#655d51]">
         {tr("Every buy and sell. USD amounts and FX rates are calculated when you save.")}
       </p>
@@ -233,6 +235,12 @@ export default function InvestingActivitiesPage() {
           >
             {isImporting ? tr("Importing…") : tr("Import XLSX")}
           </button>
+          <button type="button" onClick={() => setAddType("buy")} className={investingToolbarBtn}>
+            {tr("Add purchase")}
+          </button>
+          <button type="button" onClick={() => setAddType("sell")} className={investingToolbarBtn}>
+            {tr("Add sale")}
+          </button>
           <div className="flex rounded-full border border-black/10 bg-white p-1">
             {(["view", "edit"] as const).map((m) => (
               <button
@@ -249,14 +257,7 @@ export default function InvestingActivitiesPage() {
             ))}
           </div>
           {mode === "edit" ? (
-            <>
-              <button type="button" onClick={() => addActivity("buy")} className={investingToolbarBtn}>
-                {tr("Add purchase")}
-              </button>
-              <button type="button" onClick={() => addActivity("sell")} className={investingToolbarBtn}>
-                {tr("Add sale")}
-              </button>
-              <button
+            <button
                 type="button"
                 onClick={() => void saveActivities()}
                 disabled={!isActivitiesDirty || isActivitiesSaving || isActivitiesLoading}
@@ -269,7 +270,6 @@ export default function InvestingActivitiesPage() {
               >
                 {isActivitiesSaving ? tr("Saving…") : tr("Save")}
               </button>
-            </>
           ) : null}
         </div>
       </div>
@@ -427,7 +427,7 @@ export default function InvestingActivitiesPage() {
             {visible.length === 0 ? (
               <tr>
                 <td colSpan={colCount} className="px-3 py-8 text-center text-sm text-[#8f8676]">
-                  {activities.length === 0 ? tr("No trades yet — switch to Edit and add a purchase.") : tr("No trades match these filters.")}
+                  {activities.length === 0 ? tr("No trades yet — press Add purchase to record one.") : tr("No trades match these filters.")}
                 </td>
               </tr>
             ) : null}
@@ -564,7 +564,7 @@ export default function InvestingActivitiesPage() {
       </div>
       {mode === "edit" ? (
         <p className="-mt-2 text-[11px] text-[#8f8676]">
-          {tr("Amber border = missing ticker or a date that isn’t DD.MM.YYYY. New rows appear at the top and stay visible whatever the filters.")}
+          {tr("Amber border = missing ticker or a date that isn’t DD.MM.YYYY. Rows still being filled in stay visible whatever the filters.")}
         </p>
       ) : null}
 

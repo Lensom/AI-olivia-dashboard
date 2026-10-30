@@ -133,6 +133,8 @@ type InvestingStore = {
   saveRefills: () => Promise<void>;
   refreshActivities: () => Promise<void>;
   saveActivities: () => Promise<void>;
+  /** Adds one trade at the top and saves the whole log right away (with any other pending edits). */
+  createActivity: (init: Omit<InvestingActivity, "id">) => Promise<void>;
   refreshCapitalEntries: () => Promise<void>;
   saveCapitalEntries: () => Promise<void>;
   refreshHoldings: () => Promise<void>;
@@ -442,6 +444,17 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
 
   async function saveActivities() {
     if (!token || !isActivitiesDirty) return;
+    await putActivities(activities);
+  }
+
+  async function createActivity(init: Omit<InvestingActivity, "id">) {
+    if (!token) return;
+    const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
+    await putActivities([{ id, ...init }, ...activities]);
+  }
+
+  async function putActivities(next: InvestingActivity[]) {
+    if (!token) return;
     setActivitiesSaving(true);
     try {
       const res = await apiFetch<{
@@ -451,7 +464,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       }>("/investing/activities", {
         token,
         method: "PUT",
-        body: JSON.stringify({ activities }),
+        body: JSON.stringify({ activities: next }),
       });
       setActivities(res.activities ?? []);
       setActivitiesSummary(res.yearly_summary ?? []);
@@ -1039,6 +1052,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       saveRefills,
       refreshActivities,
       saveActivities,
+      createActivity,
       refreshCapitalEntries,
       saveCapitalEntries,
       refreshHoldings,

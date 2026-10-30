@@ -426,6 +426,14 @@ export const INVESTING: Record<string, string | string[]> = {
     "Експорт угод брокера: Trade#, Time, Ticker, Direction, Price, Quantity, Amount, Fee, Profit",
   "Add purchase": "Додати купівлю",
   "Add sale": "Додати продаж",
+  "Save trade": "Зберегти угоду",
+  "Couldn’t save the trade.": "Не вдалося зберегти угоду.",
+  "Shares × price unless you type your own": "Кількість × ціна, якщо не ввести своє значення",
+  "Amounts are in the trade’s currency; USD and the FX rate are calculated on save.":
+    "Суми — у валюті угоди; USD і курс розраховуються під час збереження.",
+  "No trades yet — press Add purchase to record one.": "Угод ще немає — натисніть «Додати купівлю», щоб записати першу.",
+  "Amber border = missing ticker or a date that isn’t DD.MM.YYYY. Rows still being filled in stay visible whatever the filters.":
+    "Бурштинова рамка — немає тикера або дата не у форматі ДД.ММ.РРРР. Незаповнені рядки видно за будь-яких фільтрів.",
   "Unsaved changes — press Save to store them and recalculate USD amounts.":
     "Незбережені зміни — натисніть «Зберегти», щоб записати їх і перерахувати суми в USD.",
   "Added {n} trades ({buys} buys, {sells} sells) at the top — review and press Save.":
