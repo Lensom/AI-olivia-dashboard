@@ -38,6 +38,8 @@ export const MEDIA: Record<string, string | string[]> = {
   "Nothing here yet": "Тут ще нічого немає",
   "Nothing matches these filters.": "Нічого не відповідає цим фільтрам.",
   "I recommend it": "Рекомендую",
+  "Watched in the cinema": "Дивився в кінотеатрі",
+  "In the cinema": "У кінотеатрі",
   Status: "Статус",
   Score: "Оцінка",
   "Your score": "Ваша оцінка",

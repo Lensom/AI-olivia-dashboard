@@ -5,6 +5,7 @@ import { cinemaKindMeta } from "@/features/cinema/nav";
 import {
   applyDetails,
   isSeries,
+  showsInCinema,
   splitList,
   STATUSES,
   type CinemaDetails,
@@ -242,6 +243,12 @@ export function TitleDialog({ initial, isNew, tmdbEnabled, onSave, onDelete, onC
             <input type="checkbox" checked={t.recommended} onChange={(e) => set("recommended", e.target.checked)} className="h-4 w-4 accent-[#2a78d6]" />
             {tr("I recommend it")}
           </label>
+          {showsInCinema(t.kind) ? (
+            <label className="flex items-center gap-2 text-sm text-[#2f2922]">
+              <input type="checkbox" checked={t.in_cinema} onChange={(e) => set("in_cinema", e.target.checked)} className="h-4 w-4 accent-emerald-600" />
+              {tr("Watched in the cinema")}
+            </label>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-3">
             <label className={fieldLabel}>

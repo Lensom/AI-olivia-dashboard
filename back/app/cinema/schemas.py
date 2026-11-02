@@ -19,6 +19,7 @@ class CinemaTitle(BaseModel):
     score: float | None = None  # 0–10, your grade
     year: int | None = None  # release year
     view_year: int | None = None  # year you watched it
+    in_cinema: bool = False  # you saw it in a movie theatre
     studios: list[str] = Field(default_factory=list)
     actors: list[str] = Field(default_factory=list)
     directors: list[str] = Field(default_factory=list)  # director (films) or creators (series)

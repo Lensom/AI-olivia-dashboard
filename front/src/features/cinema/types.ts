@@ -15,6 +15,8 @@ export type CinemaTitle = {
   score: number | null;
   year: number | null;
   view_year: number | null;
+  /** You saw it in a movie theatre. */
+  in_cinema: boolean;
   studios: string[];
   actors: string[];
   directors: string[];
@@ -135,6 +137,7 @@ export function blankTitle(kind: CinemaKind, title = ""): CinemaTitle {
     score: null,
     year: null,
     view_year: new Date().getFullYear(),
+    in_cinema: false,
     studios: [],
     actors: [],
     directors: [],
@@ -224,6 +227,9 @@ export function tagColor(name: string): string {
 }
 
 export const isSeries = (kind: CinemaKind) => kind !== "film" && kind !== "cartoon";
+
+/** Kinds that get theatrical releases, so "watched in the cinema" makes sense (anime includes its films). */
+export const showsInCinema = (kind: CinemaKind) => kind === "film" || kind === "cartoon" || kind === "anime";
 
 /** Released seasons you haven't watched yet (0 when caught up or unknown). */
 export const newSeasons = (t: Pick<CinemaTitle, "seasons" | "watched_seasons">) =>

@@ -12,6 +12,7 @@ import {
   isSeries,
   newSeasons,
   sameTitle,
+  showsInCinema,
   STATUSES,
   type CinemaDetails,
   type CinemaStatus,
@@ -70,6 +71,7 @@ export default function CinemaKindPage() {
   const [viewYear, setViewYear] = useState("");
   const [onlyRecommended, setOnlyRecommended] = useState(false);
   const [onlyNewSeasons, setOnlyNewSeasons] = useState(false);
+  const [onlyInCinema, setOnlyInCinema] = useState(false);
   const [sort, setSort] = useState<SortKey>("score");
   const [view, setView] = useState<"table" | "posters">("table");
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -122,11 +124,13 @@ export default function CinemaKindPage() {
         (!viewYear || String(t.view_year) === viewYear) &&
         (!onlyRecommended || t.recommended) &&
         (!onlyNewSeasons || newSeasons(t) > 0) &&
+        (!onlyInCinema || t.in_cinema) &&
         (!q ||
           [t.title, t.original_title, ...t.actors, ...t.studios, ...t.directors, ...t.genres].some((s) => s.toLowerCase().includes(q))),
     );
     return sortTitles(filtered, sort);
-  }, [mine, query, status, genre, releaseYear, viewYear, onlyRecommended, onlyNewSeasons, sort]);
+  }, [mine, query, status, genre, releaseYear, viewYear, onlyRecommended, onlyNewSeasons, onlyInCinema, sort]);
+  const inCinemaCount = useMemo(() => mine.filter((t) => t.in_cinema).length, [mine]);
 
   const missingTmdb = mine.filter((t) => !t.tmdb_id).length;
   const scored = mine.filter((t) => t.score != null);
@@ -383,6 +387,11 @@ export default function CinemaKindPage() {
         <button type="button" onClick={() => setOnlyRecommended((v) => !v)} className={chip(onlyRecommended)} aria-pressed={onlyRecommended}>
           ✓ {tr("Recommended")}
         </button>
+        {showsInCinema(kind) && (inCinemaCount || onlyInCinema) ? (
+          <button type="button" onClick={() => setOnlyInCinema((v) => !v)} className={chip(onlyInCinema)} aria-pressed={onlyInCinema}>
+            🎬 {tr("In the cinema")} {inCinemaCount}
+          </button>
+        ) : null}
         {behindCount ? (
           <button type="button" onClick={() => setOnlyNewSeasons((v) => !v)} className={chip(onlyNewSeasons)} aria-pressed={onlyNewSeasons}>
             {tr("New seasons")} {behindCount}
@@ -516,7 +525,12 @@ export default function CinemaKindPage() {
                   {series ? <td className="px-3 py-2.5 text-sm"><SeasonsWatched watched={t.watched_seasons} total={t.seasons} /></td> : null}
                   <td className="px-3 py-2.5"><ScoreBadge score={t.score} /></td>
                   <td className="px-3 py-2.5"><ImdbRating rating={t.imdb_rating} votes={t.imdb_votes} imdbId={t.imdb_id} /></td>
-                  <td className="px-3 py-2.5 tabular-nums text-[#3b352d]">{t.year ?? "—"}</td>
+                  <td
+                    className={`px-3 py-2.5 tabular-nums ${t.in_cinema ? "font-semibold text-emerald-600" : "text-[#3b352d]"}`}
+                    title={t.in_cinema ? tr("Watched in the cinema") : undefined}
+                  >
+                    {t.year ?? "—"}
+                  </td>
                   <td className="px-3 py-2.5 tabular-nums text-[#3b352d]">{t.view_year ?? "—"}</td>
                   <td className="max-w-[180px] px-3 py-2.5"><Tags items={t.studios} max={2} /></td>
                   <td className="max-w-[260px] px-3 py-2.5"><Tags items={t.actors} max={4} /></td>
