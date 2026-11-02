@@ -27,6 +27,67 @@ export const TIERS: Record<FranchiseTier, { label: string; ring: string; badge: 
   locked: { label: "Not started", ring: "#cfc8bb", badge: "bg-[#ece6da] text-[#8f8676]", card: "border-dashed border-black/10 bg-white/60" },
 };
 
+/**
+ * Big franchises (TMDB collection ids) shown even before you've added any of their films,
+ * as "Not started" — so Star Wars is there to start collecting.
+ */
+export const FEATURED_COLLECTIONS = [
+  10, // Star Wars
+  1241, // Harry Potter
+  119, // The Lord of the Rings
+  121938, // The Hobbit
+  435259, // Fantastic Beasts
+  645, // James Bond
+  84, // Indiana Jones
+  264, // Back to the Future
+  2344, // The Matrix
+  328, // Jurassic Park
+  295, // Pirates of the Caribbean
+  9485, // The Fast and the Furious
+  87359, // Mission: Impossible
+  528, // The Terminator
+  8091, // Alien
+  230, // The Godfather
+  263, // The Dark Knight
+  86311, // The Avengers
+  131292, // Iron Man
+  131295, // Captain America
+  131296, // Thor
+  284433, // Guardians of the Galaxy
+  556, // Spider-Man (Raimi)
+  531241, // Spider-Man (MCU)
+  748, // X-Men
+  1575, // Rocky
+  1570, // Die Hard
+  404609, // John Wick
+  31562, // The Bourne
+  726871, // Dune
+  87096, // Avatar
+  131635, // The Hunger Games
+  33514, // Twilight
+  173710, // Planet of the Apes (reboot)
+  8945, // Mad Max
+  304, // Ocean's
+  86055, // Men in Black
+  9888, // Home Alone
+  115575, // Star Trek (reboot)
+  8650, // Transformers
+  86119, // The Hangover
+  2883, // Kill Bill
+  10194, // Toy Story
+  2150, // Shrek
+  8354, // Ice Age
+  86066, // Despicable Me
+  77816, // Kung Fu Panda
+  14740, // Madagascar
+  386382, // Frozen
+  468222, // The Incredibles
+  87118, // Cars
+  89137, // How to Train Your Dragon
+  137697, // Finding Nemo
+];
+const FEATURED = new Set(FEATURED_COLLECTIONS);
+
 /** "Complete N franchises" goals, shown one at a time as the next thing to unlock. */
 export const GOALS = [1, 3, 5, 10, 15, 25, 50, 100];
 
@@ -64,7 +125,10 @@ export function useFranchises(): { franchises: Franchise[]; isLoading: boolean }
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
 
   const idsKey = useMemo(
-    () => [...new Set(items.map((x) => x.collection_id).filter((x): x is number => x != null))].sort((a, b) => a - b).join(","),
+    () =>
+      [...new Set([...items.map((x) => x.collection_id).filter((x): x is number => x != null), ...FEATURED_COLLECTIONS])]
+        .sort((a, b) => a - b)
+        .join(","),
     [items],
   );
 
@@ -103,7 +167,7 @@ export function useFranchises(): { franchises: Franchise[]; isLoading: boolean }
           nextPart: parts.find((p) => !p.released) ?? null,
         };
       })
-      .filter((f) => f.released > 1 && f.parts.some((p) => p.mine));
+      .filter((f) => f.released > 1 && (FEATURED.has(f.id) || f.parts.some((p) => p.mine)));
   }, [collections, items, today]);
 
   return { franchises, isLoading: idsKey !== "" && collections === null };
@@ -230,7 +294,9 @@ export function Franchises() {
   const { plan, adding, error } = usePlanPart();
   if (!franchises.length) return null;
   const done = franchises.filter((f) => f.tier === "gold").length;
-  const closest = franchises.filter((f) => f.tier !== "gold").sort(byProgress).slice(0, 3);
+  // Featured franchises you haven't started aren't "close to finishing".
+  const closest = franchises.filter((f) => f.tier !== "gold" && f.tier !== "locked").sort(byProgress).slice(0, 3);
+  const started = franchises.filter((f) => f.tier !== "locked").length;
 
   return (
     <section className={card} aria-labelledby="franchises-title">
@@ -239,7 +305,7 @@ export function Franchises() {
           <h2 id="franchises-title" className="text-sm font-semibold text-[#1f1c17]">
             {t("Franchises")}
           </h2>
-          <p className="text-xs text-[#6f675b]">{t("{done} of {n} complete · closest to finishing:", { done, n: franchises.length })}</p>
+          <p className="text-xs text-[#6f675b]">{t("{done} of {n} complete · closest to finishing:", { done, n: started })}</p>
         </div>
         <Link href="/cinematography/franchises" className="text-xs text-[#6f675b] hover:text-[#1f1c17]">
           {t("All franchises →")}

@@ -695,5 +695,6 @@ def collections(
         name = re.sub(r"\s*(\|\s*)?(колекція|collection)\s*$", "", d.get("name") or "", flags=re.I).strip() or d.get("name") or ""
         return CinemaCollection(id=cid, name=name, poster=_img(d.get("poster_path"), "w185"), parts=parts)
 
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        return [c for c in pool.map(one, list(dict.fromkeys(payload))[:60]) if c is not None]
+    # Your library's collections plus the featured big franchises: well over 100 for a large library.
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        return [c for c in pool.map(one, list(dict.fromkeys(payload))[:300]) if c is not None]
