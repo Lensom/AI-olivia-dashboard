@@ -669,6 +669,7 @@ export const INVESTING: Record<string, string | string[]> = {
     "Зберегти сьогоднішній капітал як підсумок цього місяця",
   "Update {month}": "Оновити {month}",
   "Record {month}": "Записати {month}",
+  "Month to record": "Місяць для запису",
   "Pre-filled from your spreadsheet: the accounts and monthly totals Jan 2025 – Sep 2026. Stocks and Crypto are live from the app. Check the numbers (Edit), then press Save.":
     "Заповнено з вашої таблиці: рахунки й щомісячні підсумки січ. 2025 – вер. 2026. Акції й Крипта — наживо з застосунку. Перевірте цифри (редагування), потім натисніть «Зберегти».",
   "Net worth": "Капітал",

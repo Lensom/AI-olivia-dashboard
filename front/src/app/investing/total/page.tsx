@@ -224,7 +224,26 @@ export default function InvestingTotalPage() {
   const last = months.filter((m) => m.month < nowMonth).at(-1) ?? null;
   const lastDec = months.filter((m) => m.month <= `${Number(nowMonth.slice(0, 4)) - 1}-12`).at(-1) ?? null;
   const yearAgo = months.filter((m) => m.month <= `${Number(nowMonth.slice(0, 4)) - 1}-${nowMonth.slice(5)}`).at(-1) ?? null;
-  const thisMonthRecorded = months.find((m) => m.month === nowMonth);
+  // Months you can record: this one, plus any skipped since the last recorded month (up to 3 back),
+  // so a month missed or deleted after it ended can still be recorded.
+  const recordable = useMemo(() => {
+    const shift = (ym: string, by: number) => {
+      const [y, m] = ym.split("-").map(Number);
+      const d = new Date(Date.UTC(y!, m! - 1 + by, 1));
+      return d.toISOString().slice(0, 7);
+    };
+    const lastRecorded = months.filter((m) => m.month && m.month < nowMonth).at(-1)?.month ?? null;
+    const out: string[] = [];
+    for (let i = 3; i >= 1; i--) {
+      const ym = shift(nowMonth, -i);
+      if ((!lastRecorded || ym > lastRecorded) && !months.some((m) => m.month === ym)) out.push(ym);
+    }
+    return [...out, nowMonth];
+  }, [months, nowMonth]);
+  const [recordPick, setRecordPick] = useState<string | null>(null);
+  // Default: the earliest skipped month, else this one.
+  const recordTarget = recordPick && recordable.includes(recordPick) ? recordPick : recordable[0]!;
+  const targetRecorded = months.find((m) => m.month === recordTarget);
 
   const yearEnds = useMemo(() => {
     const byYear = new Map<string, Month>();
@@ -240,10 +259,10 @@ export default function InvestingTotalPage() {
     edit((d) => ({
       ...d,
       months: [
-        ...d.months.filter((m) => m.month !== nowMonth),
+        ...d.months.filter((m) => m.month !== recordTarget),
         {
-          id: thisMonthRecorded?.id ?? newId(),
-          month: nowMonth,
+          id: targetRecorded?.id ?? newId(),
+          month: recordTarget,
           total_usd: Math.round(sums.net * 100) / 100,
           breakdown: Object.fromEntries(Object.entries(sums.by).map(([k, v]) => [k, Math.round(v * 100) / 100])),
         },
@@ -291,13 +310,27 @@ export default function InvestingTotalPage() {
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {recordable.length > 1 ? (
+            <select
+              value={recordTarget}
+              onChange={(e) => setRecordPick(e.target.value)}
+              className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs text-[#3b352d]"
+              aria-label={tr("Month to record")}
+            >
+              {recordable.map((ym) => (
+                <option key={ym} value={ym}>
+                  {monthLabel(ym)}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <button
             type="button"
             onClick={recordMonth}
             className={investingToolbarBtn}
             title={tr("Store today’s net worth as this month’s total")}
           >
-            {thisMonthRecorded ? tr("Update {month}", { month: monthLabel(nowMonth) }) : tr("Record {month}", { month: monthLabel(nowMonth) })}
+            {targetRecorded ? tr("Update {month}", { month: monthLabel(recordTarget) }) : tr("Record {month}", { month: monthLabel(recordTarget) })}
           </button>
           <div className="flex rounded-full border border-black/10 bg-white p-1">
             {(["view", "edit"] as const).map((m) => (
