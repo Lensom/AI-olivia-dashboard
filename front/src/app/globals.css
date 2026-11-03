@@ -12,6 +12,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/*
+ * Always show the page's scrollbar track, so the width never changes and content doesn't jump sideways
+ * when a page grows long enough to scroll. (Phones overlay their scrollbar, so nothing changes there.)
+ * The gutter also stays when a bottom sheet locks scrolling (it sets overflow: hidden on <html>).
+ */
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

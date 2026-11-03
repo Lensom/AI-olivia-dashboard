@@ -111,10 +111,10 @@ export function GlobalSearch() {
 
   useEffect(() => {
     if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const prev = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = prev;
+      document.documentElement.style.overflow = prev;
     };
   }, [open]);
 

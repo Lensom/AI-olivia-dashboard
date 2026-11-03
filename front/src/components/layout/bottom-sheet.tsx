@@ -38,11 +38,13 @@ export function BottomSheet({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    // The page scrolls on <html> (overflow-y: scroll in globals.css), so lock it there.
+    const root = document.documentElement;
+    const prevOverflow = root.style.overflow;
+    root.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = prevOverflow;
+      root.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKey);
     };
   }, [close]);
