@@ -10,8 +10,9 @@ import { apiFetch } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useCinema } from "@/state/cinema-store";
+import { CollapseToggle, useCardOpen } from "@/features/investing/dashboard/widgets";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 
 export type FranchiseTier = "locked" | "bronze" | "silver" | "gold";
 
@@ -289,6 +290,7 @@ export function PartsStrip({ f, plan, adding, size = 64 }: { f: Franchise; plan:
 
 /** Overview card: how many franchises are complete and the ones closest to it, linking to the Franchises page. */
 export function Franchises() {
+  const [open, setOpen] = useCardOpen("cinema-franchises");
   const t = useT();
   const { franchises } = useFranchises();
   const { plan, adding, error } = usePlanPart();
@@ -303,14 +305,17 @@ export function Franchises() {
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h2 id="franchises-title" className="text-sm font-semibold text-[#1f1c17]">
-            {t("Franchises")}
+            <CollapseToggle open={open} onToggle={() => setOpen(!open)}>{t("Franchises")}</CollapseToggle>
           </h2>
-          <p className="text-xs text-[#6f675b]">{t("{done} of {n} complete · closest to finishing:", { done, n: started })}</p>
+          {open ? (<p className="text-xs text-[#6f675b]">{t("{done} of {n} complete · closest to finishing:", { done, n: started })}</p>) : null}
         </div>
+        {open ? (<>
         <Link href="/cinematography/franchises" className="text-xs text-[#6f675b] hover:text-[#1f1c17]">
           {t("All franchises →")}
         </Link>
-      </div>
+      </>) : null}
+</div>
+      {open ? (<>
       {error ? <p className="mb-2 text-xs text-rose-700">{error}</p> : null}
       {closest.length ? (
         <ul className="space-y-4">
@@ -332,6 +337,7 @@ export function Franchises() {
       ) : (
         <p className="text-xs font-medium text-amber-700">★ {t("Every franchise you've started is complete.")}</p>
       )}
-    </section>
+    </>) : null}
+</section>
   );
 }

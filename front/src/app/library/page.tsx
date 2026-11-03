@@ -12,8 +12,9 @@ import { Stars } from "@/features/library/ui";
 import { HBars, VBars } from "@/features/shared/bar-charts";
 import { useLocale, useT } from "@/lib/i18n";
 import { useLibrary } from "@/state/library-store";
+import { CollapsibleCard } from "@/features/investing/dashboard/widgets";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 
 function avgScore(list: LibraryItem[]): number | null {
   const s = list.filter((t) => t.score != null);
@@ -113,13 +114,14 @@ export default function LibraryOverview() {
         {stats.map((x) => (
           <div key={x.label} className={card}>
             <p className="text-[11px] font-medium uppercase tracking-wide text-[#8f8676]">{x.label}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-[#1f1c17]">{x.value}</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-[#1f1c17] sm:text-2xl">{x.value}</p>
             <p className="mt-0.5 text-xs text-[#6f675b]">{x.sub}</p>
           </div>
         ))}
       </section>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Phones: two per row, three covers each. */}
+      <section className="grid grid-cols-2 gap-3 [&>*]:min-w-0 xl:grid-cols-4">
         {LIBRARY_KINDS.map((k) => {
           const list = items.filter((t) => t.kind === k.kind);
           const avg = avgScore(list);
@@ -127,15 +129,15 @@ export default function LibraryOverview() {
           return (
             <Link key={k.kind} href={`/library/${k.slug}`} className={`${card} group block transition hover:-translate-y-0.5 hover:bg-white`}>
               <div className="flex items-baseline justify-between gap-2">
-                <h2 className="text-base font-semibold text-[#1f1c17]">{tr(k.label)}</h2>
-                <span className="text-xs text-[#8f8676] group-hover:text-[#1f1c17]">{tr("Open →")}</span>
+                <h2 className="truncate text-sm font-semibold text-[#1f1c17] sm:text-base">{tr(k.label)}</h2>
+                <span className="hidden text-xs text-[#8f8676] group-hover:text-[#1f1c17] sm:inline">{tr("Open →")}</span>
               </div>
               <p className="mt-0.5 text-xs text-[#6f675b]">{list.length
                   ? tr("{n} titles", { n: list.length }) + (avg != null ? ` · ${tr("avg {v}", { v: `★ ${avg.toFixed(1)}` })}` : "")
                   : tr(k.description)}</p>
-              <div className="mt-3 flex h-[72px] gap-1.5">
+              <div className="mt-3 flex h-[60px] gap-1 overflow-hidden sm:h-[72px] sm:gap-1.5 max-sm:[&>*:nth-child(n+4)]:hidden">
                 {covers.length ? (
-                  covers.map((t) => <Poster key={t.id} src={t.cover} title={t.title} className="h-[72px] w-12" />)
+                  covers.map((t) => <Poster key={t.id} src={t.cover} title={t.title} className="h-[60px] w-10 shrink-0 sm:h-[72px] sm:w-12" />)
                 ) : (
                   <span className="self-center text-xs text-[#a39a89]">{list.length ? tr("No covers yet") : tr("Nothing added yet")}</span>
                 )}
@@ -148,52 +150,54 @@ export default function LibraryOverview() {
       <LibraryAchievementsCard />
 
       {s.reading.length ? (
-        <section className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Reading now")}</h2>
-          <CoverRow list={s.reading} empty="" />
-        </section>
+        <CollapsibleCard id="library-reading" title="Reading now">
+          <div className="mt-3">
+            <CoverRow list={s.reading} empty="" />
+          </div>
+        </CollapsibleCard>
       ) : null}
 
       <LibraryAiPicks />
 
       <LibrarySeriesCard />
 
-      <section className={card}>
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Your recommendations")}</h2>
-          <span className="text-xs text-[#8f8676]">{tr("highest score first")}</span>
+      <CollapsibleCard id="library-recommended" title="Your recommendations" hint="highest score first">
+        <div className="mt-3">
+          <CoverRow list={s.recommended.slice(0, 20)} empty="Tick the ✓ box on a book to recommend it." />
         </div>
-        <CoverRow list={s.recommended.slice(0, 20)} empty="Tick the ✓ box on a book to recommend it." />
-      </section>
+      </CollapsibleCard>
 
-      <section className={card}>
-        <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Recently finished")}</h2>
-        <CoverRow list={s.recent} empty="Add a finish date to see your latest reads." />
-      </section>
+      <CollapsibleCard id="library-recent" title="Recently finished">
+        <div className="mt-3">
+          <CoverRow list={s.recent} empty="Add a finish date to see your latest reads." />
+        </div>
+      </CollapsibleCard>
 
       <section className="grid grid-cols-1 gap-3 lg:grid-cols-2 [&>*]:min-w-0">
-        <div className={card}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Finished per year")}</h2>
-          <p className="mb-5 text-xs text-[#6f675b]">{tr("Titles read, by the year you finished them")}</p>
-          <VBars rows={s.yearRows} unit="{n} titles" empty="Add finish dates to see this." />
-        </div>
-        <div className={card}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("How you score")}</h2>
-          <p className="mb-5 text-xs text-[#6f675b]">{tr("{n} graded titles by stars", { n: s.scored })}</p>
-          <VBars rows={s.scored ? s.scoreRows : []} unit="{n} titles" empty="Grade a title to see this." />
-        </div>
-        <div className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Top genres")}</h2>
-          {s.genreRows.length ? <HBars rows={s.genreRows} total={items.length} unit="{n} titles" /> : <p className="text-xs text-[#8f8676]">{tr("No genres yet.")}</p>}
-        </div>
-        <div className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Authors you read most")}</h2>
-          {s.authorRows.length ? (
-            <HBars rows={s.authorRows} total={s.read.length} unit="{n} books read" />
-          ) : (
-            <p className="text-xs text-[#8f8676]">{tr("Shows once you’ve read two or more books by the same author.")}</p>
-          )}
-        </div>
+        <CollapsibleCard id="library-per-year" title="Finished per year" hint="Titles read, by the year you finished them">
+          <div className="mt-5">
+            <VBars rows={s.yearRows} unit="{n} titles" empty="Add finish dates to see this." />
+          </div>
+        </CollapsibleCard>
+        <CollapsibleCard id="library-scores" title="How you score" hint={tr("{n} graded titles by stars", { n: s.scored })}>
+          <div className="mt-5">
+            <VBars rows={s.scored ? s.scoreRows : []} unit="{n} titles" empty="Grade a title to see this." />
+          </div>
+        </CollapsibleCard>
+        <CollapsibleCard id="library-genres" title="Top genres">
+          <div className="mt-3">
+            {s.genreRows.length ? <HBars rows={s.genreRows} total={items.length} unit="{n} titles" /> : <p className="text-xs text-[#8f8676]">{tr("No genres yet.")}</p>}
+          </div>
+        </CollapsibleCard>
+        <CollapsibleCard id="library-authors" title="Authors you read most">
+          <div className="mt-3">
+            {s.authorRows.length ? (
+              <HBars rows={s.authorRows} total={s.read.length} unit="{n} books read" />
+            ) : (
+              <p className="text-xs text-[#8f8676]">{tr("Shows once you’ve read two or more books by the same author.")}</p>
+            )}
+          </div>
+        </CollapsibleCard>
       </section>
     </div>
   );

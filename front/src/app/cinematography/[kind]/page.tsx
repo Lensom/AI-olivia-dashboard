@@ -476,7 +476,57 @@ export default function CinemaKindPage() {
       ) : !visible.length ? (
         <p className="text-sm text-[#8f8676]">{tr("Nothing matches these filters.")}</p>
       ) : view === "table" ? (
-        <div className={investingTableScrollWrap}>
+        <>
+        {/* Phones: a compact card per title instead of the 11-column table. Tap to open it. */}
+        <ul className="space-y-2 sm:hidden">
+          {visible.map((t) => (
+            <li key={t.id}>
+              <button
+                type="button"
+                onClick={() => setDialog({ mode: "edit", title: t, isNew: false })}
+                className="flex w-full gap-3 rounded-2xl border border-black/5 bg-white/90 p-2.5 text-left shadow-[0_4px_16px_rgba(18,16,13,0.04)] active:bg-[#faf8f2]"
+              >
+                <Poster src={t.poster} title={t.title} className="h-[84px] w-14 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="line-clamp-2 text-sm font-medium leading-snug text-[#1f1c17]">{t.title}</span>
+                      {t.original_title && t.original_title !== t.title ? (
+                        <span className="block truncate text-[11px] text-[#8f8676]">{t.original_title}</span>
+                      ) : null}
+                    </span>
+                    <span className="shrink-0">
+                      <ScoreBadge score={t.score} />
+                    </span>
+                  </span>
+                  <span className="mt-1 block truncate text-xs text-[#6f675b]">
+                    {t.year != null ? (
+                      <span className={t.in_cinema ? "font-semibold text-emerald-600" : ""} title={t.in_cinema ? tr("Watched in the cinema") : undefined}>
+                        {t.year}
+                        {t.in_cinema ? " 🎬" : ""}
+                      </span>
+                    ) : null}
+                    {[
+                      series && t.watched_seasons ? `S${t.watched_seasons}${t.seasons ? `/${t.seasons}` : ""}` : "",
+                      t.genres.slice(0, 2).join(", "),
+                    ]
+                      .filter(Boolean)
+                      .map((x) => ` · ${x}`)
+                      .join("")}
+                  </span>
+                  <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                    <StatusPill status={t.status} />
+                    {t.imdb_rating != null ? <ImdbRating rating={t.imdb_rating} votes={t.imdb_votes} imdbId="" /> : null}
+                    {t.recommended ? (
+                      <span className="rounded-md bg-[#2a78d6] px-1.5 py-0.5 text-[10px] font-semibold text-white">✓ {tr("Rec.")}</span>
+                    ) : null}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className={`${investingTableScrollWrap} hidden sm:block`}>
           <table className="w-full min-w-[1060px] text-left text-sm">
             <thead className="bg-[#faf8f2] text-[11px] uppercase tracking-wide text-[#8f8676]">
               <tr>
@@ -542,6 +592,7 @@ export default function CinemaKindPage() {
             </tbody>
           </table>
         </div>
+        </>
       ) : (
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
           {visible.map((t) => (

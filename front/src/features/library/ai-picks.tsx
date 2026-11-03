@@ -9,6 +9,7 @@ import { apiFetch, type ApiError } from "@/lib/api";
 import { useLang, useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useLibrary } from "@/state/library-store";
+import { CollapseToggle, useCardOpen } from "@/features/investing/dashboard/widgets";
 
 type Pick = { title: string; author: string; year: number; reason: string };
 type TasteResponse = {
@@ -20,11 +21,12 @@ type TasteResponse = {
   created_at: string;
 };
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 const label = "text-[11px] font-semibold uppercase tracking-wide text-[#8f8676]";
 
 /** Overview card: Gemini reads your taste from your scores and suggests books you haven't read. */
 export function LibraryAiPicks() {
+  const [open, setOpen] = useCardOpen("library-ai");
   const t = useT();
   const locale = useLocale();
   const [lang] = useLang();
@@ -85,11 +87,12 @@ export function LibraryAiPicks() {
           </span>
           <div>
             <h2 id="library-ai-title" className="text-sm font-semibold text-[#1f1c17]">
-              {t("AI picks for you")}
+              <CollapseToggle open={open} onToggle={() => setOpen(!open)}>{t("AI picks for you")}</CollapseToggle>
             </h2>
-            <p className="text-xs text-[#8f8676]">{t("Gemini reads your taste from your scores and suggests books you haven't read.")}</p>
+            {open ? (<p className="text-xs text-[#8f8676]">{t("Gemini reads your taste from your scores and suggests books you haven't read.")}</p>) : null}
           </div>
         </div>
+        {open ? (<>
         <button
           type="button"
           onClick={() => void analyze()}
@@ -103,7 +106,9 @@ export function LibraryAiPicks() {
           {a ? null : <SparkIcon />}
           {busy ? t("Analyzing…") : a ? t("New picks") : t("Find what to read")}
         </button>
-      </div>
+      </>) : null}
+</div>
+      {open ? (<>
 
       {error ? (
         <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800" role="alert">
@@ -190,6 +195,7 @@ export function LibraryAiPicks() {
           {t("Get a short read of your taste (favourite genres and authors, how you differ from other readers) and 10 books to read next, each one click to add to Want to read.")}
         </p>
       )}
-    </section>
+    </>) : null}
+</section>
   );
 }

@@ -7,6 +7,7 @@ import { investingPrimarySaveActive } from "@/features/investing/ui/investing-cl
 import { apiFetch } from "@/lib/api";
 import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
+import { CollapseScope } from "@/features/investing/dashboard/widgets";
 
 /** Mirrors back/app/games/router.py. */
 type Game = { id: string; title: string; year: number | null; added_at: string };
@@ -217,13 +218,27 @@ function GamesPage({ initialQuery }: { initialQuery: string }) {
             ) : (
               <div className="space-y-3">
                 {groups.map((g) => (
-                  <section key={g.key} className="overflow-hidden rounded-2xl border border-black/5 bg-white/90 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
+                  <CollapseScope key={g.key} id={`games-${g.key}`}>
+                  {(open, toggle) => (
+                  <section className="overflow-hidden rounded-2xl border border-black/5 bg-white/90 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
                     {g.label ? (
-                      <h2 className="flex items-baseline justify-between border-b border-black/5 bg-[#faf8f2] px-4 py-2 text-xs">
-                        <span className="font-semibold text-[#1f1c17]">{g.label}</span>
-                        <span className="text-[#8f8676]">{t("{n} games", { n: g.list.length })}</span>
+                      <h2 className={`bg-[#faf8f2] text-xs ${open ? "border-b border-black/5" : ""}`}>
+                        <button
+                          type="button"
+                          onClick={toggle}
+                          aria-expanded={open}
+                          title={open ? t("Collapse") : t("Expand")}
+                          className="flex w-full items-center gap-2 px-4 py-2 text-left"
+                        >
+                          <span className="font-semibold text-[#1f1c17]">{g.label}</span>
+                          <span className="ml-auto text-[#8f8676]">{t("{n} games", { n: g.list.length })}</span>
+                          <svg viewBox="0 0 16 16" className={`h-4 w-4 shrink-0 text-[#8f8676] transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden>
+                          <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        </button>
                       </h2>
                     ) : null}
+                    {open || !g.label ? (
                     <ul className="divide-y divide-black/5">
                       {g.list.map((game) => (
                         <GameRow
@@ -234,7 +249,10 @@ function GamesPage({ initialQuery }: { initialQuery: string }) {
                         />
                       ))}
                     </ul>
+                    ) : null}
                   </section>
+                  )}
+                  </CollapseScope>
                 ))}
               </div>
             )}

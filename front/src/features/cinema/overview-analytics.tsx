@@ -7,8 +7,9 @@ import { isSeries, newSeasons, watchedMinutes, type CinemaKind, type CinemaTitle
 import { Poster, ScoreBadge } from "@/features/cinema/ui";
 import { HBars, VBars } from "@/features/shared/bar-charts";
 import { useLocale, useT } from "@/lib/i18n";
+import { CollapseToggle, useCardOpen } from "@/features/investing/dashboard/widgets";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 const BAR = "#2a78d6";
 
 function countBy(list: CinemaTitle[], keys: (t: CinemaTitle) => (string | number)[]): Map<string, number> {
@@ -79,6 +80,7 @@ const Empty = ({ text }: { text: string }) => {
 
 /** Charts and insights over all titles or one kind (Films, Series…), chosen with the chips on top. */
 export function CinemaAnalytics({ items }: { items: CinemaTitle[] }) {
+  const [open, setOpen] = useCardOpen("cinema-analytics");
   const t = useT();
   const locale = useLocale();
   const [scope, setScope] = useState<CinemaKind | "all">("all");
@@ -168,9 +170,12 @@ export function CinemaAnalytics({ items }: { items: CinemaTitle[] }) {
     <section className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3 pt-2">
         <div>
-          <h2 className="text-lg font-semibold text-[#1f1c17]">{t("Deeper look")}</h2>
-          <p className="text-xs text-[#6f675b]">{t("Charts and insights for all titles or one type. {n} titles in view.", { n: a.total })}</p>
+          <h2 className="text-lg font-semibold text-[#1f1c17]">
+            <CollapseToggle open={open} onToggle={() => setOpen(!open)}>{t("Deeper look")}</CollapseToggle>
+          </h2>
+          {open ? (<p className="text-xs text-[#6f675b]">{t("Charts and insights for all titles or one type. {n} titles in view.", { n: a.total })}</p>) : null}
         </div>
+        {open ? (<>
         <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("Which titles")}>
           <button type="button" onClick={() => setScope("all")} className={chip(scope === "all")} aria-pressed={scope === "all"}>
             {t("All")}
@@ -181,7 +186,9 @@ export function CinemaAnalytics({ items }: { items: CinemaTitle[] }) {
             </button>
           ))}
         </div>
-      </div>
+      </>) : null}
+</div>
+      {open ? (<>
 
       {/* Quick facts */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -377,6 +384,7 @@ export function CinemaAnalytics({ items }: { items: CinemaTitle[] }) {
           )}
         </div>
       </div>
-    </section>
+    </>) : null}
+</section>
   );
 }

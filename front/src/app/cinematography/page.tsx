@@ -14,8 +14,9 @@ import { TonightPicker } from "@/features/cinema/tonight";
 import { investingToolbarBtn } from "@/features/investing/ui/investing-classes";
 import { useLocale, useT } from "@/lib/i18n";
 import { useCinema } from "@/state/cinema-store";
+import { CollapsibleCard } from "@/features/investing/dashboard/widgets";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 
 function avgScore(list: CinemaTitle[]): number | null {
   const s = list.filter((t) => t.score != null);
@@ -86,7 +87,7 @@ export default function CinematographyOverview() {
   return (
     <div className="space-y-5">
       {items.length ? (
-        <div className="-mb-2 flex justify-end">
+        <div className="flex justify-end">
           <button type="button" onClick={() => downloadCsv(items, `cinematography-${new Date().toISOString().slice(0, 10)}.csv`)} className={investingToolbarBtn}>
             {tr("Export all to CSV")}
           </button>
@@ -96,13 +97,14 @@ export default function CinematographyOverview() {
         {stats.map((x) => (
           <div key={x.label} className={card}>
             <p className="text-[11px] font-medium uppercase tracking-wide text-[#8f8676]">{x.label}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-[#1f1c17]">{x.value}</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-[#1f1c17] sm:text-2xl">{x.value}</p>
             <p className="mt-0.5 text-xs text-[#6f675b]">{x.sub}</p>
           </div>
         ))}
       </section>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Phones: two per row, three posters each. */}
+      <section className="grid grid-cols-2 gap-3 [&>*]:min-w-0 xl:grid-cols-3">
         {CINEMA_KINDS.map((k) => {
           const list = items.filter((t) => t.kind === k.kind);
           const avg = avgScore(list);
@@ -110,17 +112,17 @@ export default function CinematographyOverview() {
           return (
             <Link key={k.kind} href={`/cinematography/${k.slug}`} className={`${card} group block transition hover:-translate-y-0.5 hover:bg-white`}>
               <div className="flex items-baseline justify-between gap-2">
-                <h2 className="text-base font-semibold text-[#1f1c17]">{tr(k.label)}</h2>
-                <span className="text-xs text-[#8f8676] group-hover:text-[#1f1c17]">{tr("Open →")}</span>
+                <h2 className="truncate text-sm font-semibold text-[#1f1c17] sm:text-base">{tr(k.label)}</h2>
+                <span className="hidden text-xs text-[#8f8676] group-hover:text-[#1f1c17] sm:inline">{tr("Open →")}</span>
               </div>
               <p className="mt-0.5 text-xs text-[#6f675b]">
                 {list.length
                   ? tr("{n} titles", { n: list.length }) + (avg != null ? ` · ${tr("avg {v}", { v: avg.toFixed(1) })}` : "")
                   : tr(k.description)}
               </p>
-              <div className="mt-3 flex h-[72px] gap-1.5">
+              <div className="mt-3 flex h-[60px] gap-1 overflow-hidden sm:h-[72px] sm:gap-1.5 max-sm:[&>*:nth-child(n+4)]:hidden">
                 {posters.length ? (
-                  posters.map((t) => <Poster key={t.id} src={t.poster} title={t.title} className="h-[72px] w-12" />)
+                  posters.map((t) => <Poster key={t.id} src={t.poster} title={t.title} className="h-[60px] w-10 shrink-0 sm:h-[72px] sm:w-12" />)
                 ) : (
                   <span className="self-center text-xs text-[#a39a89]">{list.length ? tr("No posters yet") : tr("Nothing added yet")}</span>
                 )}
@@ -130,19 +132,18 @@ export default function CinematographyOverview() {
         })}
       </section>
 
-      <section className={card}>
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Your recommendations")}</h2>
-          <span className="text-xs text-[#8f8676]">{tr("highest score first")}</span>
+      <CollapsibleCard id="cinema-recommended" title="Your recommendations" hint="highest score first">
+        <div className="mt-3">
+          <PosterRow list={s.recommended.slice(0, 20)} empty="Tick the ✓ box on a title to recommend it." />
         </div>
-        <PosterRow list={s.recommended.slice(0, 20)} empty="Tick the ✓ box on a title to recommend it." />
-      </section>
+      </CollapsibleCard>
 
       {s.watching.length ? (
-        <section className={card}>
-          <h2 className="mb-3 text-sm font-semibold text-[#1f1c17]">{tr("Watching now")}</h2>
-          <PosterRow list={s.watching} empty="" />
-        </section>
+        <CollapsibleCard id="cinema-watching" title="Watching now">
+          <div className="mt-3">
+            <PosterRow list={s.watching} empty="" />
+          </div>
+        </CollapsibleCard>
       ) : null}
 
       <AchievementsCard />

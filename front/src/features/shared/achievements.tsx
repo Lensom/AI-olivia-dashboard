@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useLocale, useT } from "@/lib/i18n";
+import { CollapseScope, CollapseToggle, useCardOpen } from "@/features/investing/dashboard/widgets";
 
 /** Medals for counted milestones, shared by Cinematography and Library. */
 export type Medal = "none" | "bronze" | "silver" | "gold";
@@ -111,11 +112,12 @@ export function useNextText() {
       : t(NEXT_TEXT[nextMedal(a.medal)], { n: (a.next - a.n).toLocaleString(locale) });
 }
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 const MEDAL_ORDER: Medal[] = ["gold", "silver", "bronze"];
 
 /** Overview card: medal counts and the three achievements closest to their next medal. */
 export function AchievementsCard({ achievements, href }: { achievements: Achievement[]; href: string }) {
+  const [open, setOpen] = useCardOpen(`achievements:${href}`);
   const t = useT();
   const nextText = useNextText();
   const medals = (m: Medal) => achievements.filter((a) => a.medal === m).length;
@@ -126,21 +128,24 @@ export function AchievementsCard({ achievements, href }: { achievements: Achieve
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h2 id="achievements-title" className="text-sm font-semibold text-[#1f1c17]">
-            {t("Achievements")}
+            <CollapseToggle open={open} onToggle={() => setOpen(!open)}>{t("Achievements")}</CollapseToggle>
           </h2>
-          <p className="mt-1 flex flex-wrap gap-1.5">
+          {open ? (<p className="mt-1 flex flex-wrap gap-1.5">
             {MEDAL_ORDER.map((m) => (
               <span key={m} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${MEDALS[m].badge}`}>
                 {t(MEDALS[m].label)} · {medals(m)}
               </span>
             ))}
             <span className="text-[11px] text-[#8f8676]">{t("of {n} achievements", { n: achievements.length })}</span>
-          </p>
+          </p>) : null}
         </div>
+        {open ? (<>
         <Link href={href} className="text-xs text-[#6f675b] hover:text-[#1f1c17]">
           {t("All achievements →")}
         </Link>
-      </div>
+      </>) : null}
+</div>
+      {open ? (<>
       <ul className="grid gap-3 sm:grid-cols-3">
         {closest.map((a) => (
           <li key={a.id} className="flex items-center gap-3">
@@ -152,7 +157,8 @@ export function AchievementsCard({ achievements, href }: { achievements: Achieve
           </li>
         ))}
       </ul>
-    </section>
+    </>) : null}
+</section>
   );
 }
 
@@ -214,8 +220,18 @@ export function AchievementsBoard({ achievements, groups }: { achievements: Achi
       {groups.map((group) => {
         const list = achievements.filter((a) => a.group === group);
         return (
-          <section key={group}>
-            <h2 className="mb-2 text-sm font-semibold text-[#1f1c17]">{t(group)}</h2>
+          <CollapseScope key={group} id={`achievements-group:${group}`}>
+          {(open, toggle) => (
+          <section>
+            <h2 className={`${open ? "mb-2" : ""} text-sm font-semibold text-[#1f1c17]`}>
+              <CollapseToggle open={open} onToggle={toggle}>
+                {t(group)}
+                <span className="text-xs font-normal text-[#8f8676]">
+                  {list.filter((a) => a.medal !== "none").length} / {list.length}
+                </span>
+              </CollapseToggle>
+            </h2>
+            {open ? (
             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {list.map((a) => (
                 <li
@@ -259,7 +275,10 @@ export function AchievementsBoard({ achievements, groups }: { achievements: Achi
                 </li>
               ))}
             </ul>
+            ) : null}
           </section>
+          )}
+          </CollapseScope>
         );
       })}
     </div>

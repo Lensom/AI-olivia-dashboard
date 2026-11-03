@@ -89,7 +89,7 @@ function autoTops(items: TopItem[], dim: TopDimension, kind: string, n = 5): Aut
     .sort((a, b) => (dim.newestFirst ? b.key.localeCompare(a.key) : b.count - a.count || b.avg - a.avg));
 }
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 const smallBtn = "rounded-md px-1.5 text-xs text-[#6f675b] hover:bg-[#f3efe5] hover:text-[#1f1c17] disabled:opacity-30";
 
 const errorText = (e: unknown, fallback: string) => {

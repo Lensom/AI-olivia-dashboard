@@ -10,8 +10,9 @@ import { apiFetch } from "@/lib/api";
 import { useLang, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useLibrary } from "@/state/library-store";
+import { CollapseToggle, useCardOpen } from "@/features/investing/dashboard/widgets";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 
 export type SeriesBook = LibrarySeriesPart & { mine: LibraryItem | null };
 
@@ -197,6 +198,7 @@ export function BooksStrip({ s, plan, adding, size = 64 }: { s: BookSeries; plan
 
 /** Overview card: how many series are complete and the ones closest to it, linking to the Series page. */
 export function LibrarySeriesCard() {
+  const [open, setOpen] = useCardOpen("library-series");
   const t = useT();
   const { series } = useBookSeries();
   const { plan, adding, error } = usePlanBook();
@@ -209,14 +211,17 @@ export function LibrarySeriesCard() {
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h2 id="series-title" className="text-sm font-semibold text-[#1f1c17]">
-            {t("Book series")}
+            <CollapseToggle open={open} onToggle={() => setOpen(!open)}>{t("Book series")}</CollapseToggle>
           </h2>
-          <p className="text-xs text-[#6f675b]">{t("{done} of {n} complete · closest to finishing:", { done, n: series.length })}</p>
+          {open ? (<p className="text-xs text-[#6f675b]">{t("{done} of {n} complete · closest to finishing:", { done, n: series.length })}</p>) : null}
         </div>
+        {open ? (<>
         <Link href="/library/series" className="text-xs text-[#6f675b] hover:text-[#1f1c17]">
           {t("All series →")}
         </Link>
-      </div>
+      </>) : null}
+</div>
+      {open ? (<>
       {error ? <p className="mb-2 text-xs text-rose-700">{error}</p> : null}
       {closest.length ? (
         <ul className="space-y-4">
@@ -238,6 +243,7 @@ export function LibrarySeriesCard() {
       ) : (
         <p className="text-xs font-medium text-amber-700">★ {t("Every series you've started is complete.")}</p>
       )}
-    </section>
+    </>) : null}
+</section>
   );
 }

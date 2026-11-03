@@ -9,8 +9,9 @@ import { ImdbRating, Poster, Tags } from "@/features/cinema/ui";
 import { investingPrimarySaveActive, investingToolbarBtn } from "@/features/investing/ui/investing-classes";
 import { useT } from "@/lib/i18n";
 import { useCinema } from "@/state/cinema-store";
+import { CollapseToggle, useCardOpen } from "@/features/investing/dashboard/widgets";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 
 /** Max minutes for a film (series are judged by one episode). */
 const TIMES = [
@@ -40,6 +41,7 @@ function pickOne(pool: CinemaTitle[], skip: string | null): CinemaTitle | null {
 
 /** "What to watch tonight": a weighted random pick from your watchlist and the series you're in the middle of. */
 export function TonightPicker() {
+  const [open, setOpen] = useCardOpen("cinema-tonight");
   const t = useT();
   const { items, update } = useCinema();
   const [kind, setKind] = useState<CinemaKind | "all">("all");
@@ -89,10 +91,11 @@ export function TonightPicker() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="tonight-title" className="text-sm font-semibold text-[#1f1c17]">
-            {t("What to watch tonight")}
+            <CollapseToggle open={open} onToggle={() => setOpen(!open)}>{t("What to watch tonight")}</CollapseToggle>
           </h2>
-          <p className="text-xs text-[#6f675b]">{t("A pick from your watchlist and the series you're watching; higher-rated titles come up more often.")}</p>
+          {open ? (<p className="text-xs text-[#6f675b]">{t("A pick from your watchlist and the series you're watching; higher-rated titles come up more often.")}</p>) : null}
         </div>
+        {open ? (<>
         <div className="flex flex-wrap items-center gap-2">
           <select value={kind} onChange={(e) => setKind(e.target.value as CinemaKind | "all")} className={select} aria-label={t("Type")}>
             <option value="all">{t("Any type")}</option>
@@ -123,7 +126,9 @@ export function TonightPicker() {
             {picked ? t("Another one") : t("Pick for me")}
           </button>
         </div>
-      </div>
+      </>) : null}
+</div>
+      {open ? (<>
 
       {!pool.length ? (
         <p className="mt-3 text-xs text-[#8f8676]">{t("Nothing on your list fits these filters.")}</p>
@@ -164,6 +169,7 @@ export function TonightPicker() {
       ) : (
         <p className="mt-3 text-xs text-[#8f8676]">{t("{n} titles to choose from.", { n: pool.length })}</p>
       )}
-    </section>
+    </>) : null}
+</section>
   );
 }

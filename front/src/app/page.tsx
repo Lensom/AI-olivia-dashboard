@@ -73,7 +73,7 @@ function StatRow({ stats }: { stats: Stat[] | null }) {
       {stats.map((s) => (
         <div key={s.label} className="min-w-0">
           <dt className="sr-only">{s.label}</dt>
-          <dd className={`truncate text-xl font-semibold tabular-nums ${s.tone === "up" ? "text-emerald-700" : s.tone === "down" ? "text-rose-700" : "text-[#1f1c17]"}`}>
+          <dd className={`truncate text-base font-semibold tabular-nums sm:text-xl ${s.tone === "up" ? "text-emerald-700" : s.tone === "down" ? "text-rose-700" : "text-[#1f1c17]"}`}>
             {s.value}
           </dd>
           <dd className="truncate text-[11px] text-[#8f8676]" aria-hidden>
@@ -91,7 +91,7 @@ function SectionCard({ cat, stats, links }: { cat: Category; stats: Stat[] | nul
   const { Icon, tile } = categoryLook(cat.slug);
   const href = categoryHref(cat.slug);
   return (
-    <article className={`${card} group flex flex-col p-5 transition hover:border-black/10`}>
+    <article className={`${card} group flex flex-col p-4 transition hover:border-black/10 sm:p-5`}>
       <Link href={href} className="flex items-center gap-3">
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tile}`}>
           <Icon className="h-5 w-5" />
@@ -99,11 +99,11 @@ function SectionCard({ cat, stats, links }: { cat: Category; stats: Stat[] | nul
         <h2 className="flex-1 text-base font-semibold text-[#1f1c17]">{t(cat.name)}</h2>
         <ChevronIcon className="h-4 w-4 text-[#b5ad9f] transition group-hover:translate-x-0.5 group-hover:text-[#1f1c17]" />
       </Link>
-      <div className="mt-4 flex-1">
+      <div className="mt-3 flex-1 sm:mt-4">
         {stats === undefined ? null : <StatRow stats={stats} />}
       </div>
       {links.length ? (
-        <div className="mt-4 flex flex-wrap gap-1.5 border-t border-black/5 pt-3">
+        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-black/5 pt-3 sm:mt-4">
           {links.map((l) => (
             <Link
               key={l.key}
@@ -148,7 +148,7 @@ function AddCategory() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex min-h-[148px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-black/15 text-sm font-medium text-[#8f8676] transition hover:border-black/30 hover:bg-white/50 hover:text-[#1f1c17]"
+        className="flex min-h-[64px] flex-col items-center sm:min-h-[148px] justify-center gap-2 rounded-2xl border border-dashed border-black/15 text-sm font-medium text-[#8f8676] transition hover:border-black/30 hover:bg-white/50 hover:text-[#1f1c17]"
       >
         <PlusIcon className="h-5 w-5" />
         {t("Add category")}
@@ -156,7 +156,7 @@ function AddCategory() {
     );
   }
   return (
-    <form onSubmit={onAdd} className={`${card} flex flex-col justify-center gap-2 p-5`}>
+    <form onSubmit={onAdd} className={`${card} flex flex-col justify-center gap-2 p-4 sm:p-5`}>
       <label>
         <span className="text-xs font-medium text-[#6f675b]">{t("Category name")}</span>
         <input
@@ -259,7 +259,7 @@ export default function Home() {
           <p className="mt-1.5 text-sm text-[#655d51]">{t("Here’s where everything stands.")}</p>
         </div>
 
-        <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+        <section className="grid gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {isLoading && !visible.length
             ? [0, 1, 2, 3].map((i) => <div key={i} className={`${card} h-[180px] animate-pulse`} />)
             : visible.map((cat) => (

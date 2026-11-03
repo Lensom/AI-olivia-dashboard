@@ -6,6 +6,7 @@ import { investingPrimarySaveActive, investingToolbarBtnSm } from "@/features/in
 import { apiFetch } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
+import { CollapseScope } from "@/features/investing/dashboard/widgets";
 
 /** Mirrors back/app/tasks/router.py. */
 type TaskStatus = "todo" | "hold" | "in_progress" | "completed";
@@ -245,8 +246,9 @@ export default function TasksPage() {
               const list = tasks.filter((x) => x.status === c.status);
               const isOver = over?.status === c.status && dragId != null;
               return (
+                <CollapseScope key={c.status} id={`tasks-col-${c.status}`}>
+                {(open, toggle) => (
                 <section
-                  key={c.status}
                   aria-label={t(c.label)}
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -259,13 +261,25 @@ export default function TasksPage() {
                     e.preventDefault();
                     drop(c.status, null);
                   }}
-                  className={`flex min-h-[260px] flex-col rounded-2xl p-3 transition ${c.tint} ${isOver ? "ring-2 ring-[#2a78d6]/40" : ""}`}
+                  className={`flex flex-col rounded-2xl p-3 transition ${open ? "min-h-[120px] sm:min-h-[260px]" : "self-start"} ${c.tint} ${isOver ? "ring-2 ring-[#2a78d6]/40" : ""}`}
                 >
-                  <h2 className="mb-3 flex items-center gap-2 px-1 text-sm font-semibold text-[#1f1c17]">
-                    <span aria-hidden className={`h-2 w-2 rounded-full ${c.dot}`} />
-                    {t(c.label)}
-                    <span className="ml-auto rounded-full bg-white/80 px-2 text-xs font-medium tabular-nums text-[#6f675b]">{list.length}</span>
+                  <h2 className={`${open ? "mb-3" : ""} text-sm font-semibold text-[#1f1c17]`}>
+                    <button
+                      type="button"
+                      onClick={toggle}
+                      aria-expanded={open}
+                      title={open ? t("Collapse") : t("Expand")}
+                      className="flex w-full items-center gap-2 rounded-lg px-1 text-left"
+                    >
+                      <span aria-hidden className={`h-2 w-2 rounded-full ${c.dot}`} />
+                      {t(c.label)}
+                      <span className="ml-auto rounded-full bg-white/80 px-2 text-xs font-medium tabular-nums text-[#6f675b]">{list.length}</span>
+                      <svg viewBox="0 0 16 16" className={`h-4 w-4 shrink-0 text-[#8f8676] transition-transform ${open ? "" : "-rotate-90"}`} aria-hidden>
+                          <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </button>
                   </h2>
+                  {open ? (
                   <ul className="flex flex-1 flex-col gap-2">
                     {list.map((task) => (
                       <TaskCard
@@ -296,7 +310,10 @@ export default function TasksPage() {
                       </li>
                     ) : null}
                   </ul>
+                  ) : null}
                 </section>
+                )}
+                </CollapseScope>
               );
             })}
           </div>

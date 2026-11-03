@@ -7,7 +7,7 @@ import { useT } from "@/lib/i18n";
 import { useLibrary } from "@/state/library-store";
 import { scrollRow } from "@/features/investing/ui/investing-classes";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 
 type Filter = "all" | "gold" | "progress";
 type Sort = "progress" | "size" | "score" | "name";
@@ -76,10 +76,10 @@ export default function LibrarySeriesPage() {
 
   return (
     <div className="space-y-5">
-      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+      <section className="grid grid-cols-2 gap-3 [&>*]:min-w-0 lg:grid-cols-3">
         <div className={`${card} border-amber-200 bg-gradient-to-br from-amber-50 to-white`}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-amber-800">{t("Complete")}</p>
-          <p className="mt-1 text-3xl font-semibold tabular-nums text-[#1f1c17]">
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-[#1f1c17] sm:text-3xl">
             {stats.done} <span className="text-base font-normal text-[#8f8676]">/ {series.length}</span>
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -90,7 +90,7 @@ export default function LibrarySeriesPage() {
             ))}
           </div>
         </div>
-        <div className={card}>
+        <div className={`${card} order-last col-span-2 lg:order-none lg:col-span-1`}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-[#8f8676]">{t("Next goal")}</p>
           {stats.goal ? (
             <>
@@ -113,7 +113,7 @@ export default function LibrarySeriesPage() {
         </div>
         <div className={card}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-[#8f8676]">{t("Series books read")}</p>
-          <p className="mt-1 text-3xl font-semibold tabular-nums text-[#1f1c17]">
+          <p className="mt-1 text-2xl font-semibold tabular-nums text-[#1f1c17] sm:text-3xl">
             {stats.read} <span className="text-base font-normal text-[#8f8676]">/ {stats.books}</span>
           </p>
           <span className="mt-2 block h-2 rounded-full bg-[#f3efe5]">

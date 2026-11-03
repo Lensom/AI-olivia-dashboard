@@ -430,7 +430,48 @@ export default function LibraryKindPage() {
       ) : !visible.length ? (
         <p className="text-sm text-[#8f8676]">{tr("Nothing matches these filters.")}</p>
       ) : view === "table" ? (
-        <div className={investingTableScrollWrap}>
+        <>
+        {/* Phones: a compact card per title instead of the table. Tap to open it. */}
+        <ul className="space-y-2 sm:hidden">
+          {visible.map((t) => (
+            <li key={t.id}>
+              <button
+                type="button"
+                onClick={() => setDialog({ mode: "edit", item: t, isNew: false })}
+                className="flex w-full gap-3 rounded-2xl border border-black/5 bg-white/90 p-2.5 text-left shadow-[0_4px_16px_rgba(18,16,13,0.04)] active:bg-[#faf8f2]"
+              >
+                <Poster src={t.cover} title={t.title} className="h-[84px] w-14 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="line-clamp-2 text-sm font-medium leading-snug text-[#1f1c17]">{t.title}</span>
+                  {t.authors.length ? <span className="block truncate text-[11px] text-[#8f8676]">{t.authors.join(", ")}</span> : null}
+                  <span className="mt-1 block truncate text-xs text-[#6f675b]">
+                    {[
+                      formatDate(t.finish_date, locale),
+                      volumes
+                        ? t.volumes_read != null
+                          ? `${t.volumes_read}${t.volumes_total ? ` / ${t.volumes_total}` : ""} ${tr("Volumes").toLowerCase()}`
+                          : ""
+                        : t.pages
+                          ? `${t.pages} ${tr("Pages").toLowerCase()}`
+                          : "",
+                      t.genres.slice(0, 2).join(", "),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                  <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                    <ReadStatusPill status={t.status} />
+                    <Stars score={t.score} />
+                    {t.recommended ? (
+                      <span className="rounded-md bg-[#2a78d6] px-1.5 py-0.5 text-[10px] font-semibold text-white">✓ {tr("Rec.")}</span>
+                    ) : null}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className={`${investingTableScrollWrap} hidden sm:block`}>
           <table className="w-full min-w-[1000px] text-left text-sm">
             <thead className="bg-[#faf8f2] text-[11px] uppercase tracking-wide text-[#8f8676]">
               <tr>
@@ -496,6 +537,7 @@ export default function LibraryKindPage() {
             </tbody>
           </table>
         </div>
+        </>
       ) : (
         <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
           {visible.map((t) => (

@@ -85,6 +85,41 @@ function Chevron({ open }: { open: boolean }) {
 }
 
 /**
+ * Remembered open/closed state for blocks rendered in a loop (board columns, year groups), where a
+ * hook can't be called directly: `<CollapseScope id="…">{(open, toggle) => …}</CollapseScope>`.
+ */
+export function CollapseScope({ id, children }: { id: string; children: (open: boolean, toggle: () => void) => ReactNode }) {
+  const [open, setOpen] = useCardOpen(id);
+  return <>{children(open, () => setOpen(!open))}</>;
+}
+
+/**
+ * The title of a card with its own header layout, as a toggle: put it inside the card's <h2>
+ * (`<h2><CollapseToggle …>Title</CollapseToggle></h2>`) and hide the body with `open`.
+ */
+export function CollapseToggle({ open, onToggle, children }: { open: boolean; onToggle: () => void; children: ReactNode }) {
+  const t = useT();
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      title={open ? t("Collapse") : t("Expand")}
+      className="group -m-1 inline-flex items-center gap-1.5 rounded-lg p-1 text-left"
+    >
+      {children}
+      <svg
+        viewBox="0 0 16 16"
+        className={`h-4 w-4 shrink-0 text-[#8f8676] transition-transform group-hover:text-[#1f1c17] ${open ? "" : "-rotate-90"}`}
+        aria-hidden
+      >
+        <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+}
+
+/**
  * A dashboard card whose title toggles it. Collapsed, only the title row shows (the hint and the
  * `right` controls hide too); the state is remembered per card `id`.
  */

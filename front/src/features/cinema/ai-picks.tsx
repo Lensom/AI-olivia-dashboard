@@ -11,6 +11,7 @@ import { apiFetch, type ApiError } from "@/lib/api";
 import { useLang, useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useCinema } from "@/state/cinema-store";
+import { CollapseToggle, useCardOpen } from "@/features/investing/dashboard/widgets";
 
 type Pick = { title: string; year: number; kind: CinemaKind; reason: string };
 type Match = {
@@ -33,11 +34,12 @@ type TasteResponse = {
   created_at: string;
 };
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 const label = "text-[11px] font-semibold uppercase tracking-wide text-[#8f8676]";
 
 /** Overview card: Gemini reads your taste from your scores and suggests titles you haven't seen. */
 export function CinemaAiPicks() {
+  const [open, setOpen] = useCardOpen("cinema-ai");
   const t = useT();
   const locale = useLocale();
   const [lang] = useLang();
@@ -98,11 +100,12 @@ export function CinemaAiPicks() {
           </span>
           <div>
             <h2 id="cinema-ai-title" className="text-sm font-semibold text-[#1f1c17]">
-              {t("AI picks for you")}
+              <CollapseToggle open={open} onToggle={() => setOpen(!open)}>{t("AI picks for you")}</CollapseToggle>
             </h2>
-            <p className="text-xs text-[#8f8676]">{t("Gemini reads your taste from your scores and suggests titles you haven't seen.")}</p>
+            {open ? (<p className="text-xs text-[#8f8676]">{t("Gemini reads your taste from your scores and suggests titles you haven't seen.")}</p>) : null}
           </div>
         </div>
+        {open ? (<>
         <button
           type="button"
           onClick={() => void analyze()}
@@ -116,7 +119,9 @@ export function CinemaAiPicks() {
           {a ? null : <SparkIcon />}
           {busy ? t("Analyzing…") : a ? t("New picks") : t("Find what to watch")}
         </button>
-      </div>
+      </>) : null}
+</div>
+      {open ? (<>
 
       {error ? (
         <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800" role="alert">
@@ -203,6 +208,7 @@ export function CinemaAiPicks() {
           {t("Get a short read of your taste (favourite genres and directors, how you differ from IMDb) and 10 titles to watch next, each one-click to add to your watchlist.")}
         </p>
       )}
-    </section>
+    </>) : null}
+</section>
   );
 }
