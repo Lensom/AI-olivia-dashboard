@@ -5,9 +5,11 @@ import {
   investingPrimarySaveActive,
   investingPrimarySaveDisabled,
   investingToolbarBtn,
+  scrollRow,
 } from "@/features/investing/ui/investing-classes";
 import { formatCryptoUsd, parseCryptoAmount } from "@/features/investing/crypto-format";
 import { buildCoinPositions, rebalancingSplit, ruleBtcShare } from "@/features/investing/crypto-stats";
+import { CollapsibleCard } from "@/features/investing/dashboard/widgets";
 import { useLocale, useT } from "@/lib/i18n";
 import { useCrypto } from "@/state/crypto-store";
 import { cryptoInputClasses } from "../_inputs";
@@ -58,7 +60,7 @@ export default function CryptoRulesPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={scrollRow}>
         <span className={investingMetaBadge}>
           {cryptoMeta.updatedAt ? tr("Synced {when}", { when: new Date(cryptoMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
         </span>
@@ -86,9 +88,11 @@ export default function CryptoRulesPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <article className="rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("New deposit split")}</h2>
-          <p className="mt-1 text-xs text-[#655d51]">{tr("Your target BTC / ETH mix. Percentages needn’t add to 100% — they’re used as a ratio.")}</p>
+        <CollapsibleCard
+          id="crypto-rule"
+          title="New deposit split"
+          hint="Your target BTC / ETH mix. Percentages needn’t add to 100% — they’re used as a ratio."
+        >
           {Math.abs(sumPct - 100) > 0.01 && sumPct > 0 ? (
             <p className="mt-2 text-xs text-amber-700">
               {tr("Total {v}% — preview uses ratio {btc}:{eth}.", { v: sumPct.toFixed(0), btc: btcPct, eth: ethPct })}
@@ -136,11 +140,9 @@ export default function CryptoRulesPage() {
               placeholder={tr("e.g. $37.50 goes to ETH")}
             />
           </label>
-        </article>
+        </CollapsibleCard>
 
-        <article className="rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Split preview")}</h2>
-          <p className="mt-1 text-xs text-[#655d51]">{tr("Hypothetical deposit size in USD.")}</p>
+        <CollapsibleCard id="crypto-preview" title="Split preview" hint="Hypothetical deposit size in USD.">
           <input
             value={previewUsd}
             onChange={(e) => setPreviewUsd(e.target.value)}
@@ -189,7 +191,7 @@ export default function CryptoRulesPage() {
               ) : null}
             </div>
           )}
-        </article>
+        </CollapsibleCard>
       </div>
     </div>
   );

@@ -1,14 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import { TabNav } from "@/components/layout/tab-nav";
 import { usePathname } from "next/navigation";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { CINEMA_EXTRA_PAGES, CINEMA_KINDS } from "@/features/cinema/nav";
 import {
   investingPageStack,
-  investingTabNavWrap,
-  investingTabPillActive,
-  investingTabPillIdle,
 } from "@/features/investing/ui/investing-classes";
 import { useT } from "@/lib/i18n";
 import { CinemaProvider } from "@/state/cinema-store";
@@ -31,17 +28,10 @@ export default function CinematographyLayout({ children }: { children: React.Rea
               {t(TABS.find((x) => x.href !== "/cinematography" && pathname.startsWith(x.href))?.label ?? "Everything you've watched")}
             </h1>
           </div>
-          <nav className={investingTabNavWrap} aria-label={t("Cinematography")}>
-            {TABS.map((tab) => (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className={pathname === tab.href ? investingTabPillActive : investingTabPillIdle}
-              >
-                {t(tab.label)}
-              </Link>
-            ))}
-          </nav>
+          <TabNav
+            title={t("Cinematography")}
+            tabs={TABS.map((tab) => ({ href: tab.href, label: t(tab.label), active: pathname === tab.href }))}
+          />
           {children}
         </div>
       </CinemaProvider>

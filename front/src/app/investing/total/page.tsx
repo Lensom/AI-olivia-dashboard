@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MonthlyTotalChart, type MonthlyTotalPoint } from "@/features/investing/charts/monthly-total-chart";
+import { CollapsibleCard } from "@/features/investing/dashboard/widgets";
 import { parseCryptoAmount } from "@/features/investing/crypto-format";
 import { formatUsd, parseUsd } from "@/features/investing/format";
 import { accountUsd, totalSums, type TotalAccount, type TotalCategory, type TotalSource } from "@/features/investing/total-stats";
@@ -13,6 +14,7 @@ import {
   investingPrimarySaveDisabled,
   investingTableScrollWrap,
   investingToolbarBtn,
+  scrollRow,
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
 import { useLocale, useT } from "@/lib/i18n";
@@ -92,7 +94,7 @@ function spreadsheetStart(): TotalData {
   };
 }
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 const input =
   "w-full rounded-lg border border-black/10 bg-white/90 px-2 py-1 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20 focus:bg-white";
 
@@ -302,14 +304,14 @@ export default function InvestingTotalPage() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={scrollRow}>
           <span className={investingMetaBadge}>{updatedAt ? tr("Saved {when}", { when: new Date(updatedAt).toLocaleString(locale) }) : tr("Not saved yet")}</span>
           <span className={investingMetaBadge}>
             {tr("Rates: NBU {date}", { date: rates?.date ?? "…" })}
             {Object.keys(data.rate_overrides).length ? ` · ${tr("with your overrides")}` : ""}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={scrollRow}>
           {recordable.length > 1 ? (
             <select
               value={recordTarget}
@@ -370,8 +372,9 @@ export default function InvestingTotalPage() {
       {saveError ? <p className="text-sm text-rose-700">{tr(saveError)}</p> : null}
 
       {/* Headline */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <article className={card}>
+      {/* Phones: net worth and the 12-month change full width, the month and year changes side by side. */}
+      <section className="grid grid-cols-2 gap-3 [&>*]:min-w-0 sm:gap-4 xl:grid-cols-4">
+        <article className={`${card} col-span-2 sm:col-span-1`}>
           <p className="text-xs text-[#7f7668]">{tr("Net worth")}</p>
           <p className="mt-1.5 text-3xl font-semibold tabular-nums text-[#1f1c17]">{formatUsd(sums.net)}</p>
           <p className="mt-1 text-xs text-[#6f675b]">
@@ -386,7 +389,7 @@ export default function InvestingTotalPage() {
         ].map(({ label, base, hint }) => {
           const diff = base ? sums.net - base.total_usd : null;
           return (
-            <article key={label} className={card}>
+            <article key={label} className={`${card} ${label === tr("Last 12 months") ? "col-span-2 sm:col-span-1" : ""}`}>
               <p className="text-xs text-[#7f7668]">{label}</p>
               <p className={`mt-1.5 text-xl font-semibold tabular-nums ${tone(diff)}`}>{diff == null ? "—" : signedUsd(diff)}</p>
               <p className="mt-1 text-xs text-[#6f675b]">
@@ -402,10 +405,11 @@ export default function InvestingTotalPage() {
 
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] [&>*]:min-w-0">
         {/* Accounts */}
-        <article className={card}>
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Accounts")}</h2>
-            {mode === "edit" ? (
+        <CollapsibleCard
+          id="total-accounts"
+          title="Accounts"
+          right={
+            mode === "edit" ? (
               <button
                 type="button"
                 onClick={() =>
@@ -418,10 +422,11 @@ export default function InvestingTotalPage() {
               >
                 {tr("Add account")}
               </button>
-            ) : null}
-          </div>
+            ) : null
+          }
+        >
           <div className={`${investingTableScrollWrap} mt-3`}>
-            <table className={`w-full ${mode === "edit" ? "min-w-[720px]" : "min-w-[520px]"} border-collapse text-left text-sm`}>
+            <table className={`stack-table w-full ${mode === "edit" ? "min-w-[720px]" : "min-w-[520px]"} border-collapse text-left text-sm`}>
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
                   <th className="px-3 py-2 font-medium">{tr("Account")}</th>
@@ -552,12 +557,11 @@ export default function InvestingTotalPage() {
           <p className="mt-2 text-[11px] text-[#8f8676]">
             {tr("Net worth = stocks + savings + crypto + owed to me − I owe. Shares are of assets (debts excluded).")}
           </p>
-        </article>
+        </CollapsibleCard>
 
         <div className="space-y-4">
           {/* Allocation vs goal */}
-          <article className={card}>
-            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Mix vs goal")}</h2>
+          <CollapsibleCard id="total-mix" title="Mix vs goal">
             <div className="mt-3 space-y-3">
               {GROUPS.map((g) => {
                 const pct = sums.assets > 0 ? (sums.by[g.key]! / sums.assets) * 100 : 0;
@@ -607,14 +611,19 @@ export default function InvestingTotalPage() {
             ) : (
               <p className="mt-3 text-xs text-emerald-800">✓ {tr("Within 1 pp of every goal.")}</p>
             )}
-          </article>
+          </CollapsibleCard>
 
           {/* Rates */}
-          <article className={card}>
-            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Exchange rates")}</h2>
-            <p className="mt-0.5 text-xs text-[#8f8676]">
-              {rates?.date ? tr("Official NBU rates for {date}.", { date: rates.date }) : tr("Official NBU rates.")} {tr("Override one only if you need a different rate.")}
-            </p>
+          <CollapsibleCard
+            id="total-rates"
+            title="Exchange rates"
+            hint={
+              <>
+                {rates?.date ? tr("Official NBU rates for {date}.", { date: rates.date }) : tr("Official NBU rates.")}{" "}
+                {tr("Override one only if you need a different rate.")}
+              </>
+            }
+          >
             <table className="mt-3 w-full text-sm tabular-nums">
               <tbody>
                 {usedCurrencies.map((c) => {
@@ -653,20 +662,17 @@ export default function InvestingTotalPage() {
               </tbody>
             </table>
             {mode === "edit" ? <p className="mt-2 text-[11px] text-[#8f8676]">{tr("Override = USD per 1 unit. Leave empty to use NBU.")}</p> : null}
-          </article>
+          </CollapsibleCard>
         </div>
       </section>
 
       {/* History */}
-      <article className={card}>
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Net worth by month")}</h2>
-            <p className="mt-0.5 text-xs text-[#8f8676]">
-              {tr("Use “Record {month}” once a month; it stores today’s net worth with its breakdown.", { month: monthLabel(nowMonth) })}
-            </p>
-          </div>
-          {mode === "edit" ? (
+      <CollapsibleCard
+        id="total-history"
+        title="Net worth by month"
+        hint={tr("Use “Record {month}” once a month; it stores today’s net worth with its breakdown.", { month: monthLabel(nowMonth) })}
+        right={
+          mode === "edit" ? (
             <button
               type="button"
               onClick={() => edit((d) => ({ ...d, months: [...d.months, { id: newId(), month: "", total_usd: 0, breakdown: {} }] }))}
@@ -674,8 +680,9 @@ export default function InvestingTotalPage() {
             >
               {tr("Add month")}
             </button>
-          ) : null}
-        </div>
+          ) : null
+        }
+      >
         {chart.length > 0 ? (
           <div className="mt-3">
             <MonthlyTotalChart data={chart} />
@@ -686,7 +693,7 @@ export default function InvestingTotalPage() {
 
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] [&>*]:min-w-0">
           <div className={`${investingTableScrollWrap} max-h-[420px] overflow-y-auto`}>
-            <table className="w-full min-w-[460px] border-collapse text-left text-sm tabular-nums">
+            <table className={`${mode === "edit" ? "stack-table" : ""} w-full border-collapse text-left text-sm tabular-nums sm:min-w-[460px]`}>
               <thead className="sticky top-0 bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
                   <th className="px-3 py-2 font-medium">{tr("Month")}</th>
@@ -772,7 +779,7 @@ export default function InvestingTotalPage() {
             </table>
           </div>
         </div>
-      </article>
+      </CollapsibleCard>
     </div>
   );
 }

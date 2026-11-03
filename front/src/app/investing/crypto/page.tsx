@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { formatCryptoUsd } from "@/features/investing/crypto-format";
 import { buildCoinPositions, buildCryptoTotals, rebalancingSplit, ruleBtcShare } from "@/features/investing/crypto-stats";
-import { investingMetaBadge, investingToolbarBtn } from "@/features/investing/ui/investing-classes";
+import { CollapsibleCard } from "@/features/investing/dashboard/widgets";
+import { investingMetaBadge, investingToolbarBtn, scrollRow } from "@/features/investing/ui/investing-classes";
 import { useLocale, useT } from "@/lib/i18n";
 import { useCrypto } from "@/state/crypto-store";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 
 function tone(n: number | null | undefined): string {
   if (n == null || n === 0) return "text-[#1f1c17]";
@@ -22,7 +23,7 @@ function Kpi({ label, value, valueTone, sub }: { label: string; value: string; v
   return (
     <article className={card}>
       <p className="text-xs text-[#7f7668]">{t(label)}</p>
-      <p className={`mt-1.5 text-xl font-semibold tabular-nums ${valueTone ?? "text-[#1f1c17]"}`}>{value}</p>
+      <p className={`mt-1.5 text-lg font-semibold tabular-nums sm:text-xl ${valueTone ?? "text-[#1f1c17]"}`}>{value}</p>
       {sub ? <div className="mt-1 text-xs text-[#6f675b]">{sub}</div> : null}
     </article>
   );
@@ -47,7 +48,7 @@ export default function CryptoOverviewPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={scrollRow}>
         <span className={investingMetaBadge}>
           {cryptoMeta.updatedAt ? tr("Synced {when}", { when: new Date(cryptoMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
         </span>
@@ -61,7 +62,7 @@ export default function CryptoOverviewPage() {
         </button>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 [&>*]:min-w-0 sm:gap-4 xl:grid-cols-4">
         <Kpi
           label="Portfolio value"
           value={formatCryptoUsd(totals.value)}
@@ -180,13 +181,15 @@ export default function CryptoOverviewPage() {
 
       {/* Split vs rule */}
       {pair > 0 ? (
-        <article className={card}>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("BTC / ETH split vs your rule")}</h2>
+        <CollapsibleCard
+          id="crypto-split"
+          title="BTC / ETH split vs your rule"
+          right={
             <Link href="/investing/crypto/rules" className="text-xs text-[#6f675b] underline decoration-black/15 underline-offset-2">
               {tr("Edit rule")}
             </Link>
-          </div>
+          }
+        >
           <div className="mt-3 space-y-2 text-xs text-[#6f675b]">
             {[
               { label: "Now", btc: actualBtc },
@@ -224,7 +227,7 @@ export default function CryptoOverviewPage() {
               ETH
             </span>
           </p>
-        </article>
+        </CollapsibleCard>
       ) : null}
 
       <p className="text-[11px] text-[#8f8676]">

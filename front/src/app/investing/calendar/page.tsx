@@ -3,14 +3,15 @@
 import { useMemo, useState } from "react";
 import { calendarEvents, daysBetween, trackedTickers, useTickerEvents, type CalendarEvent } from "@/features/investing/events";
 import { formatUsd, parseUsd } from "@/features/investing/format";
-import { investingPageStack } from "@/features/investing/ui/investing-classes";
+import { investingPageStack, scrollRow } from "@/features/investing/ui/investing-classes";
 import { TickerLogo } from "@/features/investing/watchlist/ticker-logo";
 import { VBars } from "@/features/shared/bar-charts";
 import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useInvesting } from "@/state/investing-store";
+import { CollapsibleCard } from "@/features/investing/dashboard/widgets";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 
 type Scope = "all" | "held" | "watch";
 type Kind = "all" | "earnings" | "dividend";
@@ -140,8 +141,9 @@ export default function InvestingCalendarPage() {
         {t("Earnings reports and ex-dividend dates for your holdings and watchlist. Dates from Finviz; future dividends are projected from each ticker's payment history.")}
       </p>
 
-      <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        <div className={card}>
+      {/* Phones: next earnings across the top, the two dividend totals side by side. */}
+      <section className="grid grid-cols-2 gap-3 [&>*]:min-w-0 lg:grid-cols-3">
+        <div className={`${card} col-span-2 lg:col-span-1`}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-[#8f8676]">{t("Next earnings in your portfolio")}</p>
           {summary.nextEarnings ? (
             <>
@@ -160,12 +162,12 @@ export default function InvestingCalendarPage() {
         </div>
         <div className={card}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-[#8f8676]">{t("Dividends, next 30 days")}</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-700">{isLoading ? "…" : formatUsd(summary.month)}</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-emerald-700 sm:text-2xl">{isLoading ? "…" : formatUsd(summary.month)}</p>
           <p className="mt-0.5 text-xs text-[#6f675b]">{t("by ex-date, before tax")}</p>
         </div>
         <div className={card}>
           <p className="text-[11px] font-medium uppercase tracking-wide text-[#8f8676]">{t("Dividends, next 12 months")}</p>
-          <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-700">{isLoading ? "…" : formatUsd(summary.year)}</p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-emerald-700 sm:text-2xl">{isLoading ? "…" : formatUsd(summary.year)}</p>
           <p className="mt-0.5 text-xs text-[#6f675b]">
             {summary.yieldPct != null
               ? t("{v}% of portfolio value · {n} paying holdings", { v: summary.yieldPct.toFixed(2), n: summary.payers })
@@ -174,7 +176,7 @@ export default function InvestingCalendarPage() {
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={scrollRow}>
         {(
           [
             ["all", "All"],
@@ -239,12 +241,16 @@ export default function InvestingCalendarPage() {
           )}
         </section>
 
-        <aside className={`${card} self-start`}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{t("Dividend income by month")}</h2>
-          <p className="mb-5 text-xs text-[#6f675b]">{t("Next 12 months by ex-date; the payment usually lands 1–4 weeks later.")}</p>
+        <CollapsibleCard
+          id="calendar-dividends"
+          title="Dividend income by month"
+          hint="Next 12 months by ex-date; the payment usually lands 1–4 weeks later."
+          className="self-start"
+        >
+          <div className="mt-5" />
           <VBars rows={summary.months} unit="${n}" empty="No dividends expected from your holdings." />
           <p className="mt-3 text-[11px] leading-snug text-[#8f8676]">{t("Amounts use the latest dividend per share and your current shares, before withholding tax.")}</p>
-        </aside>
+        </CollapsibleCard>
       </div>
     </div>
   );

@@ -190,8 +190,8 @@ export const INVESTING: Record<string, string | string[]> = {
   "{v}% of portfolio": "{v}% портфеля",
   today: "сьогодні",
   total: "загалом",
-  "Size = weight · color = today’s move. Hover a tile for details.":
-    "Розмір = частка · колір = зміна за день. Наведіть на плитку для деталей.",
+  "Size = weight · color = today’s move. Hover or tap a tile for details.":
+    "Розмір = частка · колір = зміна за день. Наведіть або торкніться плитки для деталей.",
   "Color scale from -3% to +3%": "Шкала кольору від −3% до +3%",
   "No live quotes yet — use Refresh market on Portfolio.":
     "Котирувань ще немає — натисніть «Оновити ринок» на «Портфелі».",
@@ -225,6 +225,8 @@ export const INVESTING: Record<string, string | string[]> = {
   pp: "п.п.",
   "Hold position": "Тримати",
   "Buy {v}": "Купити {v}",
+  "Income & risk": "Дохід і ризик",
+  target: "ціль",
   "Trim {v}": "Скоротити {v}",
   sh: "шт.",
   "Drift within ±1 pp is treated as on target.":

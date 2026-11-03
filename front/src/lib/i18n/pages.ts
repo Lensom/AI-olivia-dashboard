@@ -4,6 +4,7 @@ export const PAGES: Record<string, string | string[]> = {
   Untitled: "Без назви",
   "Delete “{title}” and its subpages?": "Видалити «{title}» разом із підсторінками?",
   Collapse: "Згорнути",
+  "Choose a page": "Оберіть сторінку",
   Expand: "Розгорнути",
   "Page actions": "Дії зі сторінкою",
   "Add a page inside": "Додати сторінку всередину",

@@ -19,6 +19,7 @@ import {
   investingSubsectionStack,
   investingTableScrollWrap,
   investingToolbarBtn,
+  scrollRow,
 } from "@/features/investing/ui/investing-classes";
 import { InvestingSubsectionHeader } from "@/features/investing/ui/investing-subsection-header";
 import { BrokerCashAndDividends } from "@/features/investing/broker-section";
@@ -79,17 +80,20 @@ function StatCard({
   value,
   hint,
   tone,
+  wide = false,
 }: {
   label: string;
   value: string;
   hint?: string;
   tone?: string;
+  /** Full width on phones (the grid is two columns there). */
+  wide?: boolean;
 }) {
   const t = useT();
   return (
-    <article className="rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
+    <article className={`rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] ${wide ? "col-span-2 sm:col-span-1" : ""}`}>
       <p className="text-xs text-[#7f7668]">{t(label)}</p>
-      <p className={`mt-1.5 text-lg font-semibold tabular-nums ${tone ?? "text-[#1f1c17]"}`}>{value}</p>
+      <p className={`mt-1.5 text-base font-semibold tabular-nums sm:text-lg ${tone ?? "text-[#1f1c17]"}`}>{value}</p>
       {hint ? <p className="mt-1 text-[11px] text-[#8f8676]">{t(hint)}</p> : null}
     </article>
   );
@@ -200,7 +204,7 @@ export default function InvestingFinancePage() {
         .
       </p>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={scrollRow}>
         <span className={investingMetaBadge}>
           {refillsMeta.updatedAt ? tr("Synced {when}", { when: new Date(refillsMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
         </span>
@@ -230,8 +234,9 @@ export default function InvestingFinancePage() {
         </button>
       </div>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <section className="grid grid-cols-2 gap-3 [&>*]:min-w-0 lg:grid-cols-3">
         <StatCard
+          wide
           label="Operating expenses, $"
           value={formatUsd(operatingExpenses)}
           hint={
@@ -280,8 +285,8 @@ export default function InvestingFinancePage() {
         <StatCard label="Fees, % of topped" value={`${feesPct.toFixed(2)}%`} hint="Operating expenses / total topped." />
       </section>
 
-      <section className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl border border-black/5 bg-white/90 px-5 py-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-        <p className="w-full text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676] sm:w-auto">
+      <section className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-black/5 bg-white/90 px-4 py-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 sm:px-5">
+        <p className="col-span-2 text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">
           {tr("{year} pace", { year: pace.year })}
         </p>
         <div>
@@ -333,11 +338,11 @@ export default function InvestingFinancePage() {
         />
         {isYearlyOpen ? (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-            <article className="rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
+            <article className="rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5">
               <h3 className="text-sm font-semibold text-[#1f1c17]">{tr("Yearly summary")}</h3>
               <p className="mt-1 text-xs text-[#655d51]">{tr("Invest amounts aggregated by calendar year.")}</p>
               <div className={`${investingTableScrollWrap} mt-4`}>
-                <table className="w-full border-collapse text-left text-sm">
+                <table className="stack-table w-full border-collapse text-left text-sm">
                   <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                     <tr>
                       <th className="px-3 py-2 font-medium">{tr("Year")}</th>
@@ -395,13 +400,13 @@ export default function InvestingFinancePage() {
               yAxisLabel="Sum of invest"
               xAxisLabel="Year"
             />
-            <article className="rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)] lg:col-span-2">
+            <article className="rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5 lg:col-span-2">
               <h3 className="text-sm font-semibold text-[#1f1c17]">{tr("Deposits vs buys")}</h3>
               <p className="mt-1 text-xs text-[#655d51]">
                 {tr("Where topped-up money went each year (buys and sales from Activities, in USD). Unspent = running topped − bought + sold − trade fees: cash not yet in positions.")}
               </p>
               <div className={`${investingTableScrollWrap} mt-4`}>
-                <table className="w-full min-w-[640px] border-collapse text-left text-sm tabular-nums">
+                <table className="stack-table w-full min-w-[640px] border-collapse text-left text-sm tabular-nums">
                   <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                     <tr>
                       <th className="px-3 py-2 font-medium">{tr("Year")}</th>
@@ -484,7 +489,7 @@ export default function InvestingFinancePage() {
               </div>
             </div>
             <div className={investingTableScrollWrap}>
-              <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+              <table className="stack-table w-full min-w-[720px] border-collapse text-left text-sm">
                 <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                   <tr>
                     <th className="px-2 py-2 font-medium">{tr("Date")}</th>

@@ -5,6 +5,7 @@ import { GOALS, TIERS, type FranchiseTier } from "@/features/cinema/franchises";
 import { BooksStrip, bySeriesProgress, SeriesBadge, useBookSeries, usePlanBook, type BookSeries } from "@/features/library/series";
 import { useT } from "@/lib/i18n";
 import { useLibrary } from "@/state/library-store";
+import { scrollRow } from "@/features/investing/ui/investing-classes";
 
 const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
 
@@ -122,7 +123,7 @@ export default function LibrarySeriesPage() {
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={scrollRow}>
         {FILTERS.map((x) => (
           <button key={x.value} type="button" onClick={() => setFilter(x.value)} className={chip(filter === x.value)} aria-pressed={filter === x.value}>
             {t(x.label)} {series.filter(x.match).length}

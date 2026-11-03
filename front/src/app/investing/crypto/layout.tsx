@@ -1,13 +1,11 @@
 "use client";
 
+import { TabNav } from "@/components/layout/tab-nav";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RequireAuth } from "@/components/auth/require-auth";
 import {
   investingPageStack,
-  investingTabNavWrap,
-  investingTabPillActive,
-  investingTabPillIdle,
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { useT } from "@/lib/i18n";
@@ -41,20 +39,14 @@ export default function CryptoLayout({ children }: { children: React.ReactNode }
             </Link>
           </div>
 
-          <nav className={investingTabNavWrap} aria-label={t("Crypto workspace")}>
-            {TABS.map((tab) => {
-              const active = "exact" in tab && tab.exact ? pathname === tab.href : pathname.startsWith(tab.href);
-              return (
-                <Link
-                  key={tab.href}
-                  href={tab.href}
-                  className={active ? investingTabPillActive : investingTabPillIdle}
-                >
-                  {t(tab.label)}
-                </Link>
-              );
-            })}
-          </nav>
+          <TabNav
+            title={t("Crypto workspace")}
+            tabs={TABS.map((tab) => ({
+              href: tab.href,
+              label: t(tab.label),
+              active: "exact" in tab && tab.exact ? pathname === tab.href : pathname.startsWith(tab.href),
+            }))}
+          />
 
           {children}
         </div>

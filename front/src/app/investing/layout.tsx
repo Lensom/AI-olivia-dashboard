@@ -1,5 +1,6 @@
 "use client";
 
+import { TabNav } from "@/components/layout/tab-nav";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
@@ -7,9 +8,6 @@ import { RequireAuth } from "@/components/auth/require-auth";
 import { investingNavItems } from "@/features/investing/nav";
 import {
   investingPageStack,
-  investingTabNavWrap,
-  investingTabPillActive,
-  investingTabPillIdle,
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
 import { useT } from "@/lib/i18n";
@@ -62,20 +60,10 @@ export default function InvestingLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        <nav className={investingTabNavWrap} aria-label={t("Stocks workspace")}>
-          {stockTabs.map((tab) => {
-            const active = stockTabActive(pathname, tab.href);
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className={active ? investingTabPillActive : investingTabPillIdle}
-              >
-                {t(tab.label)}
-              </Link>
-            );
-          })}
-        </nav>
+        <TabNav
+          title={t("Stocks workspace")}
+          tabs={stockTabs.map((tab) => ({ href: tab.href, label: t(tab.label), active: stockTabActive(pathname, tab.href) }))}
+        />
 
         {children}
       </div>

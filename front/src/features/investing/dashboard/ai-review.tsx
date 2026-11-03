@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { dashCard } from "@/features/investing/dashboard/widgets";
+import { dashCard, useCardOpen } from "@/features/investing/dashboard/widgets";
 import { formatUsd } from "@/features/investing/format";
 import { Bullets, modelName, SparkIcon } from "@/features/investing/watchlist/ai-analysis";
 import { apiFetch, type ApiError } from "@/lib/api";
@@ -55,6 +55,7 @@ const label = "text-[11px] font-semibold uppercase tracking-wide text-[#8f8676]"
 
 /** Overview card: Gemini's review of the whole portfolio, with the last saved one shown on load. */
 export function PortfolioAiReview({ token }: { token: string | null }) {
+  const [open, setOpen] = useCardOpen("ai-review");
   const t = useT();
   const locale = useLocale();
   const [lang] = useLang();
@@ -95,21 +96,39 @@ export function PortfolioAiReview({ token }: { token: string | null }) {
   const health = a ? HEALTH[a.health] : null;
 
   return (
-    <section className={dashCard} aria-labelledby="ai-review-title">
+    <section className={`${dashCard} ${open ? "" : "self-start"}`} aria-labelledby="ai-review-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          title={open ? t("Collapse") : t("Expand")}
+          className="group -m-1 flex min-w-0 items-center gap-3 rounded-lg p-1 text-left"
+        >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
             <SparkIcon className="h-4 w-4" />
           </span>
-          <div>
-            <h2 id="ai-review-title" className="text-sm font-semibold text-[#1f1c17]">
-              {t("AI portfolio review")}
-            </h2>
-            <p className="text-xs text-[#8f8676]">
-              {t("Holdings, cash, deposits, target weights and your watchlist buy zones, reviewed by Gemini.")}
-            </p>
-          </div>
-        </div>
+          <span className="min-w-0">
+            <span className="flex items-center gap-1.5">
+              <h2 id="ai-review-title" className="text-sm font-semibold text-[#1f1c17]">
+                {t("AI portfolio review")}
+              </h2>
+              <svg
+                viewBox="0 0 16 16"
+                className={`h-4 w-4 shrink-0 text-[#8f8676] transition-transform group-hover:text-[#1f1c17] ${open ? "" : "-rotate-90"}`}
+                aria-hidden
+              >
+                <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            {open ? (
+              <span className="block text-xs text-[#8f8676]">
+                {t("Holdings, cash, deposits, target weights and your watchlist buy zones, reviewed by Gemini.")}
+              </span>
+            ) : null}
+          </span>
+        </button>
+        {open ? (
         <button
           type="button"
           onClick={analyze}
@@ -123,8 +142,11 @@ export function PortfolioAiReview({ token }: { token: string | null }) {
           {a ? null : <SparkIcon />}
           {busy ? t("Analyzing…") : a ? t("Re-analyze") : t("Analyze portfolio")}
         </button>
+        ) : null}
       </div>
 
+      {open ? (
+        <>
       {error ? (
         <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800" role="alert">
           {error}
@@ -221,6 +243,8 @@ export function PortfolioAiReview({ token }: { token: string | null }) {
           {t("Get a verdict on diversification, drift from your target weights, valuation and risk, plus concrete next steps and where to put your cash.")}
         </p>
       )}
+        </>
+      ) : null}
     </section>
   );
 }

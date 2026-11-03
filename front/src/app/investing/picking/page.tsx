@@ -14,6 +14,7 @@ import {
   investingPrimarySaveDisabled,
   investingTableScrollWrap,
   investingToolbarBtn,
+  scrollRow,
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
 import { useLocale, useT } from "@/lib/i18n";
@@ -28,7 +29,7 @@ const BUCKETS = [
 type BucketKey = (typeof BUCKETS)[number]["key"];
 const BUCKET_TITLE: Record<string, string> = Object.fromEntries(BUCKETS.map((b) => [b.key, b.title]));
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 
 function inputBaseClasses() {
   return "w-full min-w-[4.5rem] rounded-lg border border-black/10 bg-white/90 px-2 py-1 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20 focus:bg-white";
@@ -220,7 +221,7 @@ export default function InvestingPickingPage() {
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={scrollRow}>
           <span className={investingMetaBadge}>
             {pickingMeta.updatedAt ? tr("Synced {when}", { when: new Date(pickingMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
           </span>
@@ -243,7 +244,7 @@ export default function InvestingPickingPage() {
             </button>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={scrollRow}>
           <div className="flex rounded-full border border-black/10 bg-white p-1">
             {(["view", "edit"] as const).map((m) => (
               <button
@@ -382,14 +383,14 @@ export default function InvestingPickingPage() {
               onSelect={setSelected}
               loading={snapshotsLoading}
             />
-            <section className="overflow-hidden rounded-2xl border border-black/5 bg-white/90 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-              <div className="flex items-baseline gap-2 px-5 py-4">
+            <section className="overflow-hidden rounded-2xl border border-black/5 bg-white/90 shadow-[0_8px_30px_rgba(18,16,13,0.05)] max-sm:pb-3 [&_.stack-table]:max-sm:px-3">
+              <div className="flex flex-wrap items-baseline gap-2 px-4 py-4 sm:px-5">
                 <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Stocks")}</h2>
                 <span className="rounded-full bg-[#f4efe4] px-2 py-0.5 text-[11px] font-medium text-[#6f675b]">{pickingRows.length}</span>
                 <span className="ml-auto text-[11px] text-[#8f8676]">{tr("best opportunities first")}</span>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[600px] border-collapse text-left text-sm">
+                <table className="stack-table w-full min-w-[600px] border-collapse text-left text-sm">
                   <thead className="text-[11px] uppercase tracking-wide text-[#8f8676]">
                     <tr className="border-t border-black/5">
                       <th className="px-5 py-2 font-medium">{tr("Stock")}</th>
@@ -403,7 +404,7 @@ export default function InvestingPickingPage() {
                     {grouped.map(({ bucket, items }) =>
                       items.length === 0 ? null : (
                         <Fragment key={bucket.key}>
-                          <tr className="border-t border-black/10 bg-[#f4efe4]/70">
+                          <tr className="stack-group border-t border-black/10 bg-[#f4efe4]/70">
                             <td colSpan={5} className="px-5 py-1.5 text-xs font-semibold text-[#1f1c17]">
                               {tr(bucket.title)} <span className="font-normal text-[#6f675b]">· {tr("{n} on the list", { n: items.length })}</span>
                             </td>
@@ -450,7 +451,7 @@ export default function InvestingPickingPage() {
                                   {/* How far from the zone; hints like "add buy prices" live in the details panel. */}
                                   {signal.rank <= 3 ? <span className="block whitespace-nowrap pt-0.5 text-[11px] text-[#8f8676]">{signal.detail}</span> : null}
                                 </td>
-                                <td className="px-5 py-2.5">
+                                <td className="stack-block px-5 py-2.5">
                                   <RangeBar low={snap?.low_52w} high={snap?.high_52w} price={px} strong={num(row.strong_buy_until)} may={num(row.may_buy_until)} />
                                 </td>
                               </tr>
@@ -482,7 +483,7 @@ export default function InvestingPickingPage() {
         </div>
       ) : (
         <div className={investingTableScrollWrap}>
-          <table className="w-full min-w-[1700px] border-collapse text-left text-sm">
+          <table className="stack-table w-full min-w-[1700px] border-collapse text-left text-sm">
             <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
               <tr>
                 <th className="px-2 py-2 font-medium">{tr("Bucket")}</th>
@@ -519,7 +520,7 @@ export default function InvestingPickingPage() {
                     </select>
                   </td>
                   {BASE_EDIT_KEYS.map((key) => (
-                    <td key={key} className="px-2 py-2">
+                    <td key={key} className={`${key === "ticker" ? "stack-title " : ""}px-2 py-2`}>
                       <input
                         value={row[key] ?? ""}
                         onChange={(e) =>

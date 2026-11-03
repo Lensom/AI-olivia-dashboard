@@ -1,13 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { formatUsd } from "@/features/investing/format";
 import { useT } from "@/lib/i18n";
 import { squarify, type Position } from "./derive";
 
 export const dashCard =
-  "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+  "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
+
+/** A row rendered as a small card on phones, where tables don't fit. */
+export const mobileRowCard = "rounded-xl border border-black/5 bg-[#faf8f2] px-3 py-2.5";
 
 /** Validated categorical order (dataviz reference palette, light). Slots past 7 fold into "Other". */
 export const CATEGORICAL = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6"];
@@ -27,12 +30,112 @@ export function toneClass(n: number): string {
   return "text-[#6f675b]";
 }
 
+// ---- Collapsible cards ----------------------------------------------------------------------
+
+// Which cards you've collapsed, remembered per browser (only collapsed ids are stored).
+const COLLAPSE_KEY = "olivia:card-collapsed:";
+const collapseListeners = new Set<() => void>();
+const subscribeCollapse = (l: () => void) => {
+  collapseListeners.add(l);
+  return () => {
+    collapseListeners.delete(l);
+  };
+};
+function readOpen(id: string): boolean {
+  try {
+    return localStorage.getItem(COLLAPSE_KEY + id) !== "1";
+  } catch {
+    return true;
+  }
+}
+function writeOpen(id: string, open: boolean) {
+  try {
+    if (open) localStorage.removeItem(COLLAPSE_KEY + id);
+    else localStorage.setItem(COLLAPSE_KEY + id, "1");
+  } catch {
+    // Storage blocked (private mode): the toggle still works until reload.
+  }
+  collapseListeners.forEach((l) => l());
+}
+
+/** Open/closed state of a collapsible card, kept across reloads. Server render: always open. */
+export function useCardOpen(id: string): [boolean, (open: boolean) => void] {
+  const [fallback, setFallback] = useState<boolean | null>(null);
+  const stored = useSyncExternalStore(subscribeCollapse, () => readOpen(id), () => true);
+  const open = fallback ?? stored;
+  return [
+    open,
+    (next: boolean) => {
+      writeOpen(id, next);
+      if (readOpen(id) !== next) setFallback(next);
+    },
+  ];
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`mt-0.5 h-4 w-4 shrink-0 text-[#8f8676] transition-transform group-hover:text-[#1f1c17] ${open ? "" : "-rotate-90"}`}
+      aria-hidden
+    >
+      <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
+ * A dashboard card whose title toggles it. Collapsed, only the title row shows (the hint and the
+ * `right` controls hide too); the state is remembered per card `id`.
+ */
+export function CollapsibleCard({
+  id,
+  title,
+  hint,
+  right,
+  className = "",
+  children,
+}: {
+  id: string;
+  title: string;
+  /** An interface key (translated here), or ready content such as a sentence with a date in it. */
+  hint?: ReactNode;
+  right?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  const t = useT();
+  const [open, setOpen] = useCardOpen(id);
+  return (
+    // Collapsed: hug the title instead of stretching to the height of the card beside it.
+    <article className={`${dashCard} ${className} ${open ? "" : "self-start"}`}>
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="group -m-1 flex min-w-0 items-start gap-1.5 rounded-lg p-1 text-left"
+          title={open ? t("Collapse") : t("Expand")}
+        >
+          <Chevron open={open} />
+          <span className="min-w-0">
+            <h2 className="text-sm font-semibold text-[#1f1c17]">{t(title)}</h2>
+            {hint && open ? <span className="mt-0.5 block text-xs font-normal text-[#8f8676]">{typeof hint === "string" ? t(hint) : hint}</span> : null}
+          </span>
+        </button>
+        {open ? right : null}
+      </div>
+      {open ? children : null}
+    </article>
+  );
+}
+
 /** Card title and hint; both are interface keys, translated here. */
 export function CardHeader({ title, hint, right }: { title: string; hint?: string; right?: ReactNode }) {
   const t = useT();
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div>
+    <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+      <div className="min-w-0">
         <h2 className="text-sm font-semibold text-[#1f1c17]">{t(title)}</h2>
         {hint ? <p className="mt-0.5 text-xs text-[#8f8676]">{t(hint)}</p> : null}
       </div>
@@ -47,21 +150,23 @@ export function KpiTile({
   valueTone,
   sub,
   hero = false,
+  className = "",
 }: {
   label: string;
   value: string;
   valueTone?: string;
   sub?: ReactNode;
   hero?: boolean;
+  className?: string;
 }) {
   const t = useT();
   return (
-    <article className={dashCard}>
+    <article className={`${dashCard} ${className}`}>
       <p className="text-xs font-medium text-[#7f7668]">{t(label)}</p>
       <p
         className={[
           "mt-1.5 font-semibold tabular-nums",
-          hero ? "text-3xl" : "text-xl",
+          hero ? "text-3xl" : "text-lg sm:text-xl",
           valueTone ?? "text-[#1f1c17]",
         ].join(" ")}
       >
@@ -120,6 +225,8 @@ export function HoldingsHeatmap({ positions }: { positions: Position[] }) {
               key={p.id}
               onMouseEnter={() => setHover(p)}
               onMouseLeave={() => setHover(null)}
+              // Phones have no hover: a tap shows the same details.
+              onClick={() => setHover(p)}
               className="absolute flex flex-col items-center justify-center overflow-hidden rounded-md text-center transition-[filter] hover:brightness-95"
               style={{
                 left: r.x + 1,
@@ -155,7 +262,7 @@ export function HoldingsHeatmap({ positions }: { positions: Position[] }) {
             · {t("total")} <span className={toneClass(hover.pnl)}>{signedPct(hover.pnlPct, 1)}</span>
           </span>
         ) : (
-          <span>{t("Size = weight · color = today’s move. Hover a tile for details.")}</span>
+          <span>{t("Size = weight · color = today’s move. Hover or tap a tile for details.")}</span>
         )}
         <span className="flex items-center gap-1" aria-label={t("Color scale from -3% to +3%")}>
           <span>−3%</span>
@@ -385,6 +492,8 @@ export function RebalanceTable({ positions, totalValue }: { positions: Position[
       return { p, drift, delta, sharesDelta: p.price > 0 ? delta / p.price : 0 };
     })
     .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  // Shared scale for the phone cards' bars, so widths compare across holdings.
+  const scale = Math.max(1, ...rows.map(({ p }) => Math.max(p.weight, p.target))) * 1.1;
 
   return (
     <div className="mt-3">
@@ -393,15 +502,56 @@ export function RebalanceTable({ positions, totalValue }: { positions: Position[
           ⚠ {t("Targets sum to {v}%, not 100% — suggestions are approximate.", { v: targetSum.toFixed(1) })}
         </p>
       ) : null}
-      <div className="overflow-x-auto">
+      {/* Phones: one card per holding, with current vs target on a shared scale. */}
+      <ul className="space-y-2 sm:hidden">
+        {rows.map(({ p, drift, delta, sharesDelta }) => {
+          const hold = Math.abs(drift) < 1;
+          return (
+            <li key={p.id} className={mobileRowCard}>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-semibold text-[#1f1c17]">{p.ticker}</span>
+                <span className="text-right text-xs tabular-nums">
+                  {hold ? (
+                    <span className="text-[#8f8676]">{t("Hold position")}</span>
+                  ) : (
+                    <>
+                      <span className={`font-semibold ${delta > 0 ? "text-emerald-700" : "text-rose-700"}`}>
+                        {delta > 0 ? t("Buy {v}", { v: formatUsd(delta) }) : t("Trim {v}", { v: formatUsd(-delta) })}
+                      </span>{" "}
+                      <span className="text-[#8f8676]">≈{Math.abs(sharesDelta).toFixed(1)} {t("sh")}</span>
+                    </>
+                  )}
+                </span>
+              </div>
+              <div className="relative mt-2 h-1.5 rounded-full bg-black/5" aria-hidden>
+                <div
+                  className={`h-1.5 rounded-full ${hold ? "bg-[#b9b1a3]" : drift > 0 ? "bg-rose-400" : "bg-emerald-500"}`}
+                  style={{ width: `${(p.weight / scale) * 100}%` }}
+                />
+                <div className="absolute -top-1 h-3.5 w-0.5 rounded bg-[#1f1c17]" style={{ left: `${(p.target / scale) * 100}%` }} />
+              </div>
+              <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[11px] tabular-nums text-[#6f675b]">
+                <span>
+                  {p.weight.toFixed(1)}% → {t("target")} {p.target.toFixed(1)}%
+                </span>
+                <span className={`font-medium ${hold ? "text-[#8f8676]" : toneClass(-drift)}`}>
+                  {drift > 0 ? "+" : ""}
+                  {drift.toFixed(1)} {t("pp")}
+                </span>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="hidden overflow-x-auto sm:block">
         <table className="w-full text-left text-sm tabular-nums">
           <thead className="text-[11px] text-[#8f8676]">
             <tr>
               <th className="py-1.5 font-medium">{t("Ticker")}</th>
-              <th className="py-1.5 text-right font-medium">{t("Current")}</th>
-              <th className="py-1.5 text-right font-medium">{t("Target")}</th>
-              <th className="py-1.5 text-right font-medium">{t("Drift")}</th>
-              <th className="py-1.5 text-right font-medium">{t("Action")}</th>
+              <th className="whitespace-nowrap py-1.5 pl-3 text-right font-medium">{t("Current")}</th>
+              <th className="whitespace-nowrap py-1.5 pl-3 text-right font-medium">{t("Target")}</th>
+              <th className="whitespace-nowrap py-1.5 pl-3 text-right font-medium">{t("Drift")}</th>
+              <th className="whitespace-nowrap py-1.5 pl-3 text-right font-medium">{t("Action")}</th>
             </tr>
           </thead>
           <tbody>
@@ -410,22 +560,22 @@ export function RebalanceTable({ positions, totalValue }: { positions: Position[
               return (
                 <tr key={p.id} className="border-t border-black/5">
                   <td className="py-1.5 font-semibold text-[#1f1c17]">{p.ticker}</td>
-                  <td className="py-1.5 text-right text-[#2f2922]">{p.weight.toFixed(1)}%</td>
-                  <td className="py-1.5 text-right text-[#2f2922]">{p.target.toFixed(1)}%</td>
-                  <td className={`py-1.5 text-right ${hold ? "text-[#8f8676]" : toneClass(-drift)}`}>
+                  <td className="whitespace-nowrap py-1.5 pl-3 text-right text-[#2f2922]">{p.weight.toFixed(1)}%</td>
+                  <td className="whitespace-nowrap py-1.5 pl-3 text-right text-[#2f2922]">{p.target.toFixed(1)}%</td>
+                  <td className={`whitespace-nowrap py-1.5 pl-3 text-right ${hold ? "text-[#8f8676]" : toneClass(-drift)}`}>
                     {drift > 0 ? "+" : ""}
                     {drift.toFixed(1)} {t("pp")}
                   </td>
-                  <td className="py-1.5 text-right text-xs">
+                  <td className="py-1.5 pl-3 text-right text-xs">
                     {hold ? (
                       <span className="text-[#8f8676]">{t("Hold position")}</span>
                     ) : delta > 0 ? (
-                      <span className="font-medium text-emerald-700">
-                        {t("Buy {v}", { v: formatUsd(delta) })} <span className="text-[#8f8676]">≈{sharesDelta.toFixed(1)} {t("sh")}</span>
+                      <span className="whitespace-nowrap font-medium text-emerald-700">
+                        {t("Buy {v}", { v: formatUsd(delta) })} <span className="block text-[#8f8676] sm:inline">≈{sharesDelta.toFixed(1)} {t("sh")}</span>
                       </span>
                     ) : (
-                      <span className="font-medium text-rose-700">
-                        {t("Trim {v}", { v: formatUsd(-delta) })} <span className="text-[#8f8676]">≈{(-sharesDelta).toFixed(1)} {t("sh")}</span>
+                      <span className="whitespace-nowrap font-medium text-rose-700">
+                        {t("Trim {v}", { v: formatUsd(-delta) })} <span className="block text-[#8f8676] sm:inline">≈{(-sharesDelta).toFixed(1)} {t("sh")}</span>
                       </span>
                     )}
                   </td>

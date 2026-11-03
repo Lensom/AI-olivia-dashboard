@@ -13,7 +13,7 @@ import { PortfolioAiReview } from "@/features/investing/dashboard/ai-review";
 import { buildPositions, buildTotals } from "@/features/investing/dashboard/derive";
 import {
   CATEGORICAL,
-  CardHeader,
+  CollapsibleCard,
   ConcentrationCard,
   HoldingsHeatmap,
   KpiTile,
@@ -23,6 +23,7 @@ import {
   SectorBars,
   TodayMovers,
   dashCard,
+  mobileRowCard,
   signedPct,
   signedUsd,
   toneClass,
@@ -31,6 +32,7 @@ import {
   investingPrimarySaveActive,
   investingPrimarySaveDisabled,
   investingToolbarBtn,
+  investingToolbarBtnSm,
 } from "@/features/investing/ui/investing-classes";
 
 const cellInput = "rounded-lg border border-black/10 bg-white px-2 py-1.5 text-sm outline-none";
@@ -142,9 +144,11 @@ export default function InvestingDashboardPage() {
       </div>
 
       {/* Headline numbers */}
-      <section className="grid gap-4 [&>*]:min-w-0 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Phones: value and total return full width (the return has the long explanation), Today and Realized side by side. */}
+      <section className="grid grid-cols-2 gap-3 [&>*]:min-w-0 sm:gap-4 xl:grid-cols-4">
         <KpiTile
           hero
+          className="col-span-2 sm:col-span-1"
           label="Portfolio value"
           value={formatUsd(totals.value)}
           sub={
@@ -159,6 +163,7 @@ export default function InvestingDashboardPage() {
         />
         {topped > 0 ? (
           <KpiTile
+            className="col-span-2 sm:col-span-1"
             label="Total return"
             value={signedUsd(accountValue - topped)}
             valueTone={toneClass(accountValue - topped)}
@@ -178,6 +183,7 @@ export default function InvestingDashboardPage() {
         ) : (
           // No refills recorded yet: fall back to cost basis so the tile still says something useful.
           <KpiTile
+            className="col-span-2 sm:col-span-1"
             label="Total return (vs cost basis)"
             value={signedUsd(totals.pnl)}
             valueTone={toneClass(totals.pnl)}
@@ -212,10 +218,13 @@ export default function InvestingDashboardPage() {
       </section>
 
       {/* Income & risk strip */}
-      <section className={`${dashCard} flex flex-wrap items-center gap-x-8 gap-y-3 py-4`}>
+      {/* Phones: a compact "label — value" list under a small header; wider screens: one row of stats. */}
+      <section
+        className={`${dashCard} py-3 sm:flex sm:flex-wrap sm:items-center sm:gap-x-8 sm:gap-y-3 sm:py-4 ${metricsDraft ? "space-y-3 sm:space-y-0" : ""}`}
+      >
         {metricsDraft ? (
           <>
-            <label className="text-xs text-[#7f7668]">
+            <label className="flex items-center justify-between text-xs text-[#7f7668] sm:block">
               {t("Div yield")}
               <input
                 value={metricsDraft.divYieldPercent}
@@ -224,7 +233,7 @@ export default function InvestingDashboardPage() {
                 placeholder="1.5%"
               />
             </label>
-            <label className="text-xs text-[#7f7668]">
+            <label className="flex items-center justify-between text-xs text-[#7f7668] sm:block">
               {t("Beta")}
               <input
                 value={metricsDraft.beta}
@@ -233,7 +242,7 @@ export default function InvestingDashboardPage() {
                 placeholder="1.10"
               />
             </label>
-            <div className="ml-auto flex gap-2">
+            <div className="flex justify-end gap-2 sm:ml-auto">
               <button type="button" onClick={() => void saveMetrics()} className={investingPrimarySaveActive}>
                 {t("Save")}
               </button>
@@ -244,6 +253,16 @@ export default function InvestingDashboardPage() {
           </>
         ) : (
           <>
+            <div className="flex items-center justify-between pb-1.5 sm:hidden">
+              <p className="text-xs font-medium text-[#7f7668]">{t("Income & risk")}</p>
+              <button
+                type="button"
+                onClick={() => setMetricsDraft({ divYieldPercent: metrics.divYieldPercent, beta: metrics.beta })}
+                className={investingToolbarBtnSm}
+              >
+                {t("Edit")}
+              </button>
+            </div>
             {[
               ["Div yield", isMetricsLoading ? "…" : metrics.divYieldPercent],
               ["Dividends, last 12 months", dividends.length ? formatUsd(dividends12m) : t("Not recorded")],
@@ -252,15 +271,18 @@ export default function InvestingDashboardPage() {
               ["Beta", isMetricsLoading ? "…" : metrics.beta],
               ["Positions", t("{n} · {up} in profit · {down} in loss", { n: positions.length, up: totals.inProfit, down: totals.inLoss })],
             ].map(([label, value]) => (
-              <div key={label}>
-                <p className="text-[11px] text-[#8f8676]">{t(label)}</p>
-                <p className="text-sm font-semibold tabular-nums text-[#1f1c17]">{value}</p>
+              <div
+                key={label}
+                className="flex items-baseline justify-between gap-3 border-t border-black/5 py-2 sm:block sm:border-0 sm:py-0"
+              >
+                <p className="text-xs text-[#8f8676] sm:text-[11px]">{t(label)}</p>
+                <p className="text-right text-sm font-semibold tabular-nums text-[#1f1c17] sm:text-left">{value}</p>
               </div>
             ))}
             <button
               type="button"
               onClick={() => setMetricsDraft({ divYieldPercent: metrics.divYieldPercent, beta: metrics.beta })}
-              className={`${investingToolbarBtn} ml-auto`}
+              className={`${investingToolbarBtn} ml-auto hidden sm:inline-block`}
             >
               {t("Edit")}
             </button>
@@ -272,26 +294,22 @@ export default function InvestingDashboardPage() {
 
       {/* Today */}
       <section className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-3">
-        <article className={`${dashCard} lg:col-span-2`}>
-          <CardHeader title="Portfolio map" hint="Each tile is a holding, sized by weight and colored by today's move." />
+        <CollapsibleCard id="portfolio-map" title="Portfolio map" hint="Each tile is a holding, sized by weight and colored by today's move." className="lg:col-span-2">
           <div className="mt-3">
             <HoldingsHeatmap positions={positions} />
           </div>
-        </article>
-        <article className={dashCard}>
-          <CardHeader title="Today's movers" hint="Session change and its $ effect on your position." />
+        </CollapsibleCard>
+        <CollapsibleCard id="today-movers" title="Today's movers" hint="Session change and its $ effect on your position.">
           <TodayMovers positions={positions} />
-        </article>
+        </CollapsibleCard>
       </section>
 
       {/* Performance & allocation */}
       <section className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-2">
-        <article className={dashCard}>
-          <CardHeader title="Winners & losers" hint="Total return on cost per holding." />
+        <CollapsibleCard id="winners-losers" title="Winners & losers" hint="Total return on cost per holding.">
           <PerformanceBars positions={positions} />
-        </article>
-        <article className={dashCard}>
-          <CardHeader title="Allocation" hint="By holding and by industry." />
+        </CollapsibleCard>
+        <CollapsibleCard id="allocation" title="Allocation" hint="By holding and by industry.">
           <div className="mt-3">
             <DonutChart title="By holding" slices={allocationSlices} size={180} />
           </div>
@@ -299,26 +317,26 @@ export default function InvestingDashboardPage() {
             <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">{t("By industry")}</p>
             <SectorBars positions={positions} />
           </div>
-        </article>
+        </CollapsibleCard>
       </section>
 
       {/* Risk & actions */}
       <section className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-5">
-        <article className={`${dashCard} lg:col-span-2`}>
-          <CardHeader title="Concentration risk" />
+        <CollapsibleCard id="concentration" title="Concentration risk" className="lg:col-span-2">
           <ConcentrationCard positions={positions} />
-        </article>
-        <article className={`${dashCard} lg:col-span-3`}>
-          <CardHeader title="Rebalance to target" hint="What to buy or trim to match your target weights." />
+        </CollapsibleCard>
+        <CollapsibleCard id="rebalance" title="Rebalance to target" hint="What to buy or trim to match your target weights." className="lg:col-span-3">
           <RebalanceTable positions={positions} totalValue={totals.value} />
-        </article>
+        </CollapsibleCard>
       </section>
 
       {/* Capital history */}
       <section className="grid gap-4 [&>*]:min-w-0 lg:grid-cols-2">
-        <CapitalValueLineChart data={capitalSeries} />
-        <article className={dashCard}>
-          <CardHeader
+        <CollapsibleCard id="capital-chart" title="Portfolio value over time" hint="From capital tracking entries (total value).">
+          <CapitalValueLineChart data={capitalSeries} bare />
+        </CollapsibleCard>
+        <CollapsibleCard
+            id="capital-entries"
             title="Capital entries"
             hint="Deposits and portfolio total over time."
             right={
@@ -349,8 +367,63 @@ export default function InvestingDashboardPage() {
                 </button>
               )
             }
-          />
-          <div className="mt-4 overflow-x-auto rounded-xl border border-black/5">
+          >
+          {/* Phones: one card per entry. */}
+          <ul className="mt-4 space-y-2 sm:hidden">
+            {capitalEntries.map((d) =>
+              isEditingEntries ? (
+                <li key={d.id} className={`${mobileRowCard} grid grid-cols-2 gap-2`}>
+                  <label className="col-span-2 text-[11px] text-[#8f8676]">
+                    {t("Date")}
+                    <input value={d.date} onChange={(e) => updateCapitalEntry(d.id, { date: e.target.value })} className={`${cellInput} mt-0.5 w-full`} />
+                  </label>
+                  <label className="text-[11px] text-[#8f8676]">
+                    {t("Invested sum")}
+                    <input
+                      value={d.deposit}
+                      onChange={(e) => updateCapitalEntry(d.id, { deposit: e.target.value })}
+                      className={`${cellInput} mt-0.5 w-full text-right`}
+                      inputMode="decimal"
+                    />
+                  </label>
+                  <label className="text-[11px] text-[#8f8676]">
+                    {t("Total value")}
+                    <input
+                      value={d.total_value}
+                      onChange={(e) => updateCapitalEntry(d.id, { total_value: e.target.value })}
+                      className={`${cellInput} mt-0.5 w-full text-right`}
+                      inputMode="decimal"
+                    />
+                  </label>
+                  <button type="button" onClick={() => deleteCapitalEntry(d.id)} className={`${investingToolbarBtn} col-span-2 justify-self-end`}>
+                    {t("Delete")}
+                  </button>
+                </li>
+              ) : (
+                <li key={d.id} className={mobileRowCard}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-medium text-[#1f1c17]">{d.date}</span>
+                    <span className={`text-sm font-semibold tabular-nums ${toneClass(parsePercent(d.roi_percent))}`}>{d.roi_percent || "—"}</span>
+                  </div>
+                  <dl className="mt-1.5 grid grid-cols-3 gap-2 text-[11px] tabular-nums">
+                    {(
+                      [
+                        ["Invested sum", d.deposit, ""],
+                        ["Total value", d.total_value, ""],
+                        ["1Y", d.one_year_percent, toneClass(parsePercent(d.one_year_percent))],
+                      ] as const
+                    ).map(([label, value, tone]) => (
+                      <div key={label} className="min-w-0">
+                        <dt className="text-[#8f8676]">{t(label)}</dt>
+                        <dd className={`truncate font-medium ${tone || "text-[#2f2922]"}`}>{value || "—"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </li>
+              ),
+            )}
+          </ul>
+          <div className="mt-4 hidden overflow-x-auto rounded-xl border border-black/5 sm:block">
             <table className="w-full border-collapse text-left">
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
@@ -412,7 +485,7 @@ export default function InvestingDashboardPage() {
               </tbody>
             </table>
           </div>
-        </article>
+        </CollapsibleCard>
       </section>
     </div>
   );

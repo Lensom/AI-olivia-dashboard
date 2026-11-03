@@ -15,7 +15,7 @@ import { useT } from "@/lib/i18n";
 import { newBrokerId, useBroker, type BrokerDividend } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 const input =
   "w-full rounded-lg border border-black/10 bg-white/90 px-2 py-1 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20 focus:bg-white";
 const CURRENCIES = ["USD", "EUR", "RON", "UAH", "GBP", "RUB"];
@@ -172,7 +172,7 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                   {t("Add dividend")}
                 </button>
               </div>
-              <div className="mt-3 flex flex-wrap gap-x-8 gap-y-2">
+              <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:gap-x-8">
                 {[
                   { label: t("Last 12 months (net)"), value: formatUsd(stats.last12), sub: estimated > 0 ? t("estimate at current yield: {v}", { v: formatUsd(estimated) }) : "" },
                   { label: t("{year} so far", { year: new Date(nowMs).getUTCFullYear() }), value: formatUsd(stats.thisYear), sub: "" },
@@ -193,7 +193,7 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
               </div>
 
               <div className={`${investingTableScrollWrap} mt-3 max-h-[360px] overflow-y-auto`}>
-                <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+                <table className="stack-table w-full min-w-[640px] border-collapse text-left text-sm">
                   <thead className="sticky top-0 bg-[#f4efe4] text-xs text-[#7f7668]">
                     <tr>
                       <th className="px-2 py-2 font-medium">{t("Date")}</th>

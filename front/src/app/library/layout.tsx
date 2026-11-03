@@ -1,14 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import { TabNav } from "@/components/layout/tab-nav";
 import { usePathname } from "next/navigation";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { LIBRARY_EXTRA_PAGES, LIBRARY_KINDS } from "@/features/library/nav";
 import {
   investingPageStack,
-  investingTabNavWrap,
-  investingTabPillActive,
-  investingTabPillIdle,
 } from "@/features/investing/ui/investing-classes";
 import { useT } from "@/lib/i18n";
 import { LibraryProvider } from "@/state/library-store";
@@ -31,13 +28,7 @@ export default function LibraryLayout({ children }: { children: React.ReactNode 
               {t(TABS.find((x) => x.href !== "/library" && pathname.startsWith(x.href))?.label ?? "Everything you've read")}
             </h1>
           </div>
-          <nav className={investingTabNavWrap} aria-label={t("Library")}>
-            {TABS.map((tab) => (
-              <Link key={tab.href} href={tab.href} className={pathname === tab.href ? investingTabPillActive : investingTabPillIdle}>
-                {t(tab.label)}
-              </Link>
-            ))}
-          </nav>
+          <TabNav title={t("Library")} tabs={TABS.map((tab) => ({ href: tab.href, label: t(tab.label), active: pathname === tab.href }))} />
           {children}
         </div>
       </LibraryProvider>

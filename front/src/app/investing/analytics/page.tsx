@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CollapsibleCard } from "@/features/investing/dashboard/widgets";
 import { useEffect, useMemo, useState } from "react";
 import {
   AnnualReturnsChart,
@@ -21,7 +22,7 @@ import { useInvesting } from "@/state/investing-store";
 const BENCHMARK = "SPY";
 const BENCHMARK_LABEL = "S&P 500 (SPY)";
 
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 const th = "px-3 py-2 font-medium";
 const td = "px-3 py-2 tabular-nums";
 
@@ -244,17 +245,17 @@ export default function InvestingAnalyticsPage() {
       </p>
 
       {/* Headline performance */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 [&>*]:min-w-0 sm:gap-4 xl:grid-cols-4">
         <article className={card}>
           <p className="text-xs text-[#7f7668]">{tr("Average annual return")}</p>
-          <p className={`mt-1.5 text-xl font-semibold tabular-nums ${toneClass(kpis.you)}`}>{signedPct(kpis.you)}</p>
+          <p className={`mt-1.5 text-lg font-semibold tabular-nums sm:text-xl ${toneClass(kpis.you)}`}>{signedPct(kpis.you)}</p>
           <p className="mt-1 text-xs text-[#6f675b]">
             {tr("{bench} {v} over the same years ({span})", { bench: BENCHMARK_LABEL, v: bench == null ? "…" : signedPct(kpis.them), span: kpis.span })}
           </p>
         </article>
         <article className={card}>
           <p className="text-xs text-[#7f7668]">{tr("vs {bench}", { bench: BENCHMARK_LABEL })}</p>
-          <p className={`mt-1.5 text-xl font-semibold tabular-nums ${toneClass(kpis.you != null && kpis.them != null ? kpis.you - kpis.them : null)}`}>
+          <p className={`mt-1.5 text-lg font-semibold tabular-nums sm:text-xl ${toneClass(kpis.you != null && kpis.them != null ? kpis.you - kpis.them : null)}`}>
             {kpis.you != null && kpis.them != null ? `${signedPct(kpis.you - kpis.them)} / ${tr("yr")}` : "—"}
           </p>
           <p className="mt-1 text-xs text-[#6f675b]">
@@ -263,7 +264,7 @@ export default function InvestingAnalyticsPage() {
         </article>
         <article className={card}>
           <p className="text-xs text-[#7f7668]">{tr("Best year")}</p>
-          <p className={`mt-1.5 text-xl font-semibold tabular-nums ${toneClass(kpis.best?.ret)}`}>
+          <p className={`mt-1.5 text-lg font-semibold tabular-nums sm:text-xl ${toneClass(kpis.best?.ret)}`}>
             {kpis.best ? signedPct(kpis.best.ret) : "—"}
           </p>
           <p className="mt-1 text-xs text-[#6f675b]">
@@ -272,7 +273,7 @@ export default function InvestingAnalyticsPage() {
         </article>
         <article className={card}>
           <p className="text-xs text-[#7f7668]">{tr("Worst year")}</p>
-          <p className={`mt-1.5 text-xl font-semibold tabular-nums ${toneClass(kpis.worst?.ret)}`}>
+          <p className={`mt-1.5 text-lg font-semibold tabular-nums sm:text-xl ${toneClass(kpis.worst?.ret)}`}>
             {kpis.worst ? signedPct(kpis.worst.ret) : "—"}
           </p>
           <p className="mt-1 text-xs text-[#6f675b]">
@@ -284,26 +285,29 @@ export default function InvestingAnalyticsPage() {
       {hasHistory ? (
         <>
           <section className="grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
-            <article className={card}>
-              <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Annual return vs the market")}</h2>
-              <p className="mb-3 mt-0.5 text-xs text-[#8f8676]">
-                {tr("Your return each year next to {bench} with dividends reinvested.", { bench: BENCHMARK_LABEL })}
-              </p>
-              <AnnualReturnsChart data={returnsChart} benchmarkLabel={BENCHMARK_LABEL} />
-            </article>
-            <article className={card}>
-              <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Value vs money invested")}</h2>
-              <p className="mb-3 mt-0.5 text-xs text-[#8f8676]">
-                {tr("Year-end value against everything you’ve put in. The gap between the lines is your gain.")}
-              </p>
-              <ValueVsInvestedChart data={valueChart} />
-            </article>
+            <CollapsibleCard
+              id="analytics-annual"
+              title="Annual return vs the market"
+              hint={tr("Your return each year next to {bench} with dividends reinvested.", { bench: BENCHMARK_LABEL })}
+            >
+              <div className="mt-3">
+                <AnnualReturnsChart data={returnsChart} benchmarkLabel={BENCHMARK_LABEL} />
+              </div>
+            </CollapsibleCard>
+            <CollapsibleCard
+              id="analytics-value"
+              title="Value vs money invested"
+              hint="Year-end value against everything you’ve put in. The gap between the lines is your gain."
+            >
+              <div className="mt-3">
+                <ValueVsInvestedChart data={valueChart} />
+              </div>
+            </CollapsibleCard>
           </section>
 
-          <article className={card}>
-            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Year by year")}</h2>
+          <CollapsibleCard id="analytics-years" title="Year by year">
             <div className={`${investingTableScrollWrap} mt-3`}>
-              <table className="w-full min-w-[680px] border-collapse text-left text-sm">
+              <table className="stack-table w-full min-w-[680px] border-collapse text-left text-sm">
                 <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                   <tr>
                     <th className={th}>{tr("Year")}</th>
@@ -340,7 +344,7 @@ export default function InvestingAnalyticsPage() {
               {firstYearPartial ? tr("{year} is a partial year (you started mid-year), so the cards above leave it out.", { year: firstYearPartial }) + " " : ""}
               * {tr("Year to date uses current holdings plus broker cash (enter it on Finance).")}
             </p>
-          </article>
+          </CollapsibleCard>
         </>
       ) : (
         <article className={`${card} text-sm text-[#655d51]`}>
@@ -352,14 +356,12 @@ export default function InvestingAnalyticsPage() {
       )}
 
       {/* Risk & income */}
-      <article className={card}>
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Risk & income by holding")}</h2>
-            <p className="mt-0.5 text-xs text-[#8f8676]">
-              {tr("Beta: how much a holding moves with the market (1.0 = same as the market). Contribution = weight × beta, and the contributions add up to the portfolio’s beta.")}
-            </p>
-          </div>
+      <CollapsibleCard
+        id="analytics-risk"
+        title="Risk & income by holding"
+        hint="Beta: how much a holding moves with the market (1.0 = same as the market). Contribution = weight × beta, and the contributions add up to the portfolio’s beta."
+      >
+        <div className="mt-2">
           <p className="text-xs text-[#6f675b]">
             {tr("Portfolio beta")}{" "}
             <span className="font-semibold text-[#1f1c17]">
@@ -378,7 +380,7 @@ export default function InvestingAnalyticsPage() {
           </p>
         </div>
         <div className={`${investingTableScrollWrap} mt-3`}>
-          <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+          <table className="stack-table w-full min-w-[720px] border-collapse text-left text-sm">
             <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
               <tr>
                 <th className={th}>{tr("Holding")}</th>
@@ -422,21 +424,25 @@ export default function InvestingAnalyticsPage() {
         <p className="mt-2 text-[11px] text-[#8f8676]">
           {tr("Beta and trailing 12-month yield from Finviz. Income is an estimate: value × yield. Beta ≥ 1.5 is highlighted.")}
         </p>
-      </article>
+      </CollapsibleCard>
 
       {/* Trading */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <YearlyActivityVolumeChart data={tradingRows.map((r) => ({ year: r.year, purchases: r.bought, sales: r.sold }))} />
-        <article className={card}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Trading results by year")}</h2>
-          <p className="mt-0.5 text-xs text-[#8f8676]">
-            {tr("Profit locked in by selling, and what trades cost.")}{" "}
-            <Link href="/investing/activities" className="underline decoration-black/15 underline-offset-2">
-              {tr("Activities")} →
-            </Link>
-          </p>
+        <CollapsibleCard
+          id="analytics-trading"
+          title="Trading results by year"
+          hint={
+            <>
+              {tr("Profit locked in by selling, and what trades cost.")}{" "}
+              <Link href="/investing/activities" className="underline decoration-black/15 underline-offset-2">
+                {tr("Activities")} →
+              </Link>
+            </>
+          }
+        >
           <div className={`${investingTableScrollWrap} mt-3`}>
-            <table className="w-full min-w-[480px] border-collapse text-left text-sm">
+            <table className="stack-table w-full min-w-[480px] border-collapse text-left text-sm">
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
                   <th className={th}>{tr("Year")}</th>
@@ -481,7 +487,7 @@ export default function InvestingAnalyticsPage() {
               </tbody>
             </table>
           </div>
-        </article>
+        </CollapsibleCard>
       </section>
     </div>
   );

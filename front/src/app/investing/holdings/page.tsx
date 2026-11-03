@@ -5,6 +5,7 @@ import { formatPercent, formatUsd, parsePercent, parseUsd } from "@/features/inv
 import type { InvestingHolding } from "@/features/investing/types";
 import {
   investingMetaBadge,
+  scrollRow,
   investingPageStack,
   investingPrimarySaveActive,
   investingPrimarySaveDisabled,
@@ -290,6 +291,79 @@ export default function InvestingTablePage() {
 
   const isFiltered = mode === "view" && (search.trim() !== "" || rowFilter !== "all");
 
+  // Cost, price vs avg, weight vs target, industry and links: shown under a row (table) or a card (phones).
+  const holdingDetails = (h: (typeof holdings)[number], s: NonNullable<ReturnType<typeof statsById.get>>) => (
+        <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <p className="text-[11px] text-[#8f8676]">{tr("Cost basis")}</p>
+            <p className="font-semibold text-[#1f1c17]">{formatUsd(s.cost)}</p>
+            <p className="text-[11px] text-[#8f8676]">
+              {h.shares} × {formatUsd(parseUsd(h.avgBuyPrice))}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] text-[#8f8676]">{tr("Price vs avg buy")}</p>
+            <p className={`font-semibold ${toneClass(s.priceVsAvgPct)}`}>
+              {signedPct(s.priceVsAvgPct)}
+            </p>
+            <p className="text-[11px] text-[#8f8676]">
+              {tr("{v} now", { v: formatUsd(parseUsd(h.marketPrice)) })}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] text-[#8f8676]">{tr("Weight vs target")}</p>
+            <p className="font-semibold text-[#1f1c17]">
+              {formatPercent(parsePercent(h.currentWeight))}{" "}
+              <span className="font-normal text-[#8f8676]">
+                / {s.target > 0 ? formatPercent(s.target) : tr("no target")}
+              </span>
+            </p>
+            <p className="text-[11px]">
+              {s.target <= 0 ? (
+                <span className="text-[#8f8676]">{tr("Set a target in Edit")}</span>
+              ) : Math.abs(s.drift) < 1 ? (
+                <span className="text-[#8f8676]">{tr("On target — hold")}</span>
+              ) : s.rebalanceUsd > 0 ? (
+                <span className="text-emerald-700">
+                  {tr("Buy {v}", { v: formatUsd(s.rebalanceUsd) })} ≈ {s.rebalanceShares.toFixed(1)} {tr("sh")}
+                </span>
+              ) : (
+                <span className="text-rose-700">
+                  {tr("Trim {v}", { v: formatUsd(-s.rebalanceUsd) })} ≈ {(-s.rebalanceShares).toFixed(1)} {tr("sh")}
+                </span>
+              )}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] text-[#8f8676]">{tr("Industry")}</p>
+            <p className="text-[#1f1c17]">
+              {h.industry && h.industry !== "—" ? h.industry : tr("Unclassified")}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] text-[#8f8676]">{tr("Research")}</p>
+            <p className="flex gap-3">
+              <a
+                href={`https://finance.yahoo.com/quote/${encodeURIComponent(h.ticker)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-[#3b352d] underline decoration-black/20 underline-offset-2 hover:text-[#1f1c17]"
+              >
+                Yahoo ↗
+              </a>
+              <a
+                href={`https://finviz.com/quote.ashx?t=${encodeURIComponent(h.ticker)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-[#3b352d] underline decoration-black/20 underline-offset-2 hover:text-[#1f1c17]"
+              >
+                Finviz ↗
+              </a>
+            </p>
+          </div>
+        </div>
+  );
+
   return (
     <div className={investingPageStack}>
       <p className="text-sm text-[#655d51]">
@@ -297,7 +371,7 @@ export default function InvestingTablePage() {
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-2 text-xs text-[#6f675b]">
+        <div className={`${scrollRow} text-xs text-[#6f675b]`}>
           <span className={investingMetaBadge}>{tr("Total value {v}", { v: formatUsd(totals.totalValue) })}</span>
           <span className={investingMetaBadge}>{tr("Target sum {v}", { v: formatPercent(totals.totalTarget) })}</span>
           <span className={investingMetaBadge}>{tr("Current sum {v}", { v: formatPercent(totals.totalCurrent) })}</span>
@@ -309,7 +383,7 @@ export default function InvestingTablePage() {
           <span className={investingMetaBadge}>{tr("Beta")} {isMetricsLoading ? "…" : metrics.beta}</span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={scrollRow}>
           <button
             onClick={() => void refreshMarketPrices().catch(() => {})}
             disabled={isMarketPricesLoading}
@@ -470,7 +544,7 @@ export default function InvestingTablePage() {
             aria-label={tr("Search holdings")}
             className="w-full max-w-xs rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20"
           />
-          <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter holdings")}>
+          <div className="scroll-row flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter holdings")}>
             {FILTERS.map((f) => (
               <button
                 key={f.key}
@@ -490,9 +564,89 @@ export default function InvestingTablePage() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-black/5 bg-white/90 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
+      {/* Phones, View mode: one card per holding; tap it for the details. */}
+      {mode === "view" ? (
+        <ul className="space-y-2 sm:hidden">
+          {sortedHoldings.length === 0 ? (
+            <li className="rounded-2xl border border-dashed border-black/10 px-4 py-6 text-center text-sm text-[#8f8676]">
+              {holdings.length === 0
+                ? tr("No holdings yet — Add row in Edit mode, or Import XLSX.")
+                : tr("No holdings match this search or filter.")}
+            </li>
+          ) : null}
+          {sortedHoldings.map((h) => {
+            const s = statsById.get(h.id)!;
+            const open = !!expandedRowIds[h.id];
+            return (
+              <li key={h.id} className="rounded-2xl border border-black/5 bg-white/90 shadow-[0_4px_16px_rgba(18,16,13,0.04)]">
+                <button
+                  type="button"
+                  onClick={() => toggleExpanded(h.id)}
+                  aria-expanded={open}
+                  className="block w-full px-4 py-3 text-left"
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-[#1f1c17]">{h.ticker}</span>
+                      <span className="block truncate text-xs text-[#8f8676]">{h.name}</span>
+                    </span>
+                    <span className="shrink-0 text-right tabular-nums">
+                      <span className="block text-sm font-semibold text-[#1f1c17]">{formatUsd(parseUsd(h.marketValue))}</span>
+                      <span className={`block text-xs font-medium ${dayChangeCellClass(h.dayChangePercent)}`}>
+                        {h.dayChangePercent ?? "—"}
+                        {s.dayUsd != null ? <span className="font-normal text-[#8f8676]"> · {signedUsd(s.dayUsd)}</span> : null}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="mt-2.5 grid grid-cols-3 gap-2 border-t border-black/5 pt-2 text-[11px] tabular-nums">
+                    <span>
+                      <span className="block text-[#8f8676]">{tr("Weight")}</span>
+                      <span className="font-medium text-[#2f2922]">{formatPercent(parsePercent(h.currentWeight))}</span>
+                      {s.target > 0 ? <span className="text-[#8f8676]"> / {formatPercent(s.target)}</span> : null}
+                    </span>
+                    <span>
+                      <span className="block text-[#8f8676]">{tr("Shares")}</span>
+                      <span className="font-medium text-[#2f2922]">{h.shares}</span>
+                      <span className="text-[#8f8676]"> × {formatUsd(parseUsd(h.avgBuyPrice))}</span>
+                    </span>
+                    <span className="text-right">
+                      <span className="block text-[#8f8676]">{tr("P&L")}</span>
+                      <span className={`font-semibold ${toneClass(s.pnl)}`}>{signedUsd(s.pnl)}</span>
+                      <span className={`block ${toneClass(s.pnlPct)}`}>{signedPct(s.pnlPct)}</span>
+                    </span>
+                  </span>
+                </button>
+                {open ? <div className="border-t border-black/5 px-4 py-3 text-sm">{holdingDetails(h, s)}</div> : null}
+              </li>
+            );
+          })}
+          {holdings.length > 0 && !isFiltered ? (
+            <li className="flex items-baseline justify-between gap-3 rounded-2xl bg-[#f3efe5] px-4 py-3 text-sm tabular-nums">
+              <span>
+                <span className="font-semibold text-[#1f1c17]">{tr("Total")}</span>
+                <span className="block text-[11px] text-[#6f675b]">
+                  {tr("{n} positions · cost {v}", { n: holdings.length, v: formatUsd(totals.totalCost) })}
+                </span>
+              </span>
+              <span className="text-right">
+                <span className="block font-semibold text-[#1f1c17]">{formatUsd(totals.totalValue)}</span>
+                {totals.hasQuotes ? (
+                  <span className={`block text-[11px] ${toneClass(totals.dayUsd)}`}>
+                    {signedUsd(totals.dayUsd)} ({signedPct(totals.dayPct, 2)})
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+
+      {/* Table: always on wider screens; on phones only in Edit mode, where its rows stack into cards. */}
+      <div
+        className={`${mode === "view" ? "hidden sm:block" : "max-sm:border-0 max-sm:bg-transparent max-sm:shadow-none"} overflow-hidden rounded-2xl border border-black/5 bg-white/90 shadow-[0_8px_30px_rgba(18,16,13,0.05)]`}
+      >
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1080px] table-fixed border-collapse text-left tabular-nums">
+          <table className="stack-table w-full min-w-[1080px] table-fixed border-collapse text-left tabular-nums">
             <thead className="sticky top-0 z-10 bg-[#f4efe4] text-xs text-[#7f7668]">
               <tr>
                 <th className="w-[52px] px-2 py-2 font-medium" />
@@ -602,7 +756,7 @@ export default function InvestingTablePage() {
                               {expandedRowIds[h.id] ? "−" : "+"}
                             </button>
                           </td>
-                          <td className="px-2 py-2">
+                          <td className="stack-title px-2 py-2">
                             <input
                               value={h.ticker}
                               onChange={(e) => updateHolding(h.id, { ticker: e.target.value.toUpperCase() })}
@@ -779,75 +933,7 @@ export default function InvestingTablePage() {
                               </label>
                             </div>
                           ) : (
-                            <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
-                              <div>
-                                <p className="text-[11px] text-[#8f8676]">{tr("Cost basis")}</p>
-                                <p className="font-semibold text-[#1f1c17]">{formatUsd(s.cost)}</p>
-                                <p className="text-[11px] text-[#8f8676]">
-                                  {h.shares} × {formatUsd(parseUsd(h.avgBuyPrice))}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] text-[#8f8676]">{tr("Price vs avg buy")}</p>
-                                <p className={`font-semibold ${toneClass(s.priceVsAvgPct)}`}>
-                                  {signedPct(s.priceVsAvgPct)}
-                                </p>
-                                <p className="text-[11px] text-[#8f8676]">
-                                  {tr("{v} now", { v: formatUsd(parseUsd(h.marketPrice)) })}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] text-[#8f8676]">{tr("Weight vs target")}</p>
-                                <p className="font-semibold text-[#1f1c17]">
-                                  {formatPercent(parsePercent(h.currentWeight))}{" "}
-                                  <span className="font-normal text-[#8f8676]">
-                                    / {s.target > 0 ? formatPercent(s.target) : tr("no target")}
-                                  </span>
-                                </p>
-                                <p className="text-[11px]">
-                                  {s.target <= 0 ? (
-                                    <span className="text-[#8f8676]">{tr("Set a target in Edit")}</span>
-                                  ) : Math.abs(s.drift) < 1 ? (
-                                    <span className="text-[#8f8676]">{tr("On target — hold")}</span>
-                                  ) : s.rebalanceUsd > 0 ? (
-                                    <span className="text-emerald-700">
-                                      {tr("Buy {v}", { v: formatUsd(s.rebalanceUsd) })} ≈ {s.rebalanceShares.toFixed(1)} {tr("sh")}
-                                    </span>
-                                  ) : (
-                                    <span className="text-rose-700">
-                                      {tr("Trim {v}", { v: formatUsd(-s.rebalanceUsd) })} ≈ {(-s.rebalanceShares).toFixed(1)} {tr("sh")}
-                                    </span>
-                                  )}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] text-[#8f8676]">{tr("Industry")}</p>
-                                <p className="text-[#1f1c17]">
-                                  {h.industry && h.industry !== "—" ? h.industry : tr("Unclassified")}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] text-[#8f8676]">{tr("Research")}</p>
-                                <p className="flex gap-3">
-                                  <a
-                                    href={`https://finance.yahoo.com/quote/${encodeURIComponent(h.ticker)}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="font-medium text-[#3b352d] underline decoration-black/20 underline-offset-2 hover:text-[#1f1c17]"
-                                  >
-                                    Yahoo ↗
-                                  </a>
-                                  <a
-                                    href={`https://finviz.com/quote.ashx?t=${encodeURIComponent(h.ticker)}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="font-medium text-[#3b352d] underline decoration-black/20 underline-offset-2 hover:text-[#1f1c17]"
-                                  >
-                                    Finviz ↗
-                                  </a>
-                                </p>
-                              </div>
-                            </div>
+                            holdingDetails(h, s)
                           )}
                         </td>
                       </tr>

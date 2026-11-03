@@ -12,9 +12,10 @@ import {
 import { useLocale, useT } from "@/lib/i18n";
 import { useBroker } from "@/state/broker-store";
 import { useInvesting } from "@/state/investing-store";
+import { CollapsibleCard } from "@/features/investing/dashboard/widgets";
 
 const AUTOSAVE_MS = 1500;
-const card = "rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]";
+const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 
 /** **bold** inside a line; everything else stays plain text (no HTML injection). */
 function inline(text: string): ReactNode {
@@ -245,9 +246,8 @@ export default function InvestingNotesPage() {
           </p>
         </article>
 
-        <aside className={`${card} h-fit space-y-2`}>
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr("Your numbers")}</h2>
-          <p className="pb-1 text-[11px] text-[#8f8676]">{tr("Live values to check your rules against. Click to open.")}</p>
+        <CollapsibleCard id="notes-numbers" title="Your numbers" hint="Live values to check your rules against. Click to open." className="h-fit">
+          <div className="mt-2 space-y-2">
           <Fact label="Account value" value={formatUsd(facts.value)} hint={cashUsd > 0 ? tr("incl. {v} broker cash", { v: formatUsd(cashUsd) }) : undefined} href="/investing/holdings" />
           <Fact
             label="ETF share"
@@ -273,7 +273,8 @@ export default function InvestingNotesPage() {
             hint={facts.largest?.ticker}
             href="/investing/dashboard"
           />
-        </aside>
+          </div>
+        </CollapsibleCard>
       </div>
     </div>
   );

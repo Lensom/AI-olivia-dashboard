@@ -22,8 +22,14 @@ export const investingPrimarySaveActive =
 export const investingPrimarySaveDisabled =
   "cursor-not-allowed rounded-full bg-black/10 px-3.5 py-1.5 text-xs font-medium text-[#6f675b]";
 
-/** Horizontal pill tabs (Crypto + Stocks workspaces). */
-export const investingTabNavWrap = "flex flex-wrap gap-2 border-b border-black/5 pb-3";
+/**
+ * A row of chips, badges or buttons that wraps on desktop and becomes one swipeable line on phones
+ * (see `.scroll-row` in globals.css). Use it for page-level rows, not inside cards.
+ */
+export const scrollRow = "scroll-row flex flex-wrap items-center gap-2";
+
+/** Horizontal pill tabs (Crypto + Stocks workspaces, Cinematography, Library, Life). */
+export const investingTabNavWrap = "scroll-row flex flex-wrap gap-2 border-b border-black/5 pb-3";
 
 const investingTabPillBase = "rounded-full px-3.5 py-1.5 text-xs font-medium transition";
 

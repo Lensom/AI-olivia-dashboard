@@ -125,7 +125,7 @@ export default function CryptoHoldingsPage() {
 
       <div className={investingTableScrollWrap}>
         {mode === "view" ? (
-          <table className="w-full min-w-[860px] border-collapse text-sm">
+          <table className="stack-table w-full min-w-[860px] border-collapse text-sm">
             <thead className="bg-[#f4efe4]">
               <tr>
                 <th className={`${th} text-left`}>{tr("Coin")}</th>
@@ -192,7 +192,7 @@ export default function CryptoHoldingsPage() {
             ) : null}
           </table>
         ) : (
-          <table className="w-full min-w-[640px] border-collapse text-sm">
+          <table className="stack-table w-full min-w-[640px] border-collapse text-sm">
             <thead className="bg-[#f4efe4]">
               <tr>
                 <th className={`${th} text-left`}>{tr("Ticker")}</th>

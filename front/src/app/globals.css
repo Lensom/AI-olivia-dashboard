@@ -19,6 +19,212 @@ body {
   letter-spacing: -0.01em;
 }
 
+/*
+ * Rows of tabs, chips and badges: on phones one swipeable line, bleeding to the screen edge
+ * (the page gutter is 1rem), instead of wrapping into three or four lines. Unlayered, so it
+ * beats Tailwind's flex-wrap utilities.
+ */
+@media (max-width: 639.98px) {
+  .scroll-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+    /* As a flex item it may shrink to the screen instead of growing to its content. */
+    min-width: 0;
+    max-width: calc(100% + 2rem);
+    scroll-padding-inline: 1rem;
+  }
+  .scroll-row::-webkit-scrollbar {
+    display: none;
+  }
+  .scroll-row > * {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+/*
+ * Tables that become cards on phones: add `stack-table` to the <table>. Each row turns into a card,
+ * the first cell is its title, every other cell reads "column — value" (the column name comes from
+ * the header, copied into data-label by <StackTableLabels />). The scrolling, bordered wrapper
+ * around the table steps aside. Desktop is untouched.
+ */
+@media (max-width: 639.98px) {
+  :where(div):has(> table.stack-table) {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    max-height: none;
+  }
+  table.stack-table {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+  table.stack-table thead {
+    display: none;
+  }
+  table.stack-table tbody,
+  table.stack-table tfoot {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  table.stack-table tfoot {
+    margin-top: 0.5rem;
+  }
+  table.stack-table tr {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgb(0 0 0 / 0.05);
+    border-radius: 0.75rem;
+    background: #faf8f2;
+    padding: 0.5rem 0.75rem;
+  }
+  table.stack-table tfoot tr {
+    background: #f3efe5;
+  }
+  table.stack-table td,
+  table.stack-table th {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.2rem 0;
+    border: 0;
+    text-align: right;
+    max-width: none;
+    white-space: normal;
+  }
+  table.stack-table td::before,
+  table.stack-table th::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    max-width: 50%;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 400;
+    color: #8f8676;
+  }
+  table.stack-table td:not([data-label])::before,
+  table.stack-table td[data-label=""]::before {
+    content: none;
+  }
+  /* The card's title: the cell marked .stack-title, else the row's first cell. */
+  table.stack-table tr:not(:has(> .stack-title)) > td:first-child,
+  table.stack-table td.stack-title {
+    order: -1;
+    justify-content: flex-start;
+    text-align: left;
+    font-weight: 600;
+    padding-bottom: 0.35rem;
+  }
+  table.stack-table tr:not(:has(> .stack-title)) > td:first-child::before,
+  table.stack-table td.stack-title::before {
+    content: none;
+  }
+  /* A cell whose content needs the full card width (a bar, a chart): label above it. */
+  table.stack-table td.stack-block {
+    display: block;
+    text-align: left;
+  }
+  table.stack-table td.stack-block::before {
+    display: block;
+    max-width: none;
+    margin-bottom: 0.25rem;
+  }
+  table.stack-table td.stack-block > * {
+    width: 100%;
+  }
+  /* A group heading row (e.g. a bucket name) between cards: plain text, not a card. */
+  table.stack-table tr.stack-group {
+    border: 0;
+    background: transparent;
+    padding: 0.5rem 0.25rem 0;
+  }
+  table.stack-table tr.stack-group > td {
+    padding: 0;
+    font-weight: 600;
+  }
+  /* Cells that mean nothing on a card (row expanders, spacers). */
+  table.stack-table .stack-hide {
+    display: none;
+  }
+  /* Empty cells (spacers, hidden actions) take no room. */
+  table.stack-table td:empty {
+    display: none;
+  }
+  /* Inputs in edit mode fill the value side. */
+  table.stack-table td > :is(input, select, textarea) {
+    max-width: 60%;
+  }
+  table.stack-table td.stack-title > :is(input, select, textarea) {
+    max-width: none;
+  }
+}
+
+/*
+ * Bottom sheet (the phone tab picker): glides up over a fading backdrop and back down on close.
+ * The curve is the one native iOS sheets use: a quick start that settles in softly.
+ */
+@keyframes sheet-up {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+@keyframes sheet-down {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+@keyframes sheet-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.sheet-up {
+  will-change: transform;
+  animation: sheet-up 420ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.sheet-down {
+  will-change: transform;
+  animation: sheet-down 280ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+.sheet-fade {
+  animation: sheet-fade-in 360ms ease-out both;
+}
+.sheet-fade-out {
+  animation: sheet-fade-out 280ms ease-in both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-up,
+  .sheet-down,
+  .sheet-fade,
+  .sheet-fade-out {
+    animation: none;
+  }
+}
+
 /* Visible keyboard focus everywhere; mouse clicks don't show it. */
 :where(a, button, select, summary, [tabindex]):focus-visible {
   outline: 2px solid #2a78d6;

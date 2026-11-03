@@ -25,6 +25,7 @@ import {
   investingPrimarySaveActive,
   investingTableScrollWrap,
   investingToolbarBtn,
+  scrollRow,
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
 import { useT } from "@/lib/i18n";
@@ -248,14 +249,14 @@ export default function CinemaKindPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={scrollRow}>
           <span className={investingMetaBadge}>
             {tr(meta.count, { n: mine.length })}
           </span>
           {avg != null ? <span className={investingMetaBadge}>{tr("Average score {v}", { v: avg.toFixed(1) })}</span> : null}
           <span className={investingMetaBadge}>{tr("{n} recommended", { n: mine.filter((t) => t.recommended).length })}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={scrollRow}>
           <button type="button" onClick={() => fileRef.current?.click()} disabled={importing} className={investingToolbarBtn}>
             {importing ? tr("Reading…") : tr("Import CSV / XLSX")}
           </button>
@@ -376,6 +377,7 @@ export default function CinemaKindPage() {
           placeholder={tr("Search title, actor, studio…")}
           className="w-full rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-xs outline-none focus:border-black/25 sm:w-60"
         />
+        <div className={`${scrollRow} sm:contents`}>
         <button type="button" onClick={() => setStatus("all")} className={chip(status === "all")}>
           {tr("All")} {mine.length}
         </button>
@@ -459,6 +461,7 @@ export default function CinemaKindPage() {
             ))}
           </span>
         </span>
+        </div>
       </div>
 
       {!isLoaded ? (

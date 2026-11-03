@@ -10,6 +10,7 @@ import {
   investingSubsectionStack,
   investingTableScrollWrap,
   investingToolbarBtn,
+  scrollRow,
 } from "@/features/investing/ui/investing-classes";
 import { InvestingSubsectionHeader } from "@/features/investing/ui/investing-subsection-header";
 import { useLocale, useT } from "@/lib/i18n";
@@ -74,7 +75,7 @@ export default function CryptoLedgerPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={scrollRow}>
         <span className={investingMetaBadge}>
           {cryptoMeta.updatedAt ? tr("Synced {when}", { when: new Date(cryptoMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
         </span>
@@ -102,7 +103,7 @@ export default function CryptoLedgerPage() {
         </div>
       ) : null}
 
-      <section className="flex flex-wrap gap-x-8 gap-y-3 rounded-2xl border border-black/5 bg-white/90 px-5 py-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
+      <section className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-black/5 bg-white/90 px-4 py-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:flex sm:flex-wrap sm:gap-x-8 sm:px-5">
         {[
           { label: "Funded", value: formatCryptoUsd(summary.usd), sub: `${summary.uah.toLocaleString(locale, { maximumFractionDigits: 2 })} UAH` },
           { label: "Average rate", value: summary.rate ? `${summary.rate.toFixed(2)} UAH/$` : "—", sub: tr("UAH ÷ USD across funding") },
@@ -130,7 +131,7 @@ export default function CryptoLedgerPage() {
               {tr("Date, UAH paid and USD received. Rate and “Spent” are calculated; Spent is what the purchases on the same date used.")}
             </p>
             <div className={investingTableScrollWrap}>
-              <table className="w-full min-w-[780px] border-collapse text-sm">
+              <table className="stack-table w-full min-w-[780px] border-collapse text-sm">
                 <thead className="bg-[#f4efe4]">
                   <tr>
                     <th className={`${th} text-center`}>{tr("Date")}</th>
@@ -201,7 +202,7 @@ export default function CryptoLedgerPage() {
               {tr("Per date: USD spent and the execution price. Leave a coin empty if you only bought the other. Coins bought are calculated (USD ÷ price).")}
             </p>
             <div className={investingTableScrollWrap}>
-              <table className="w-full min-w-[1040px] border-collapse text-sm">
+              <table className="stack-table w-full min-w-[1040px] border-collapse text-sm">
                 <thead className="bg-[#f4efe4]">
                   <tr>
                     <th className={`${th} text-center`}>{tr("Date")}</th>

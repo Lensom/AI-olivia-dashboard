@@ -10,6 +10,7 @@ import {
   investingSubsectionStack,
   investingTableScrollWrap,
   investingToolbarBtn,
+  scrollRow,
 } from "@/features/investing/ui/investing-classes";
 import { AddActivityDialog } from "@/features/investing/activity-dialog";
 import { InvestingSubsectionHeader } from "@/features/investing/ui/investing-subsection-header";
@@ -339,6 +340,7 @@ export default function InvestingActivitiesPage() {
           aria-label={tr("Search activities")}
           className="w-full max-w-xs rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20"
         />
+        <div className={`${scrollRow} sm:contents`}>
         <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter by type")}>
           {(
             [
@@ -359,10 +361,11 @@ export default function InvestingActivitiesPage() {
             </button>
           ))}
         </div>
+        </div>
       </div>
 
       {/* Summary of what is shown */}
-      <section className="flex flex-wrap gap-x-8 gap-y-3 rounded-2xl border border-black/5 bg-white/90 px-5 py-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
+      <section className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-black/5 bg-white/90 px-4 py-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:flex sm:flex-wrap sm:gap-x-8 sm:px-5">
         {[
           {
             label: isFiltered ? "Trades shown" : "Trades",
@@ -391,7 +394,7 @@ export default function InvestingActivitiesPage() {
 
       {/* Trade log */}
       <div className={investingTableScrollWrap}>
-        <table className={`w-full ${mode === "edit" ? "min-w-[1180px]" : "min-w-[860px]"} border-collapse text-left text-sm`}>
+        <table className={`stack-table w-full ${mode === "edit" ? "min-w-[1180px]" : "min-w-[860px]"} border-collapse text-left text-sm`}>
           <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
             {mode === "view" ? (
               <tr>
@@ -449,7 +452,7 @@ export default function InvestingActivitiesPage() {
                         {isSell ? tr("Sell") : tr("Buy")}
                       </span>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="stack-title px-3 py-2">
                       <span className="font-semibold text-[#1f1c17]">{row.ticker || "—"}</span>
                       {row.name && row.name.toUpperCase() !== row.ticker.toUpperCase() ? (
                         <span className="block max-w-[220px] truncate text-[11px] text-[#8f8676]" title={row.name}>
@@ -493,7 +496,7 @@ export default function InvestingActivitiesPage() {
                       <option value="sell">{tr("Sell")}</option>
                     </select>
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="stack-title px-2 py-2">
                     <input value={row.name} onChange={(e) => updateActivity(row.id, { name: e.target.value })} className={inputBaseClasses()} placeholder={tr("Company")} />
                   </td>
                   <td className="px-2 py-2">
@@ -573,7 +576,7 @@ export default function InvestingActivitiesPage() {
         <InvestingSubsectionHeader title={tr("By ticker ({n})", { n: byTicker.length })} isOpen={isTickersOpen} onToggle={() => setTickersOpen((v) => !v)} />
         {isTickersOpen ? (
           <div className={investingTableScrollWrap}>
-            <table className="w-full min-w-[760px] border-collapse text-left text-sm tabular-nums">
+            <table className="stack-table w-full min-w-[760px] border-collapse text-left text-sm tabular-nums">
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
                   <th className="px-3 py-2 font-medium">{tr("Ticker")}</th>
@@ -627,7 +630,7 @@ export default function InvestingActivitiesPage() {
         <InvestingSubsectionHeader title="Yearly totals" isOpen={isYearlyOpen} onToggle={() => setYearlyOpen((v) => !v)} />
         {isYearlyOpen ? (
           <div className={investingTableScrollWrap}>
-            <table className="w-full min-w-[760px] border-collapse text-left text-sm tabular-nums">
+            <table className="stack-table w-full min-w-[760px] border-collapse text-left text-sm tabular-nums">
               <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
                 <tr>
                   <th className="px-3 py-2 font-medium">{tr("Year")}</th>

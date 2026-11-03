@@ -51,12 +51,16 @@ export function CapitalValueLineChart({
   title = "Portfolio value over time",
   subtitle = "From capital tracking entries (total value).",
   data,
+  bare = false,
 }: {
   title?: string;
   subtitle?: string;
   data: CapitalValuePoint[];
+  /** Only the chart, without its card and title (for a card that brings its own, e.g. a collapsible one). */
+  bare?: boolean;
 }) {
   const clipId = useId().replace(/:/g, "");
+  const Box = bare ? "div" : "article";
   const tr = useT();
 
   const { pathD, circles, ticks, tickYs, viewW, viewH, xLabels } = useMemo(() => {
@@ -104,30 +108,38 @@ export function CapitalValueLineChart({
 
   if (data.length === 0) {
     return (
-      <article className="flex h-full min-h-[300px] flex-col rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-[#1f1c17]">{tr(title)}</h2>
-          <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-[#6f675b]">
-            {tr("Capital")}
-          </span>
-        </div>
-        <p className="mt-1 text-xs text-[#655d51]">{tr(subtitle)}</p>
-        <p className="mt-10 text-center text-sm text-[#7f7668]">
+      <Box className={bare ? "" : "flex h-full min-h-[300px] flex-col rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]"}>
+        {bare ? null : (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-[#1f1c17]">{tr(title)}</h2>
+              <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-[#6f675b]">
+                {tr("Capital")}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-[#655d51]">{tr(subtitle)}</p>
+          </>
+        )}
+        <p className={`${bare ? "mt-6 mb-4" : "mt-10"} text-center text-sm text-[#7f7668]`}>
           {tr("On the Dashboard, add capital rows with a date (e.g. 15.03.2024 or 2024-03-15) and total value.")}
         </p>
-      </article>
+      </Box>
     );
   }
 
   return (
-    <article className="flex h-full flex-col rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-[#1f1c17]">{tr(title)}</h2>
-        <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-[#6f675b]">
-          {tr("Capital")}
-        </span>
-      </div>
-      <p className="mt-1 text-xs text-[#655d51]">{tr(subtitle)}</p>
+    <Box className={bare ? "" : "flex h-full flex-col rounded-2xl border border-black/5 bg-white/90 p-5 shadow-[0_8px_30px_rgba(18,16,13,0.05)]"}>
+      {bare ? null : (
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-[#1f1c17]">{tr(title)}</h2>
+            <span className="rounded-xl border border-black/10 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-[#6f675b]">
+              {tr("Capital")}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-[#655d51]">{tr(subtitle)}</p>
+        </>
+      )}
       <svg
         className="mx-auto mt-3 w-full max-w-full overflow-visible"
         viewBox={`0 0 ${viewW} ${viewH}`}
@@ -203,6 +215,6 @@ export function CapitalValueLineChart({
           Date
         </text>
       </svg>
-    </article>
+    </Box>
   );
 }
