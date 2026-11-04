@@ -13,6 +13,7 @@ from app.library.ai import router as library_ai_router
 import app.library.wikidata as library_wikidata_module
 from app.library.series import router as library_series_router
 from app.categories.router import router as categories_router
+import app.investing.router as investing_router_module
 from app.investing.router import router as investing_router
 from app.investing.watchlist import router as watchlist_router
 from app.investing.events import router as events_router
@@ -21,6 +22,7 @@ from app.games.router import router as games_router
 from app.pages.router import router as pages_router
 from app.db import create_pool, init_db
 from app.llm.client import DEFAULT_FALLBACK_MODELS, DEFAULT_MODEL, LLMClient
+import app.broker.router as broker_router_module
 
 
 class Settings(BaseSettings):
@@ -36,6 +38,11 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""  # Investing: AI stock analysis
     gemini_model: str = DEFAULT_MODEL  # tried first
     gemini_fallback_models: str = ",".join(DEFAULT_FALLBACK_MODELS)  # comma-separated, tried in order when the first fails
+    # Investing: sync with Freedom24 (Tradernet API). Used only through the read-only client in app/broker/freedom24.py.
+    freedom24_public_key: str = ""
+    freedom24_private_key: str = ""
+    # Only this account (its login email) can see the Freedom24 data; empty = nobody.
+    freedom24_owner_email: str = ""
     cors_origins: str = (
         "http://localhost:3000,"
         "http://127.0.0.1:3000,"
@@ -94,6 +101,16 @@ app.include_router(watchlist_router, prefix=API_PREFIX)
 app.include_router(events_router, prefix=API_PREFIX)
 app.dependency_overrides[cinema_router_module.get_tmdb_key] = lambda: settings.tmdb_api_key.strip()
 app.include_router(cinema_router_module.router, prefix=API_PREFIX)
+app.dependency_overrides[broker_router_module.get_freedom24_settings] = lambda: broker_router_module.Freedom24Settings(
+    public_key=settings.freedom24_public_key.strip(),
+    private_key=settings.freedom24_private_key.strip(),
+    owner_email=settings.freedom24_owner_email.strip(),
+)
+app.include_router(broker_router_module.router, prefix=API_PREFIX)
+# Investing pages read positions, trades, deposits, dividends and cash from Freedom24 for the keys' owner.
+app.dependency_overrides[investing_router_module.get_broker_source] = lambda: (
+    lambda user: broker_router_module.source_for(user, app.dependency_overrides[broker_router_module.get_freedom24_settings]())
+)
 app.dependency_overrides[library_router_module.get_google_books_key] = lambda: settings.google_books_api_key.strip()
 app.include_router(library_router_module.router, prefix=API_PREFIX)
 library_wikidata_module.CONTACT = settings.wikidata_contact.strip()

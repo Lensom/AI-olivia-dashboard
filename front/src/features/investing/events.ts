@@ -9,7 +9,15 @@ import type { T } from "@/lib/i18n";
 import type { InvestingPickingRow } from "@/state/investing-store";
 
 /** Mirrors TickerEvents in back/app/investing/events.py. */
-export type DividendDate = { date: string; amount: number | null; estimated: boolean };
+export type DividendDate = {
+  date: string;
+  amount: number | null;
+  estimated: boolean;
+  /** Payment date, when the broker has announced the dividend. */
+  pay_date?: string;
+  /** "freedom24": announced by your broker (exact amount and pay date). */
+  source?: string;
+};
 export type TickerEvents = {
   ticker: string;
   earnings_date: string;
@@ -36,6 +44,9 @@ export type CalendarEvent = {
   /** Dividend per share, and what your shares would get. */
   perShare?: number | null;
   income?: number | null;
+  /** Dividend: when the money arrives, and whether your broker confirmed it. */
+  payDate?: string;
+  fromBroker?: boolean;
 };
 
 /** Events for the given tickers; refetched when the set changes. */
@@ -93,6 +104,8 @@ export function calendarEvents(
         estimated: d.estimated,
         perShare: d.amount,
         income: held && d.amount != null ? d.amount * (shares.get(e.ticker) ?? 0) : null,
+        payDate: d.pay_date || undefined,
+        fromBroker: d.source === "freedom24",
       });
     }
   }

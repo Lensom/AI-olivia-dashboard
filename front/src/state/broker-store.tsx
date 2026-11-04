@@ -44,6 +44,8 @@ type BrokerStore = BrokerData & {
   /** Uninvested broker cash in USD (non-USD balances at official NBU rates). */
   cashUsd: number;
   updatedAt: string | null;
+  /** Cash and dividends come from Freedom24 (read-only); the attention rules stay yours. */
+  fromBroker: boolean;
   isLoaded: boolean;
   isDirty: boolean;
   isSaving: boolean;
@@ -64,6 +66,7 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
   const [data, setData] = useState<BrokerData>({ cash: [], dividends: [], rules: DEFAULT_RULES });
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [fromBroker, setFromBroker] = useState(false);
   const [isLoaded, setLoaded] = useState(false);
   const [isDirty, setDirty] = useState(false);
   const [isSaving, setSaving] = useState(false);
@@ -77,11 +80,12 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token) return;
-    apiFetch<BrokerData & { updated_at: string | null }>("/investing/broker", { token })
+    apiFetch<BrokerData & { updated_at: string | null; source?: string }>("/investing/broker", { token })
       .then((res) => {
         const next = { cash: res.cash, dividends: res.dividends, rules: { ...DEFAULT_RULES, ...res.rules } };
         savedRef.current = next;
         setData(next);
+        setFromBroker(res.source === "freedom24");
         setUpdatedAt(res.updated_at);
         setDirty(false);
       })
@@ -130,6 +134,7 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
       ...data,
       cashUsd,
       updatedAt,
+      fromBroker,
       isLoaded,
       isDirty,
       isSaving,
@@ -160,7 +165,7 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [data, cashUsd, updatedAt, isLoaded, isDirty, isSaving, put],
+    [data, cashUsd, updatedAt, fromBroker, isLoaded, isDirty, isSaving, put],
   );
 
   return <BrokerContext.Provider value={store}>{children}</BrokerContext.Provider>;

@@ -100,9 +100,12 @@ function StatCard({
 }
 
 export default function InvestingFinancePage() {
+  // Deposits come from Freedom24: the table is read-only; the operating-expenses override stays yours.
   const {
     refills,
     operatingExpensesUsd,
+    externalFeesUsd,
+    brokerInterestUsd,
     refillsMeta,
     isRefillsLoading,
     isRefillsSaving,
@@ -113,9 +116,12 @@ export default function InvestingFinancePage() {
     addRefill,
     deleteRefill,
     setOperatingExpensesUsd,
+    externalFees,
+    setExternalFees,
     saveRefills,
     refreshRefills,
   } = useInvesting();
+  const refillsFromBroker = !!refillsMeta.fromBroker;
   const { cashUsd } = useBroker();
   const tr = useT();
   const locale = useLocale();
@@ -128,8 +134,8 @@ export default function InvestingFinancePage() {
 
   // All fees: refill commissions + buy and sell commissions from Activities, unless overridden manually.
   const fees = useMemo(
-    () => feeBreakdown(refills, activitiesSummary, operatingExpensesUsd),
-    [refills, activitiesSummary, operatingExpensesUsd],
+    () => feeBreakdown(refills, activitiesSummary, operatingExpensesUsd, externalFeesUsd, brokerInterestUsd),
+    [refills, activitiesSummary, operatingExpensesUsd, externalFeesUsd, brokerInterestUsd],
   );
   const operatingExpenses = fees.total;
 
@@ -205,7 +211,8 @@ export default function InvestingFinancePage() {
       </p>
 
       <div className={scrollRow}>
-        <span className={investingMetaBadge}>
+        <span className={`${investingMetaBadge} ${refillsFromBroker ? "border-emerald-200 bg-emerald-50 text-emerald-800" : ""}`}>
+          {refillsFromBroker ? "Freedom24 · " : ""}
           {refillsMeta.updatedAt ? tr("Synced {when}", { when: new Date(refillsMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
         </span>
         <button
@@ -216,9 +223,11 @@ export default function InvestingFinancePage() {
         >
           {isRefillsLoading ? tr("Loading…") : tr("Reload")}
         </button>
-        <button type="button" onClick={addRefill} className={investingToolbarBtn}>
-          {tr("Add refill")}
-        </button>
+        {!refillsFromBroker ? (
+          <button type="button" onClick={addRefill} className={investingToolbarBtn}>
+            {tr("Add refill")}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={() => void saveRefills()}
@@ -242,7 +251,9 @@ export default function InvestingFinancePage() {
           hint={
             fees.isOverride
               ? tr("Manual override is active (calculated: {v}).", { v: formatUsd(fees.computed) })
-              : tr("Refills {r} · Buys {b} · Sells {s}", { r: formatUsd(fees.refill), b: formatUsd(fees.buy), s: formatUsd(fees.sell) })
+              : tr("Refills {r} · Buys {b} · Sells {s}", { r: formatUsd(fees.refill), b: formatUsd(fees.buy), s: formatUsd(fees.sell) }) +
+                (fees.external ? ` · ${tr("Outside the broker {v}", { v: formatUsd(fees.external) })}` : "") +
+                (fees.interest ? ` · ${tr("Margin interest {v}", { v: formatUsd(fees.interest) })}` : "")
           }
         />
         <StatCard
@@ -382,6 +393,72 @@ export default function InvestingFinancePage() {
                 </table>
               </div>
               <div className="mt-4 rounded-xl border border-black/5 bg-[#faf8f2] p-3">
+                <label className="block text-xs font-medium text-[#6f675b]" htmlFor="external-fees">
+                  {tr("Fees outside the broker, $")}
+                </label>
+                <p className="mt-0.5 text-[11px] text-[#8f8676]">
+                  {tr("What deposits cost before the money reached the broker (deposit services, card currency exchange). The broker never sees these, so add them here; they count in operating expenses.")}
+                </p>
+                {/* One row per deposit: date (the deposit's), fee in USD, an optional note. */}
+                <table className="stack-table mt-2 w-full border-collapse text-left text-sm">
+                  <thead className="text-[11px] text-[#8f8676]">
+                    <tr>
+                      <th className="py-1 pr-2 font-medium">{tr("Date")}</th>
+                      <th className="py-1 pr-2 font-medium">{tr("Fee, $")}</th>
+                      <th className="py-1 pr-2 font-medium">{tr("Note")}</th>
+                      <th className="py-1" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...externalFees]
+                      .sort((a, b) => (parseInvestingDateMs(b.date) ?? 0) - (parseInvestingDateMs(a.date) ?? 0))
+                      .map((f) => {
+                        const patch = (p: Partial<typeof f>) => setExternalFees((rows) => rows.map((r) => (r.id === f.id ? { ...r, ...p } : r)));
+                        return (
+                          <tr key={f.id} className="border-t border-black/5">
+                            <td className="py-1 pr-2">
+                              <input value={f.date} onChange={(e) => patch({ date: e.target.value })} placeholder="DD.MM.YYYY" className={`${inputBaseClasses()} w-[118px]`} />
+                            </td>
+                            <td className="py-1 pr-2">
+                              <input value={f.amount} onChange={(e) => patch({ amount: e.target.value })} inputMode="decimal" placeholder="0" className={`${inputBaseClasses()} w-[90px] text-right tabular-nums`} />
+                            </td>
+                            <td className="py-1 pr-2">
+                              <input value={f.note} onChange={(e) => patch({ note: e.target.value })} placeholder={tr("e.g. crypto deposit")} className={inputBaseClasses()} />
+                            </td>
+                            <td className="py-1 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setExternalFees((rows) => rows.filter((r) => r.id !== f.id))}
+                                className="text-xs text-[#8f8676] hover:text-rose-700"
+                                aria-label={tr("Delete fee")}
+                              >
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExternalFees((rows) => [
+                        ...rows,
+                        { id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`, date: "", amount: "", note: "" },
+                      ])
+                    }
+                    className={investingToolbarBtn}
+                  >
+                    {tr("Add fee")}
+                  </button>
+                  <span className="text-xs text-[#6f675b]">
+                    {tr("Total {v}", { v: formatUsd(parseUsd(externalFeesUsd || "0")) })} · {tr("press Save above to keep changes")}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-3 rounded-xl border border-black/5 bg-[#faf8f2] p-3">
                 <label className="block text-xs font-medium text-[#6f675b]">{tr("Operating expenses override, $")}</label>
                 <p className="mt-0.5 text-[11px] text-[#8f8676]">
                   {tr("Leave empty to use all fees: refill commissions plus buy and sell commissions from Activities. Set a total only to match another source (e.g. a broker statement).")}
@@ -506,6 +583,7 @@ export default function InvestingFinancePage() {
                         <input
                           value={row.date}
                           onChange={(e) => updateRefill(row.id, { date: e.target.value })}
+                          readOnly={refillsFromBroker}
                           className={inputBaseClasses()}
                           placeholder="DD.MM.YYYY"
                         />
@@ -514,6 +592,7 @@ export default function InvestingFinancePage() {
                         <input
                           value={row.amount}
                           onChange={(e) => updateRefill(row.id, { amount: e.target.value })}
+                          readOnly={refillsFromBroker}
                           className={inputBaseClasses()}
                           placeholder="0"
                         />
@@ -522,12 +601,14 @@ export default function InvestingFinancePage() {
                         <input
                           value={row.commission}
                           onChange={(e) => updateRefill(row.id, { commission: e.target.value })}
+                          readOnly={refillsFromBroker}
                           className={inputBaseClasses()}
                           placeholder="0"
                         />
                       </td>
                       <td className="px-2 py-2 pt-3 text-right tabular-nums text-[#8f8676]">{fmt2(cumulative)}</td>
                       <td className="px-2 py-2">
+                        {!refillsFromBroker ? (
                         <button
                           type="button"
                           onClick={() => deleteRefill(row.id)}
@@ -535,6 +616,7 @@ export default function InvestingFinancePage() {
                         >
                           {tr("Delete")}
                         </button>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

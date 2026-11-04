@@ -45,7 +45,7 @@ export function AttentionStrip() {
   const { token } = useAuth();
   const t = useT();
   const locale = useLocale();
-  const { holdings, pickingRows, refills, activitiesSummary, operatingExpensesUsd } = useInvesting();
+  const { holdings, pickingRows, refills, activitiesSummary, operatingExpensesUsd, externalFeesUsd, brokerInterestUsd } = useInvesting();
   const { cash, cashUsd, dividends, rules, saveRules, isLoaded } = useBroker();
   const [total, setTotal] = useState<TotalDoc | null | undefined>(undefined); // undefined = loading
   const [cryptoValue, setCryptoValue] = useState(0);
@@ -85,7 +85,7 @@ export function AttentionStrip() {
   const items = useMemo(() => {
     const holdingsValue = holdings.reduce((a, h) => a + parseUsd(h.marketValue), 0);
     const topped = refills.reduce((a, r) => a + parseUsd(r.amount), 0);
-    const fees = feeBreakdown(refills, activitiesSummary, operatingExpensesUsd).total;
+    const fees = feeBreakdown(refills, activitiesSummary, operatingExpensesUsd, externalFeesUsd, brokerInterestUsd).total;
     const xirr = xirrFromRefills(refills, holdingsValue + cashUsd, nowMs);
     const month = new Date(nowMs).toISOString().slice(0, 7);
 
@@ -132,7 +132,7 @@ export function AttentionStrip() {
     // Events sit after rules and opportunities, before the monthly to-dos.
     const firstTodo = ruleItems.findIndex((i) => i.kind === "todo");
     return firstTodo < 0 ? [...ruleItems, ...upcoming] : [...ruleItems.slice(0, firstTodo), ...upcoming, ...ruleItems.slice(firstTodo)];
-  }, [holdings, refills, activitiesSummary, operatingExpensesUsd, cashUsd, cash, dividends, pickingRows, rules, total, rates, cryptoValue, nowMs, t, locale, events]);
+  }, [holdings, refills, activitiesSummary, operatingExpensesUsd, externalFeesUsd, brokerInterestUsd, cashUsd, cash, dividends, pickingRows, rules, total, rates, cryptoValue, nowMs, t, locale, events]);
 
   const loading = !isLoaded || total === undefined || holdings.length === 0;
   const visible = showAll ? items : items.slice(0, 6);

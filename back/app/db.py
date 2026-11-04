@@ -133,6 +133,25 @@ def init_db(pool: ConnectionPool) -> None:
             );
             """
         )
+        # Fees paid outside the broker (deposit services, card currency exchange) that the broker never sees,
+        # added to the broker's own fees in operating expenses.
+        conn.execute("ALTER TABLE investing_refills ADD COLUMN IF NOT EXISTS external_fees_usd TEXT NOT NULL DEFAULT ''")
+        # The same fees one by one (date, amount, note); external_fees_usd is kept as their sum.
+        conn.execute("ALTER TABLE investing_refills ADD COLUMN IF NOT EXISTS external_fees JSONB NOT NULL DEFAULT '[]'::jsonb")
+        # Hand-kept investing data saved before switching a section to the broker's API (Freedom24),
+        # one row per table snapshot, so nothing typed by hand is ever lost.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS investing_manual_archive (
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                kind TEXT NOT NULL,
+                data JSONB NOT NULL,
+                source_updated_at TIMESTAMPTZ,
+                archived_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS cinema_titles (

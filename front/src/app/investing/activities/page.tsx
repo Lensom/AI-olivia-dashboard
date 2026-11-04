@@ -107,6 +107,7 @@ export default function InvestingActivitiesPage() {
   }
 
   const [mode, setMode] = useState<"view" | "edit">("view");
+  const fromBroker = !!activitiesMeta.fromBroker;
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [yearFilter, setYearFilter] = useState<number | "all">("all");
@@ -212,13 +213,18 @@ export default function InvestingActivitiesPage() {
     <div className={investingPageStack}>
       {addType ? <AddActivityDialog key={addType} initialType={addType} onClose={() => setAddType(null)} /> : null}
       <p className="text-sm text-[#655d51]">
-        {tr("Every buy and sell. USD amounts and FX rates are calculated when you save.")}
+        {fromBroker
+          ? tr("Every buy and sell, straight from Freedom24 — new trades appear by themselves. Nothing to import or type in.")
+          : tr("Every buy and sell. USD amounts and FX rates are calculated when you save.")}
       </p>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className={investingMetaBadge}>
+        <span className={`${investingMetaBadge} ${fromBroker ? "border-emerald-200 bg-emerald-50 text-emerald-800" : ""}`}>
+          {fromBroker ? "Freedom24 · " : ""}
           {activitiesMeta.updatedAt ? tr("Synced {when}", { when: new Date(activitiesMeta.updatedAt).toLocaleString(locale) }) : tr("Not synced")}
         </span>
+        {/* Import, add and edit only for a hand-kept table; trades from the broker are read-only. */}
+        {!fromBroker ? (
         <div className="flex flex-wrap items-center gap-2">
           <input
             ref={fileInputRef}
@@ -273,6 +279,7 @@ export default function InvestingActivitiesPage() {
               </button>
           ) : null}
         </div>
+        ) : null}
       </div>
 
       {isActivitiesDirty ? (

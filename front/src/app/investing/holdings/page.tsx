@@ -11,7 +11,9 @@ import {
   investingPrimarySaveDisabled,
   investingToolbarBtn,
 } from "@/features/investing/ui/investing-classes";
+import { apiFetch } from "@/lib/api";
 import { useLocale, useT } from "@/lib/i18n";
+import { useAuth } from "@/state/auth-store";
 import { useInvesting, type InvestingHoldingsImportSummary } from "@/state/investing-store";
 
 function inputBaseClasses() {
@@ -110,6 +112,7 @@ const FILTERS: { key: RowFilter; label: string }[] = [
 ];
 
 export default function InvestingTablePage() {
+  const { token } = useAuth();
   const {
     holdings,
     holdingsMeta,
@@ -126,6 +129,7 @@ export default function InvestingTablePage() {
     isHoldingsDirty,
     isHoldingsSaving,
     importHoldings,
+    syncHoldingsFromFreedom24,
     autofillHoldingProfiles,
   } = useInvesting();
   const tr = useT();
@@ -139,8 +143,24 @@ export default function InvestingTablePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<
-    { ok: true; summary: InvestingHoldingsImportSummary } | { ok: false; message: string } | null
+    | { ok: true; source: "file" | "freedom24"; summary: InvestingHoldingsImportSummary }
+    | { ok: false; source: "file" | "freedom24"; message: string }
+    | null
   >(null);
+  // Freedom24 sync shows only for the account its API keys belong to (GET /broker/freedom24/status).
+  const [f24Connected, setF24Connected] = useState(false);
+  // Positions come from Freedom24: shares and prices are the broker's; targets, names and industries stay yours.
+  const fromBroker = !!holdingsMeta.fromBroker;
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    apiFetch<{ connected: boolean }>("/broker/freedom24/status", { token })
+      .then((r) => alive && setF24Connected(r.connected))
+      .catch(() => alive && setF24Connected(false));
+    return () => {
+      alive = false;
+    };
+  }, [token]);
   const [isAutofilling, setAutofilling] = useState(false);
   const [autofillResult, setAutofillResult] = useState<string | null>(null);
 
@@ -158,13 +178,28 @@ export default function InvestingTablePage() {
     setImportResult(null);
     try {
       const summary = await importHoldings(file);
-      setImportResult({ ok: true, summary });
+      setImportResult({ ok: true, source: "file", summary });
       setMode("edit");
     } catch (err) {
-      setImportResult({ ok: false, message: importErrorMessage(err) });
+      setImportResult({ ok: false, source: "file", message: importErrorMessage(err) });
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  /** Shares and prices from Freedom24 into the table (unsaved until Save); your targets and industries stay. */
+  async function handleSyncFreedom24() {
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const summary = await syncHoldingsFromFreedom24();
+      setImportResult({ ok: true, source: "freedom24", summary });
+      setMode("edit");
+    } catch (err) {
+      setImportResult({ ok: false, source: "freedom24", message: importErrorMessage(err) });
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -376,7 +411,7 @@ export default function InvestingTablePage() {
           <span className={investingMetaBadge}>{tr("Target sum {v}", { v: formatPercent(totals.totalTarget) })}</span>
           <span className={investingMetaBadge}>{tr("Current sum {v}", { v: formatPercent(totals.totalCurrent) })}</span>
           <span className={investingMetaBadge}>
-            {tr("Source {v}", { v: holdingsMeta.source })}
+            {tr("Source {v}", { v: fromBroker ? "Freedom24" : holdingsMeta.source })}
             {holdingsMeta.updatedAt ? ` · ${tr("synced {when}", { when: new Date(holdingsMeta.updatedAt).toLocaleString(locale) })}` : ""}
           </span>
           <span className={investingMetaBadge}>{tr("Div yield")} {isMetricsLoading ? "…" : metrics.divYieldPercent}</span>
@@ -411,6 +446,7 @@ export default function InvestingTablePage() {
             className="hidden"
             onChange={(e) => void handleImportFile(e.target.files?.[0])}
           />
+          {!fromBroker ? (
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -420,6 +456,18 @@ export default function InvestingTablePage() {
           >
             {isImporting ? tr("Importing…") : tr("Import XLSX")}
           </button>
+          ) : null}
+          {f24Connected && !fromBroker ? (
+            <button
+              type="button"
+              onClick={() => void handleSyncFreedom24()}
+              disabled={isImporting}
+              title={tr("Shares, average and market prices from Freedom24. Your targets and industries stay. Review, then Save.")}
+              className={["transition", isImporting ? investingPrimarySaveDisabled : investingToolbarBtn].join(" ")}
+            >
+              {isImporting ? tr("Syncing…") : tr("Sync Freedom24")}
+            </button>
+          ) : null}
           <div className="flex rounded-full border border-black/10 bg-white p-1">
             <button
               type="button"
@@ -455,9 +503,11 @@ export default function InvestingTablePage() {
               >
                 {isHoldingsSaving ? tr("Saving…") : tr("Save")}
               </button>
-              <button onClick={addHolding} className={investingPrimarySaveActive}>
-                {tr("Add row")}
-              </button>
+              {!fromBroker ? (
+                <button onClick={addHolding} className={investingPrimarySaveActive}>
+                  {tr("Add row")}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void handleAutofill()}
@@ -509,10 +559,12 @@ export default function InvestingTablePage() {
           {importResult.ok ? (
             <div className="grid gap-0.5">
               <p className="font-medium">
-                {tr("Imported: {updated} updated, {added} added. Review and press Save to store in the database.", {
-                  updated: importResult.summary.updated.length,
-                  added: importResult.summary.added.length,
-                })}
+                {tr(
+                  importResult.source === "freedom24"
+                    ? "Synced from Freedom24: {updated} updated, {added} added. Your targets and industries are kept. Review and press Save to store in the database."
+                    : "Imported: {updated} updated, {added} added. Review and press Save to store in the database.",
+                  { updated: importResult.summary.updated.length, added: importResult.summary.added.length },
+                )}
               </p>
               {importResult.summary.added.length > 0 ? (
                 <p>
@@ -520,14 +572,22 @@ export default function InvestingTablePage() {
                 </p>
               ) : null}
               {importResult.summary.notInFile.length > 0 ? (
-                <p>{tr("Not in file (kept, delete if sold): {list}", { list: importResult.summary.notInFile.join(", ") })}</p>
+                <p>
+                  {tr(importResult.source === "freedom24" ? "Not at Freedom24 (kept, delete if sold): {list}" : "Not in file (kept, delete if sold): {list}", {
+                    list: importResult.summary.notInFile.join(", "),
+                  })}
+                </p>
               ) : null}
               {importResult.summary.skipped.length > 0 ? (
-                <p>{tr("Skipped (missing Qty or Entry Price): {list}", { list: importResult.summary.skipped.join(", ") })}</p>
+                <p>
+                  {tr(importResult.source === "freedom24" ? "Skipped (not in USD): {list}" : "Skipped (missing Qty or Entry Price): {list}", {
+                    list: importResult.summary.skipped.join(", "),
+                  })}
+                </p>
               ) : null}
             </div>
           ) : (
-            <p>{tr("Import failed: {v}", { v: tr(importResult.message) })}</p>
+            <p>{tr(importResult.source === "freedom24" ? "Freedom24 sync failed: {v}" : "Import failed: {v}", { v: tr(importResult.message) })}</p>
           )}
           <button type="button" onClick={() => setImportResult(null)} className="text-xs opacity-70 hover:opacity-100">
             {tr("Dismiss")}
@@ -794,6 +854,8 @@ export default function InvestingTablePage() {
                           <td className="px-2 py-2 text-left">
                             <input
                               value={String(h.shares)}
+                              readOnly={fromBroker}
+                              title={fromBroker ? tr("From Freedom24") : undefined}
                               onChange={(e) => updateHolding(h.id, { shares: Number(e.target.value) || 0 })}
                               className={`${inputBaseClasses()} text-left tabular-nums`}
                               inputMode="decimal"
@@ -803,6 +865,8 @@ export default function InvestingTablePage() {
                           <td className="px-2 py-2 text-left">
                             <input
                               value={h.avgBuyPrice}
+                              readOnly={fromBroker}
+                              title={fromBroker ? tr("From Freedom24") : undefined}
                               onChange={(e) => updateHolding(h.id, { avgBuyPrice: e.target.value })}
                               onBlur={() => updateHolding(h.id, { avgBuyPrice: formatUsd(parseUsd(h.avgBuyPrice)) })}
                               className={`${inputBaseClasses()} text-left tabular-nums`}
@@ -813,6 +877,8 @@ export default function InvestingTablePage() {
                           <td className="px-2 py-2 text-left">
                             <input
                               value={h.marketPrice}
+                              readOnly={fromBroker}
+                              title={fromBroker ? tr("From Freedom24") : undefined}
                               onChange={(e) => updateHolding(h.id, { marketPrice: e.target.value })}
                               onBlur={() => updateHolding(h.id, { marketPrice: formatUsd(parseUsd(h.marketPrice)) })}
                               className={`${inputBaseClasses()} text-left tabular-nums`}
@@ -834,6 +900,8 @@ export default function InvestingTablePage() {
                           <td className="px-2 py-2 text-left">
                             <input
                               value={h.marketValue}
+                              readOnly={fromBroker}
+                              title={fromBroker ? tr("From Freedom24") : undefined}
                               onChange={(e) => updateHolding(h.id, { marketValue: e.target.value })}
                               onBlur={() => updateHolding(h.id, { marketValue: formatUsd(parseUsd(h.marketValue)) })}
                               className={`${inputBaseClasses()} text-left tabular-nums`}
@@ -852,9 +920,11 @@ export default function InvestingTablePage() {
                             </div>
                           </td>
                           <td className="px-2 py-2">
-                            <button onClick={() => deleteHolding(h.id)} className={investingToolbarBtn} type="button">
-                              {tr("Delete")}
-                            </button>
+                            {!fromBroker ? (
+                              <button onClick={() => deleteHolding(h.id)} className={investingToolbarBtn} type="button">
+                                {tr("Delete")}
+                              </button>
+                            ) : null}
                           </td>
                         </>
                       ) : (

@@ -120,7 +120,11 @@ export type FeeBreakdown = {
   refill: number;
   buy: number;
   sell: number;
-  /** refill + buy + sell, before any manual override. */
+  /** Fees paid outside the broker (deposit services, card exchange), typed in by hand. */
+  external: number;
+  /** Interest the broker charged on a negative cash balance (from Freedom24). */
+  interest: number;
+  /** refill + buy + sell + external + interest, before any manual override. */
   computed: number;
   /** What the app uses: the manual override if one is set, otherwise `computed`. */
   total: number;
@@ -132,13 +136,17 @@ export function feeBreakdown(
   refills: InvestingRefillRow[],
   activityYears: InvestingActivityYearSummary[],
   overrideUsd: string,
+  externalUsd = "",
+  interestUsd = "",
 ): FeeBreakdown {
   const refill = refills.reduce((a, r) => a + parseUsd(r.commission), 0);
   const buy = activityYears.reduce((a, y) => a + parseUsd(y.purchases_commission), 0);
   const sell = activityYears.reduce((a, y) => a + parseUsd(y.sales_commission), 0);
-  const computed = refill + buy + sell;
+  const external = externalUsd.trim() ? parseUsd(externalUsd) : 0;
+  const interest = interestUsd.trim() ? parseUsd(interestUsd) : 0;
+  const computed = refill + buy + sell + external + interest;
   const isOverride = overrideUsd.trim() !== "";
-  return { refill, buy, sell, computed, total: isOverride ? parseUsd(overrideUsd) : computed, isOverride };
+  return { refill, buy, sell, external, interest, computed, total: isOverride ? parseUsd(overrideUsd) : computed, isOverride };
 }
 
 export type FlowYearRow = {

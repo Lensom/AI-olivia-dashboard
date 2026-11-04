@@ -28,6 +28,7 @@ const chip = (active: boolean) =>
 
 function EventRow({ e }: { e: CalendarEvent }) {
   const t = useT();
+  const locale = useLocale();
   const isEarnings = e.type === "earnings";
   return (
     <li className="flex items-center gap-3 px-4 py-2.5">
@@ -46,12 +47,20 @@ function EventRow({ e }: { e: CalendarEvent }) {
               ≈ {t("estimated")}
             </span>
           ) : null}
+          {e.fromBroker ? (
+            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-800" title={t("Announced by Freedom24: exact amount and payment date")}>
+              ✓ Freedom24
+            </span>
+          ) : null}
         </p>
         <p className="truncate text-[11px] text-[#8f8676]">
           {[
             e.name,
             isEarnings && e.time === "AMC" ? t("after the close") : isEarnings && e.time === "BMO" ? t("before the open") : "",
             !isEarnings && e.perShare != null ? t("{v} per share", { v: formatUsd(e.perShare) }) : "",
+            !isEarnings && e.payDate
+              ? t("paid {date}", { date: new Date(`${e.payDate}T00:00:00`).toLocaleDateString(locale, { day: "numeric", month: "short" }) })
+              : "",
           ]
             .filter(Boolean)
             .join(" · ")}

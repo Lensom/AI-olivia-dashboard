@@ -3,7 +3,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from html import unescape
-from typing import Annotated
+from typing import Annotated, Any, Callable
 import json
 import re
 import time
@@ -44,6 +44,7 @@ from app.investing.schemas import (
     InvestingPickingResponse,
     InvestingPickingRow,
     InvestingPickingUpdateRequest,
+    ExternalFeeRow,
     InvestingRefillRow,
     InvestingRefillsResponse,
     InvestingRefillsUpdateRequest,
@@ -376,6 +377,20 @@ def _fetch_yahoo_chart_quote(ticker: str) -> dict | None:
     return row
 
 
+def _quote_rows(tickers: list[str], src: Any = None) -> dict[str, dict]:
+    """Live prices: from the broker (Freedom24, real time) when connected, the rest from Yahoo."""
+    rows: dict[str, dict] = {}
+    if src is not None:
+        try:
+            rows = src.quotes(tickers)
+        except Exception:  # broker unreachable: Yahoo for everything
+            rows = {}
+    rest = [t for t in tickers if t not in rows]
+    if rest:
+        rows.update(_fetch_yahoo_quote_rows(rest))
+    return rows
+
+
 def _fetch_yahoo_quote_rows(tickers: list[str]) -> dict[str, dict]:
     """Ticker (uppercase) → {regularMarketPrice, regularMarketChangePercent?}, fetched in parallel."""
     if not tickers:
@@ -499,13 +514,13 @@ def _pick_row_to_storage(row: InvestingPickingRow) -> dict:
     return {k: str(d.get(k) or "") for k in _PICKING_STORED_KEYS}
 
 
-def _enrich_picking_rows(rows: list[dict]) -> list[dict]:
+def _enrich_picking_rows(rows: list[dict], src: Any = None) -> list[dict]:
     tickers = list(
         dict.fromkeys(
             str(r.get("ticker", "")).strip().upper() for r in rows if str(r.get("ticker", "")).strip()
         )
     )[:50]
-    quotes = _fetch_yahoo_quote_rows(tickers) if tickers else {}
+    quotes = _quote_rows(tickers, src) if tickers else {}
     missing: list[str] = []
     for t in tickers:
         q = quotes.get(t)
@@ -708,6 +723,23 @@ def _fetch_finviz_profile(ticker: str) -> InvestingTickerProfile | None:
     return profile
 
 
+def get_broker_source() -> Callable[[UserResponse], Any]:
+    """Overridden in main.py. Returns a function giving the broker source (Freedom24) for an account whose
+    data comes from the broker's API, or None (data from this database, as before)."""
+    return lambda user: None
+
+
+def _live(source_for: Callable[[UserResponse], Any], user: UserResponse, read: Callable[[Any], Any]) -> Any:
+    """Data from the broker, or None to fall back to the database (not connected, or the broker is unreachable)."""
+    src = source_for(user)
+    if src is None:
+        return None
+    try:
+        return read(src)
+    except Exception:  # broker down or an unexpected answer: show the saved data rather than an error
+        return None
+
+
 @router.get("/profiles", response_model=InvestingProfilesResponse)
 def get_profiles(
     tickers: Annotated[str, Query(description="Comma-separated tickers, e.g. AAPL,VOO")] = "",
@@ -752,12 +784,16 @@ _benchmark_cache: dict[str, tuple[InvestingBenchmarkResponse, float]] = {}
 
 @router.get("/benchmark", response_model=InvestingBenchmarkResponse)
 def get_benchmark(
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
     symbol: Annotated[str, Query(description="Benchmark ticker, e.g. SPY")] = "SPY",
-    user: Annotated[UserResponse, Depends(get_current_user)] = None,
 ):
-    """Calendar-year total returns from Yahoo monthly adjusted closes (last bar of each year vs the previous)."""
-    _ = user.id
+    """Calendar-year total returns: from your broker's daily prices and dividends (Freedom24) when connected,
+    else from Yahoo monthly adjusted closes (last bar of each year vs the previous)."""
     sym = symbol.strip().upper() or "SPY"
+    live = _live(source_for, user, lambda src: src.benchmark_yearly(sym))
+    if live:
+        return InvestingBenchmarkResponse(symbol=sym, yearly_return_percent=live, as_of=datetime.utcnow().isoformat(), source="freedom24")
     now = time.time()
     cached = _benchmark_cache.get(sym)
     if cached and now - cached[1] < _BENCHMARK_CACHE_TTL_SECONDS:
@@ -788,15 +824,17 @@ def get_benchmark(
 
 @router.get("/quotes", response_model=InvestingQuotesResponse)
 def get_quotes(
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
     tickers: Annotated[str, Query(description="Comma-separated tickers, e.g. AAPL,MSFT")] = "",
-    user: Annotated[UserResponse, Depends(get_current_user)] = None,
 ):
-    _ = user.id
     parsed = [t.strip().upper() for t in tickers.split(",") if t.strip()]
     unique_tickers = list(dict.fromkeys(parsed))[:50]
     if not unique_tickers:
         return InvestingQuotesResponse(prices={}, day_change_percent={}, as_of=datetime.utcnow().isoformat())
-    rows = _fetch_yahoo_quote_rows(unique_tickers)
+    src = source_for(user)
+    rows = _quote_rows(unique_tickers, src)
+    from_broker = src is not None and any("marketStatus" in r for r in rows.values())
     prices: dict[str, float] = {}
     day_change: dict[str, float] = {}
     missing_prices: list[str] = []
@@ -831,6 +869,7 @@ def get_quotes(
         prices=prices,
         day_change_percent=day_change,
         as_of=datetime.utcnow().isoformat(),
+        source="freedom24" if from_broker else "",
     )
 
 
@@ -890,11 +929,16 @@ def update_metrics(
 def get_holdings(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
     row = conn.execute(
         "SELECT holdings, updated_at FROM investing_holdings WHERE user_id = %s",
         (user.id,),
     ).fetchone()
+    # Broker numbers, with your targets / industries / names from the saved rows.
+    live = _live(source_for, user, lambda src: src.holdings(row[0] if row and isinstance(row[0], list) else []))
+    if live is not None:
+        return InvestingHoldingsResponse(holdings=live, updated_at=datetime.now().isoformat(), source="freedom24")
     if not row:
         return InvestingHoldingsResponse(holdings=[], updated_at=None)
     return InvestingHoldingsResponse(holdings=row[0], updated_at=str(row[1]))
@@ -1269,11 +1313,24 @@ def update_notes(
 def get_activities(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
     row = conn.execute(
         "SELECT activities, updated_at FROM investing_activities WHERE user_id = %s",
         (user.id,),
     ).fetchone()
+    saved = row[0] if row and isinstance(row[0], list) else []
+    # Names and categories you gave tickers before carry over to the broker's trades.
+    known = {str(a.get("ticker", "")).upper(): (str(a.get("name", "")), str(a.get("category", ""))) for a in saved if isinstance(a, dict)}
+    live = _live(source_for, user, lambda src: src.activities(known))
+    if live is not None:
+        enriched = _enrich_activities_with_usd(live)
+        return InvestingActivitiesResponse(
+            activities=enriched,
+            yearly_summary=_calc_activity_yearly_summary(enriched),
+            updated_at=datetime.now().isoformat(),
+            source="freedom24",
+        )
     if not row:
         return InvestingActivitiesResponse(activities=[], yearly_summary=[], updated_at=None)
     raw = row[0] if isinstance(row[0], list) else []
@@ -1292,7 +1349,11 @@ def update_activities(
     payload: InvestingActivitiesUpdateRequest,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
+    if source_for(user) is not None:
+        # Trades come from the broker now; the hand-kept table is archived, not edited.
+        raise HTTPException(status_code=409, detail="Trades come from Freedom24 and can't be edited here.")
     activities_json = [
         {
             k: v
@@ -1326,6 +1387,7 @@ def update_activities(
 def get_picking(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
     row = conn.execute(
         "SELECT rows, updated_at FROM investing_picking WHERE user_id = %s",
@@ -1335,7 +1397,7 @@ def get_picking(
         return InvestingPickingResponse(rows=[], updated_at=None)
     raw = row[0] if isinstance(row[0], list) else []
     base = [_normalize_stored_picking_row(r) for r in raw if isinstance(r, dict)]
-    enriched = _enrich_picking_rows(base)
+    enriched = _enrich_picking_rows(base, source_for(user))
     return InvestingPickingResponse(rows=[InvestingPickingRow(**e) for e in enriched], updated_at=str(row[1]))
 
 
@@ -1344,6 +1406,7 @@ def update_picking(
     payload: InvestingPickingUpdateRequest,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
     rows_json = [_pick_row_to_storage(r) for r in payload.rows]
     row = conn.execute(
@@ -1359,7 +1422,7 @@ def update_picking(
     ).fetchone()
     conn.commit()
     updated_at = str(row[0]) if row else None
-    enriched = _enrich_picking_rows([dict(r) for r in rows_json])
+    enriched = _enrich_picking_rows([dict(r) for r in rows_json], source_for(user))
     return InvestingPickingResponse(rows=[InvestingPickingRow(**e) for e in enriched], updated_at=updated_at)
 
 
@@ -1375,6 +1438,13 @@ def _normalize_refill_row(raw: dict) -> dict:
     }
 
 
+def _external_total(rows: list[ExternalFeeRow], fallback: str) -> str:
+    """Sum of the fees-outside-the-broker rows; the old single number when there are no rows yet."""
+    if not rows:
+        return fallback
+    return f"{sum(_parse_num(r.amount) for r in rows):.2f}"
+
+
 def _sort_refill_rows(rows: list[dict]) -> list[dict]:
     return sorted(rows, key=lambda r: _parse_date(str(r.get("date", ""))))
 
@@ -1383,11 +1453,26 @@ def _sort_refill_rows(rows: list[dict]) -> list[dict]:
 def get_refills(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
     row = conn.execute(
-        "SELECT rows, operating_expenses_usd, updated_at FROM investing_refills WHERE user_id = %s",
+        "SELECT rows, operating_expenses_usd, updated_at, external_fees_usd, external_fees FROM investing_refills WHERE user_id = %s",
         (user.id,),
     ).fetchone()
+    fee_rows = [ExternalFeeRow(**r) for r in (row[4] if row and isinstance(row[4], list) else []) if isinstance(r, dict)]
+    external = _external_total(fee_rows, str(row[3] if row and row[3] is not None else ""))
+    live = _live(source_for, user, lambda src: (src.refills(), src.margin_interest_usd()))
+    if live is not None:
+        deposits, interest = live
+        return InvestingRefillsResponse(
+            rows=[InvestingRefillRow(**r) for r in _sort_refill_rows(deposits)],
+            operating_expenses_usd=str(row[1] if row and row[1] is not None else ""),  # still yours to set
+            external_fees_usd=external,
+            external_fees=fee_rows,
+            broker_interest_usd=f"{interest:.2f}",
+            updated_at=datetime.now().isoformat(),
+            source="freedom24",
+        )
     if not row:
         return InvestingRefillsResponse(rows=[], operating_expenses_usd="", updated_at=None)
     raw_rows = row[0] if isinstance(row[0], list) else []
@@ -1397,6 +1482,8 @@ def get_refills(
     return InvestingRefillsResponse(
         rows=[InvestingRefillRow(**r) for r in sorted_rows],
         operating_expenses_usd=opx,
+        external_fees_usd=external,
+        external_fees=fee_rows,
         updated_at=str(row[2]),
     )
 
@@ -1406,27 +1493,48 @@ def update_refills(
     payload: InvestingRefillsUpdateRequest,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
+    opx = str(payload.operating_expenses_usd or "").strip()[:64]
+    fee_rows = [r.model_dump() for r in payload.external_fees]
+    external = _external_total(payload.external_fees, str(payload.external_fees_usd or "").strip()[:64])
+    if source_for(user) is not None:
+        # Deposits come from the broker: only your two fee fields are saved; the old rows stay as they are.
+        conn.execute(
+            """
+            INSERT INTO investing_refills(user_id, rows, operating_expenses_usd, external_fees_usd, external_fees, updated_at)
+            VALUES (%s, '[]'::jsonb, %s, %s, %s, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET operating_expenses_usd = EXCLUDED.operating_expenses_usd,
+                                                external_fees_usd = EXCLUDED.external_fees_usd,
+                                                external_fees = EXCLUDED.external_fees, updated_at = NOW()
+            """,
+            (user.id, opx, external, Json(fee_rows)),
+        )
+        conn.commit()
+        return get_refills(user, conn, source_for)
     rows_json = [_normalize_refill_row(r.model_dump()) for r in payload.rows]
     rows_json = _sort_refill_rows(rows_json)
-    opx = str(payload.operating_expenses_usd or "").strip()[:64]
     row = conn.execute(
         """
-        INSERT INTO investing_refills(user_id, rows, operating_expenses_usd, updated_at)
-        VALUES (%s, %s, %s, NOW())
+        INSERT INTO investing_refills(user_id, rows, operating_expenses_usd, external_fees_usd, external_fees, updated_at)
+        VALUES (%s, %s, %s, %s, %s, NOW())
         ON CONFLICT (user_id)
         DO UPDATE SET rows = EXCLUDED.rows,
                       operating_expenses_usd = EXCLUDED.operating_expenses_usd,
+                      external_fees_usd = EXCLUDED.external_fees_usd,
+                      external_fees = EXCLUDED.external_fees,
                       updated_at = NOW()
         RETURNING updated_at
         """,
-        (user.id, Json(rows_json), opx),
+        (user.id, Json(rows_json), opx, external, Json(fee_rows)),
     ).fetchone()
     conn.commit()
     updated_at = str(row[0]) if row else None
     return InvestingRefillsResponse(
         rows=[InvestingRefillRow(**r) for r in rows_json],
         operating_expenses_usd=opx,
+        external_fees_usd=external,
+        external_fees=[ExternalFeeRow(**r) for r in fee_rows],
         updated_at=updated_at,
     )
 
@@ -1649,11 +1757,21 @@ def _broker_response(data: InvestingBrokerData, updated_at: str | None) -> Inves
 def get_broker(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
     row = conn.execute("SELECT data, updated_at FROM investing_broker WHERE user_id = %s", (user.id,)).fetchone()
+    saved = InvestingBrokerData(**(row[0] if row and isinstance(row[0], dict) else {}))
+    # Cash and dividends from the broker; your attention rules stay in the database.
+    live = _live(source_for, user, lambda src: (src.cash(), src.dividends()))
+    if live is not None:
+        cash, dividends = live
+        data = InvestingBrokerData(cash=cash, dividends=dividends, rules=saved.rules)
+        res = _broker_response(data, datetime.now().isoformat())
+        res.source = "freedom24"
+        return res
     if not row:
         return InvestingBrokerResponse()
-    return _broker_response(InvestingBrokerData(**(row[0] if isinstance(row[0], dict) else {})), str(row[1]))
+    return _broker_response(saved, str(row[1]))
 
 
 @router.put("/broker", response_model=InvestingBrokerResponse)
@@ -1661,7 +1779,20 @@ def update_broker(
     payload: InvestingBrokerData,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
+    if source_for(user) is not None:
+        # Cash and dividends come from the broker: save only your attention rules, keep the old rows untouched.
+        conn.execute(
+            """
+            INSERT INTO investing_broker(user_id, data, updated_at)
+            VALUES (%s, jsonb_build_object('rules', %s::jsonb), NOW())
+            ON CONFLICT (user_id) DO UPDATE SET data = investing_broker.data || jsonb_build_object('rules', %s::jsonb), updated_at = NOW()
+            """,
+            (user.id, Json(payload.rules.model_dump()), Json(payload.rules.model_dump())),
+        )
+        conn.commit()
+        return get_broker(user, conn, source_for)
     data = payload.model_dump()
     for d in data["dividends"]:  # USD columns are derived, never stored
         d.pop("amount_usd", None)

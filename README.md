@@ -210,8 +210,6 @@ back/
     investing/
       router.py          # all /investing endpoints + market data fetchers
       schemas.py         # request/response models
-    seed_picking.py      # optional seed scripts (see below)
-    seed_refills.py
   requirements.txt
 front/
   src/
@@ -250,16 +248,6 @@ All endpoints are under the `/api` prefix (e.g. `/api/investing/holdings`); the 
 - **Exchange rates:** the Total page uses official National Bank of Ukraine rates (cached 3 h). Trade imports convert fees/profits with Frankfurter rates for the trade date.
 - **The portfolio page doesn't wait for quotes.** Saved holdings show immediately and live prices are applied when they arrive, so a slow or unavailable data provider never hides your portfolio.
 - These are unofficial public sources. If a provider changes its page or API, the related numbers show `—` until the parser is updated in `back/app/investing/router.py`.
-
-## Seeding sample data (optional)
-
-From `back/`, with the virtual environment activated:
-
-```powershell
-python -m app.seed_picking you@example.com          # allocation-rule buckets
-python -m app.seed_refills you@example.com          # refill history
-# add --force to replace data that already exists
-```
 
 ## Development notes
 

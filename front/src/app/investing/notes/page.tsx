@@ -105,6 +105,8 @@ export default function InvestingNotesPage() {
     holdings,
     refills,
     operatingExpensesUsd,
+    externalFeesUsd,
+    brokerInterestUsd,
     activitiesSummary,
   } = useInvesting();
   const { cashUsd } = useBroker();
@@ -160,7 +162,7 @@ export default function InvestingNotesPage() {
       .filter((h) => (h.industry ?? "").trim().toUpperCase().startsWith("ETF"))
       .reduce((a, h) => a + parseUsd(h.marketValue), 0);
     const topped = refills.reduce((a, r) => a + parseUsd(r.amount), 0);
-    const fees = feeBreakdown(refills, activitiesSummary, operatingExpensesUsd).total;
+    const fees = feeBreakdown(refills, activitiesSummary, operatingExpensesUsd, externalFeesUsd, brokerInterestUsd).total;
     const largest = [...holdings].sort((a, b) => parseUsd(b.marketValue) - parseUsd(a.marketValue))[0];
     return {
       value,
@@ -169,7 +171,7 @@ export default function InvestingNotesPage() {
       xirr: xirrFromRefills(refills, value),
       largest: largest && holdingsValue > 0 ? { ticker: largest.ticker, pct: (parseUsd(largest.marketValue) / holdingsValue) * 100 } : null,
     };
-  }, [holdings, refills, operatingExpensesUsd, activitiesSummary, cashUsd]);
+  }, [holdings, refills, operatingExpensesUsd, externalFeesUsd, brokerInterestUsd, activitiesSummary, cashUsd]);
 
   const words = notes.trim() ? notes.trim().split(/\s+/).length : 0;
   const status = saveError

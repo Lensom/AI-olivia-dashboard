@@ -32,6 +32,8 @@ class InvestingHolding(BaseModel):
 class InvestingHoldingsResponse(BaseModel):
     holdings: list[InvestingHolding]
     updated_at: str | None = None
+    # "freedom24" when the data came from the broker's API (read-only in the app), else "app".
+    source: str = "app"
 
 
 class InvestingHoldingsUpdateRequest(BaseModel):
@@ -93,6 +95,8 @@ class InvestingBenchmarkResponse(BaseModel):
     # Calendar-year total return (dividends reinvested), %, keyed by year; the current year is year-to-date.
     yearly_return_percent: dict[str, float] = Field(default_factory=dict)
     as_of: str | None = None
+    # "freedom24" when computed from your broker's prices and dividends, else "" (Yahoo).
+    source: str = ""
 
 
 class InvestingTickerProfile(BaseModel):
@@ -114,6 +118,8 @@ class InvestingQuotesResponse(BaseModel):
         description="Ticker (uppercase) → change in percent points: Yahoo session change when available; else CoinGecko 24h.",
     )
     as_of: str | None = None
+    # "freedom24" when the prices came from your broker in real time, else "" (Yahoo / Stooq / CoinGecko).
+    source: str = ""
 
 
 class InvestingNotesResponse(BaseModel):
@@ -183,6 +189,8 @@ class InvestingActivitiesResponse(BaseModel):
     activities: list[InvestingActivity]
     yearly_summary: list[InvestingActivityYearSummary]
     updated_at: str | None = None
+    # "freedom24" when the data came from the broker's API (read-only in the app), else "app".
+    source: str = "app"
 
 
 class InvestingActivitiesUpdateRequest(BaseModel):
@@ -233,15 +241,35 @@ class InvestingRefillRow(BaseModel):
     commission: str = ""
 
 
+class ExternalFeeRow(BaseModel):
+    """A fee paid outside the broker for one deposit (deposit service, card currency exchange), in USD."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    date: str = ""  # DD.MM.YYYY, the deposit's date
+    amount: str = ""
+    note: str = ""
+
+
 class InvestingRefillsResponse(BaseModel):
     rows: list[InvestingRefillRow]
     operating_expenses_usd: str = ""
+    # Fees paid outside the broker (e.g. deposit services), added to the broker's fees: the sum of external_fees.
+    external_fees_usd: str = ""
+    external_fees: list[ExternalFeeRow] = Field(default_factory=list)
+    # Interest the broker charged on a negative cash balance (from Freedom24; empty otherwise).
+    broker_interest_usd: str = ""
     updated_at: str | None = None
+    # "freedom24" when the data came from the broker's API (read-only in the app), else "app".
+    source: str = "app"
 
 
 class InvestingRefillsUpdateRequest(BaseModel):
     rows: list[InvestingRefillRow] = Field(default_factory=list)
     operating_expenses_usd: str = Field(default="", max_length=64)
+    external_fees_usd: str = Field(default="", max_length=64)
+    external_fees: list[ExternalFeeRow] = Field(default_factory=list)
 
 
 class CryptoHolding(BaseModel):
@@ -376,3 +404,5 @@ class InvestingBrokerData(BaseModel):
 
 class InvestingBrokerResponse(InvestingBrokerData):
     updated_at: str | None = None
+    # "freedom24" when the data came from the broker's API (read-only in the app), else "app".
+    source: str = "app"

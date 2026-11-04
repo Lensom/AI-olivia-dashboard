@@ -226,6 +226,33 @@ export const INVESTING: Record<string, string | string[]> = {
   "Hold position": "Тримати",
   "Buy {v}": "Купити {v}",
   "Income & risk": "Дохід і ризик",
+  "Sync Freedom24": "Синхронізувати Freedom24",
+  "Fees outside the broker, $": "Комісії поза брокером, $",
+  "What deposits cost before the money reached the broker (deposit services, card currency exchange). The broker never sees these, so add them here; they count in operating expenses.":
+    "Скільки коштувало поповнення до того, як гроші дійшли до брокера (сервіси поповнення, обмін валюти на картці). Брокер їх не бачить, тож додайте їх тут — вони враховуються в операційних витратах.",
+  "Outside the broker {v}": "Поза брокером {v}",
+  "Margin interest {v}": "Відсотки за маржу {v}",
+  "Fee, $": "Комісія, $",
+  "e.g. crypto deposit": "напр. поповнення криптою",
+  "Delete fee": "Видалити комісію",
+  "Add fee": "Додати комісію",
+  "Total {v}": "Разом {v}",
+  "press Save above to keep changes": "натисніть Save вгорі, щоб зберегти",
+  "Announced by Freedom24: exact amount and payment date": "Оголошено Freedom24: точна сума й дата виплати",
+  "paid {date}": "виплата {date}",
+  "Every buy and sell, straight from Freedom24 — new trades appear by themselves. Nothing to import or type in.":
+    "Усі купівлі й продажі напряму з Freedom24 — нові угоди з'являються самі. Нічого не треба імпортувати чи вводити.",
+  "From Freedom24": "З Freedom24",
+  "From Freedom24, updated by itself. Counted in current value, total return and XIRR.":
+    "З Freedom24, оновлюється само. Враховується в поточній вартості, загальній дохідності та XIRR.",
+  "Syncing…": "Синхронізація…",
+  "Shares, average and market prices from Freedom24. Your targets and industries stay. Review, then Save.":
+    "Кількість, середні й ринкові ціни з Freedom24. Ваші цілі та галузі лишаються. Перегляньте й натисніть Save.",
+  "Synced from Freedom24: {updated} updated, {added} added. Your targets and industries are kept. Review and press Save to store in the database.":
+    "Синхронізовано з Freedom24: оновлено {updated}, додано {added}. Ваші цілі та галузі збережено. Перегляньте й натисніть Save, щоб зберегти в базі.",
+  "Not at Freedom24 (kept, delete if sold): {list}": "Немає у Freedom24 (залишено, видаліть, якщо продано): {list}",
+  "Skipped (not in USD): {list}": "Пропущено (не в USD): {list}",
+  "Freedom24 sync failed: {v}": "Не вдалося синхронізувати з Freedom24: {v}",
   target: "ціль",
   "Trim {v}": "Скоротити {v}",
   sh: "шт.",
@@ -672,8 +699,8 @@ export const INVESTING: Record<string, string | string[]> = {
   "Update {month}": "Оновити {month}",
   "Record {month}": "Записати {month}",
   "Month to record": "Місяць для запису",
-  "Pre-filled from your spreadsheet: the accounts and monthly totals Jan 2025 – Sep 2026. Stocks and Crypto are live from the app. Check the numbers (Edit), then press Save.":
-    "Заповнено з вашої таблиці: рахунки й щомісячні підсумки січ. 2025 – вер. 2026. Акції й Крипта — наживо з застосунку. Перевірте цифри (редагування), потім натисніть «Зберегти».",
+  "A starting point: Stocks and Crypto are live from the app. Add your bank accounts and cash (Edit), then press Save.":
+    "Початковий вигляд: Акції й Крипта — наживо з застосунку. Додайте банківські рахунки й готівку (редагування), потім натисніть «Зберегти».",
   "Net worth": "Капітал",
   "Assets {v}": "Активи {v}",
   "debts {v}": "борги {v}",

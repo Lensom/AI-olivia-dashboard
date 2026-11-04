@@ -40,6 +40,7 @@ const cellInput = "rounded-lg border border-black/10 bg-white px-2 py-1.5 text-s
 export default function InvestingDashboardPage() {
   const {
     holdings,
+    quotesSource,
     holdingsMeta,
     isHoldingsLoading,
     activitiesSummary,
@@ -131,6 +132,7 @@ export default function InvestingDashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#6f675b]">
         <span>
           {totals.hasQuotes ? t("Live prices") : t("Last saved prices")}
+          {totals.hasQuotes && quotesSource === "freedom24" ? " · Freedom24" : ""}
           {holdingsMeta.updatedAt ? ` · ${t("portfolio saved {when}", { when: new Date(holdingsMeta.updatedAt).toLocaleString(locale) })}` : ""}
         </span>
         <button

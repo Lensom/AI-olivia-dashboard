@@ -35,7 +35,7 @@ export function dividendsLast12mUsd(rows: BrokerDividend[], nowMs: number): numb
 }
 
 export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: number }) {
-  const { cash, dividends, cashUsd, isDirty, isSaving, setCash, setDividends, save } = useBroker();
+  const { cash, dividends, cashUsd, isDirty, isSaving, setCash, setDividends, save, fromBroker } = useBroker();
   const { metrics } = useInvesting();
   const t = useT();
   const [open, setOpen] = useState(true);
@@ -106,7 +106,11 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
             {/* Cash */}
             <article className={card}>
               <h3 className="text-sm font-semibold text-[#1f1c17]">{t("Uninvested cash at the broker")}</h3>
-              <p className="mt-0.5 text-xs text-[#8f8676]">{t("Counted in current value, total return and XIRR. Update it when you check your broker.")}</p>
+              <p className="mt-0.5 text-xs text-[#8f8676]">
+                {fromBroker
+                  ? t("From Freedom24, updated by itself. Counted in current value, total return and XIRR.")
+                  : t("Counted in current value, total return and XIRR. Update it when you check your broker.")}
+              </p>
               <p className="mt-3 text-2xl font-semibold tabular-nums text-[#1f1c17]">{formatUsd(cashUsd)}</p>
               <p className="text-xs text-[#6f675b]">{t("{v}% of the account (holdings + cash)", { v: cashShare.toFixed(1) })}</p>
               <ul className="mt-3 space-y-2">
@@ -115,6 +119,7 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                     <input
                       value={c.amount}
                       onChange={(e) => setCash((rows) => rows.map((r) => (r.id === c.id ? { ...r, amount: e.target.value } : r)))}
+                      readOnly={fromBroker}
                       className={`${input} text-right tabular-nums`}
                       inputMode="decimal"
                       placeholder="0"
@@ -123,6 +128,7 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                     <select
                       value={c.currency}
                       onChange={(e) => setCash((rows) => rows.map((r) => (r.id === c.id ? { ...r, currency: e.target.value } : r)))}
+                      disabled={fromBroker}
                       className={`${input} w-24`}
                       aria-label={t("Currency")}
                     >
@@ -132,7 +138,8 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                         </option>
                       ))}
                     </select>
-                    <button
+                    {!fromBroker ? (
+<button
                       type="button"
                       onClick={() => setCash((rows) => rows.filter((r) => r.id !== c.id))}
                       className="text-xs text-[#8f8676] hover:text-rose-700"
@@ -140,16 +147,19 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                     >
                       ✕
                     </button>
+) : null}
                   </li>
                 ))}
               </ul>
-              <button
+              {!fromBroker ? (
+<button
                 type="button"
                 onClick={() => setCash((rows) => [...rows, { id: newBrokerId(), currency: rows.length ? "EUR" : "USD", amount: "" }])}
                 className={`${investingToolbarBtn} mt-3`}
               >
                 {cash.length ? t("Add another currency") : t("Add cash balance")}
               </button>
+) : null}
               {cash.some((c) => c.currency !== "USD") ? (
                 <p className="mt-2 text-[11px] text-[#8f8676]">{t("Other currencies are converted at official NBU rates.")}</p>
               ) : null}
@@ -159,7 +169,8 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
             <article className={card}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="text-sm font-semibold text-[#1f1c17]">{t("Dividends received")}</h3>
-                <button
+                {!fromBroker ? (
+<button
                   type="button"
                   onClick={() =>
                     setDividends((rows) => [
@@ -171,6 +182,7 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                 >
                   {t("Add dividend")}
                 </button>
+) : null}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:gap-x-8">
                 {[
@@ -223,19 +235,19 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                       return (
                         <tr key={d.id} className="border-t border-black/5">
                           <td className="px-2 py-1.5">
-                            <input value={d.date} onChange={(e) => patch({ date: e.target.value })} className={`${input} w-[110px] ${badDate ? "border-amber-400" : ""}`} placeholder="DD.MM.YYYY" />
+                            <input readOnly={fromBroker} value={d.date} onChange={(e) => patch({ date: e.target.value })} className={`${input} w-[110px] ${badDate ? "border-amber-400" : ""}`} placeholder="DD.MM.YYYY" />
                           </td>
                           <td className="px-2 py-1.5">
-                            <input value={d.ticker} onChange={(e) => patch({ ticker: e.target.value.toUpperCase() })} className={`${input} w-[90px]`} placeholder="VOO" />
+                            <input readOnly={fromBroker} value={d.ticker} onChange={(e) => patch({ ticker: e.target.value.toUpperCase() })} className={`${input} w-[90px]`} placeholder="VOO" />
                           </td>
                           <td className="px-2 py-1.5">
-                            <input value={d.amount} onChange={(e) => patch({ amount: e.target.value })} className={`${input} w-[90px] text-right tabular-nums`} inputMode="decimal" placeholder="0" />
+                            <input readOnly={fromBroker} value={d.amount} onChange={(e) => patch({ amount: e.target.value })} className={`${input} w-[90px] text-right tabular-nums`} inputMode="decimal" placeholder="0" />
                           </td>
                           <td className="px-2 py-1.5">
-                            <input value={d.tax} onChange={(e) => patch({ tax: e.target.value })} className={`${input} w-[90px] text-right tabular-nums`} inputMode="decimal" placeholder="0" />
+                            <input readOnly={fromBroker} value={d.tax} onChange={(e) => patch({ tax: e.target.value })} className={`${input} w-[90px] text-right tabular-nums`} inputMode="decimal" placeholder="0" />
                           </td>
                           <td className="px-2 py-1.5">
-                            <select value={d.currency} onChange={(e) => patch({ currency: e.target.value })} className={`${input} w-20`}>
+                            <select value={d.currency} disabled={fromBroker} onChange={(e) => patch({ currency: e.target.value })} className={`${input} w-20`}>
                               {[...new Set([...CURRENCIES, d.currency])].map((cur) => (
                                 <option key={cur} value={cur}>
                                   {cur}
@@ -245,7 +257,8 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                           </td>
                           <td className="px-2 py-1.5 text-right tabular-nums text-[#1f1c17]">{formatUsd(netUsd)}</td>
                           <td className="px-2 py-1.5 text-right">
-                            <button
+                            {!fromBroker ? (
+<button
                               type="button"
                               onClick={() => setDividends((rows) => rows.filter((r) => r.id !== d.id))}
                               className="text-xs text-[#8f8676] hover:text-rose-700"
@@ -253,6 +266,7 @@ export function BrokerCashAndDividends({ holdingsValue }: { holdingsValue: numbe
                             >
                               ✕
                             </button>
+) : null}
                           </td>
                         </tr>
                       );

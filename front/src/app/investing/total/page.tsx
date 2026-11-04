@@ -55,41 +55,22 @@ const CURRENCY_SIGN: Record<string, string> = { USD: "$", EUR: "€", UAH: "₴"
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`);
 
 /**
- * Starting point taken from the user's spreadsheet ("Total saving" + "Money" tables), used only while nothing
- * is saved yet. Stocks and Crypto are live from the app instead of typed amounts.
+ * What a new account starts with, until its first Save: Stocks and Crypto live from the app, and an empty
+ * savings row to type a bank balance into.
  */
-function spreadsheetStart(): TotalData {
-  const acc = (name: string, category: Category, amount: string, currency: string, source: Source = "manual"): Account => ({
+function freshStart(): TotalData {
+  const acc = (name: string, category: Category, currency: string, source: Source = "manual"): Account => ({
     id: newId(),
     name,
     category,
-    amount,
+    amount: "",
     currency,
     source,
   });
-  const totals: [string, number][] = [
-    ["2025-01", 14486.97], ["2025-02", 16321.13], ["2025-03", 16321.13], ["2025-04", 13568.45],
-    ["2025-05", 15238.23], ["2025-06", 16821.35], ["2025-07", 18603.75], ["2025-08", 19812.72],
-    ["2025-09", 20481.1], ["2025-10", 21514.43], ["2025-11", 22285.05], ["2025-12", 22997.53],
-    ["2026-01", 21734.11], ["2026-02", 21588.41], ["2026-03", 19686.84], ["2026-04", 22349.29],
-    ["2026-05", 28045.4], ["2026-06", 27458.65], ["2026-07", 38232.17], ["2026-08", 33367.37],
-    ["2026-09", 32213.0],
-  ];
   return {
-    accounts: [
-      acc("Stocks", "stocks", "", "USD", "stocks"),
-      acc("ING", "savings", "35238", "RON"),
-      acc("Savings", "savings", "4.24", "EUR"),
-      acc("Crypto", "crypto", "", "USD", "crypto"),
-      acc("Cash", "savings", "5", "EUR"),
-      acc("Crypto (savings)", "savings", "834", "USD"),
-      acc("Cash", "savings", "10", "RON"),
-      acc("Cash", "savings", "352.10", "UAH"),
-      acc("Debt (to me)", "owed_to_me", "0", "EUR"),
-      acc("Debt (mine)", "i_owe", "0", "USD"),
-    ],
+    accounts: [acc("Stocks", "stocks", "USD", "stocks"), acc("Crypto", "crypto", "USD", "crypto"), acc("Savings", "savings", "USD")],
     goals: { stocks: 70, savings: 20, crypto: 10 },
-    months: totals.map(([month, total_usd]) => ({ id: newId(), month, total_usd, breakdown: {} })),
+    months: [],
     rate_overrides: {},
   };
 }
@@ -139,7 +120,7 @@ export default function InvestingTotalPage() {
     apiFetch<TotalData & { updated_at: string | null }>("/investing/total", { token })
       .then((res) => {
         if (!res.updated_at) {
-          setData(spreadsheetStart());
+          setData(freshStart());
           setPrefilled(true);
           setDirty(true);
         } else {
@@ -362,7 +343,7 @@ export default function InvestingTotalPage() {
 
       {isPrefilled ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-          {tr("Pre-filled from your spreadsheet: the accounts and monthly totals Jan 2025 – Sep 2026. Stocks and Crypto are live from the app. Check the numbers (Edit), then press Save.")}
+          {tr("A starting point: Stocks and Crypto are live from the app. Add your bank accounts and cash (Edit), then press Save.")}
         </div>
       ) : isDirty ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">

@@ -235,6 +235,13 @@ body {
   }
 }
 
+/* Values that come from the broker are shown in inputs but can't be changed: make that visible. */
+input[readonly] {
+  background-color: #f6f3ea;
+  color: #6f675b;
+  cursor: default;
+}
+
 /* Visible keyboard focus everywhere; mouse clicks don't show it. */
 :where(a, button, select, summary, [tabindex]):focus-visible {
   outline: 2px solid #2a78d6;

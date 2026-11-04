@@ -73,14 +73,21 @@ export type InvestingPickingRow = {
   notes: string;
 };
 
+/** A fee paid outside the broker for one deposit, in USD (mirrors ExternalFeeRow in back/app/investing/schemas.py). */
+export type ExternalFeeRow = { id: string; date: string; amount: string; note: string };
+
 type InvestingStore = {
   holdings: InvestingHolding[];
-  holdingsMeta: { source: "server" | "default"; updatedAt: string | null };
+  /** `fromBroker`: positions come from Freedom24 (shares and prices are read-only; targets etc. stay yours). */
+  holdingsMeta: { source: "server" | "default"; updatedAt: string | null; fromBroker?: boolean };
+  /** "freedom24" when live prices come from the broker in real time. */
+  quotesSource: string;
   capitalEntries: InvestingCapitalEntry[];
   capitalEntriesMeta: { updatedAt: string | null };
   activities: InvestingActivity[];
   activitiesSummary: InvestingActivityYearSummary[];
-  activitiesMeta: { updatedAt: string | null };
+  /** `fromBroker`: trades come from Freedom24 and can't be edited or imported. */
+  activitiesMeta: { updatedAt: string | null; fromBroker?: boolean };
   pickingRows: InvestingPickingRow[];
   pickingMeta: { updatedAt: string | null };
   isPickingLoading: boolean;
@@ -88,7 +95,13 @@ type InvestingStore = {
   isPickingDirty: boolean;
   refills: InvestingRefillRow[];
   operatingExpensesUsd: string;
-  refillsMeta: { updatedAt: string | null };
+  /** Fees paid outside the broker, added to its fees (kept by hand: the broker never sees them). */
+  externalFeesUsd: string;
+  externalFees: ExternalFeeRow[];
+  /** Margin interest charged by the broker (Freedom24 only; read-only). */
+  brokerInterestUsd: string;
+  /** `fromBroker`: deposits come from Freedom24; only the operating-expenses override is yours. */
+  refillsMeta: { updatedAt: string | null; fromBroker?: boolean };
   isRefillsLoading: boolean;
   isRefillsSaving: boolean;
   isRefillsDirty: boolean;
@@ -129,6 +142,7 @@ type InvestingStore = {
   addRefill: () => void;
   deleteRefill: (id: string) => void;
   setOperatingExpensesUsd: (value: string) => void;
+  setExternalFees: (fn: (rows: ExternalFeeRow[]) => ExternalFeeRow[]) => void;
   refreshRefills: () => Promise<void>;
   saveRefills: () => Promise<void>;
   refreshActivities: () => Promise<void>;
@@ -141,6 +155,7 @@ type InvestingStore = {
   refreshMarketPrices: () => Promise<void>;
   saveHoldings: () => Promise<void>;
   importHoldings: (file: File) => Promise<InvestingHoldingsImportSummary>;
+  syncHoldingsFromFreedom24: () => Promise<InvestingHoldingsImportSummary>;
   importActivities: (file: File) => Promise<InvestingActivitiesImportSummary>;
   autofillHoldingProfiles: () => Promise<{ filled: string[]; notFound: string[] }>;
   setNotes: (next: string) => void;
@@ -282,9 +297,12 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
   const [holdingsMeta, setHoldingsMeta] = useState<{
     source: "server" | "default";
     updatedAt: string | null;
+    fromBroker?: boolean;
   }>({ source: "default", updatedAt: null });
   const [isHoldingsLoading, setHoldingsLoading] = useState(false);
   const [isMarketPricesLoading, setMarketPricesLoading] = useState(false);
+  // Where the live prices came from: "freedom24" (your broker, real time) or "" (Yahoo and friends).
+  const [quotesSource, setQuotesSource] = useState("");
   const [isHoldingsDirty, setHoldingsDirty] = useState(false);
   const [isHoldingsSaving, setHoldingsSaving] = useState(false);
   const [notes, setNotesState] = useState("");
@@ -300,7 +318,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
   });
   const [activities, setActivities] = useState<InvestingActivity[]>([]);
   const [activitiesSummary, setActivitiesSummary] = useState<InvestingActivityYearSummary[]>([]);
-  const [activitiesMeta, setActivitiesMeta] = useState<{ updatedAt: string | null }>({ updatedAt: null });
+  const [activitiesMeta, setActivitiesMeta] = useState<{ updatedAt: string | null; fromBroker?: boolean }>({ updatedAt: null });
   const [pickingRows, setPickingRows] = useState<InvestingPickingRow[]>([]);
   const [pickingMeta, setPickingMeta] = useState<{ updatedAt: string | null }>({ updatedAt: null });
   const [isPickingLoading, setPickingLoading] = useState(false);
@@ -308,7 +326,14 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
   const [isPickingDirty, setPickingDirty] = useState(false);
   const [refills, setRefills] = useState<InvestingRefillRow[]>([]);
   const [operatingExpensesUsd, setOperatingExpensesUsdState] = useState("");
-  const [refillsMeta, setRefillsMeta] = useState<{ updatedAt: string | null }>({ updatedAt: null });
+  const [externalFees, setExternalFeesState] = useState<ExternalFeeRow[]>([]);
+  // Total of the rows (what counts in operating expenses).
+  const externalFeesUsd = useMemo(
+    () => (externalFees.length ? externalFees.reduce((a, r) => a + parseUsd(r.amount), 0).toFixed(2) : ""),
+    [externalFees],
+  );
+  const [brokerInterestUsd, setBrokerInterestUsd] = useState("");
+  const [refillsMeta, setRefillsMeta] = useState<{ updatedAt: string | null; fromBroker?: boolean }>({ updatedAt: null });
   const [isRefillsLoading, setRefillsLoading] = useState(false);
   const [isRefillsSaving, setRefillsSaving] = useState(false);
   const [isRefillsDirty, setRefillsDirty] = useState(false);
@@ -337,14 +362,14 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
     }
     setHoldingsLoading(true);
     try {
-      const res = await apiFetch<{ holdings: InvestingHolding[]; updated_at: string | null }>(
+      const res = await apiFetch<{ holdings: InvestingHolding[]; updated_at: string | null; source?: string }>(
         "/investing/holdings",
         { token },
       );
       const persisted = normalizeHoldings(res.holdings);
       // Show persisted holdings right away; live quotes are applied when (and if) they arrive.
       setHoldings(persisted);
-      setHoldingsMeta({ source: "server", updatedAt: res.updated_at });
+      setHoldingsMeta({ source: "server", updatedAt: res.updated_at, fromBroker: res.source === "freedom24" });
       setHoldingsDirty(false);
       const uniqueTickers = Array.from(
         new Set(
@@ -357,12 +382,14 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
         void apiFetch<{
           prices: Record<string, number>;
           day_change_percent?: Record<string, number>;
+          source?: string;
         }>(`/investing/quotes?tickers=${encodeURIComponent(uniqueTickers.join(","))}`, { token })
-          .then((quoteRes) =>
+          .then((quoteRes) => {
+            setQuotesSource(quoteRes.source ?? "");
             setHoldings((prev) =>
               applyMarketPrices(prev, quoteRes.prices ?? {}, quoteRes.day_change_percent ?? {}),
-            ),
-          )
+            );
+          })
           .catch(() => {
             // Keep persisted holdings if quote provider is unavailable.
           });
@@ -387,7 +414,9 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       const res = await apiFetch<{
         prices: Record<string, number>;
         day_change_percent?: Record<string, number>;
+        source?: string;
       }>(`/investing/quotes?tickers=${encodeURIComponent(uniqueTickers.join(","))}`, { token });
+      setQuotesSource(res.source ?? "");
       setHoldings((prev) =>
         applyMarketPrices(prev, res.prices ?? {}, res.day_change_percent ?? {}),
       );
@@ -432,10 +461,11 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
         activities: InvestingActivity[];
         yearly_summary: InvestingActivityYearSummary[];
         updated_at: string | null;
+        source?: string;
       }>("/investing/activities", { token });
       setActivities(res.activities ?? []);
       setActivitiesSummary(res.yearly_summary ?? []);
-      setActivitiesMeta({ updatedAt: res.updated_at ?? null });
+      setActivitiesMeta({ updatedAt: res.updated_at ?? null, fromBroker: res.source === "freedom24" });
       setActivitiesDirty(false);
     } finally {
       setActivitiesLoading(false);
@@ -479,6 +509,8 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
     if (!token) {
       setRefills([]);
       setOperatingExpensesUsdState("");
+      setExternalFeesState([]);
+      setBrokerInterestUsd("");
       setRefillsMeta({ updatedAt: null });
       setRefillsDirty(false);
       return;
@@ -488,11 +520,17 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       const res = await apiFetch<{
         rows: InvestingRefillRow[];
         operating_expenses_usd: string;
+        external_fees_usd?: string;
+        external_fees?: ExternalFeeRow[];
+        broker_interest_usd?: string;
         updated_at: string | null;
+        source?: string;
       }>("/investing/refills", { token });
       setRefills(res.rows ?? []);
       setOperatingExpensesUsdState(res.operating_expenses_usd ?? "");
-      setRefillsMeta({ updatedAt: res.updated_at ?? null });
+      setExternalFeesState(res.external_fees ?? []);
+      setBrokerInterestUsd(res.broker_interest_usd ?? "");
+      setRefillsMeta({ updatedAt: res.updated_at ?? null, fromBroker: res.source === "freedom24" });
       setRefillsDirty(false);
     } finally {
       setRefillsLoading(false);
@@ -506,18 +544,25 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       const res = await apiFetch<{
         rows: InvestingRefillRow[];
         operating_expenses_usd: string;
+        external_fees_usd?: string;
+        external_fees?: ExternalFeeRow[];
+        broker_interest_usd?: string;
         updated_at: string | null;
+        source?: string;
       }>("/investing/refills", {
         token,
         method: "PUT",
         body: JSON.stringify({
           rows: refills,
           operating_expenses_usd: operatingExpensesUsd,
+          external_fees: externalFees,
         }),
       });
       setRefills(res.rows ?? []);
       setOperatingExpensesUsdState(res.operating_expenses_usd ?? "");
-      setRefillsMeta({ updatedAt: res.updated_at ?? null });
+      setExternalFeesState(res.external_fees ?? []);
+      setBrokerInterestUsd(res.broker_interest_usd ?? "");
+      setRefillsMeta({ updatedAt: res.updated_at ?? null, fromBroker: res.source === "freedom24" });
       setRefillsDirty(false);
     } finally {
       setRefillsSaving(false);
@@ -641,7 +686,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
         method: "PUT",
         body: JSON.stringify({ holdings }),
       });
-      setHoldingsMeta({ source: "server", updatedAt: res.updated_at ?? null });
+      setHoldingsMeta((m) => ({ source: "server", updatedAt: res.updated_at ?? null, fromBroker: m.fromBroker }));
       setHoldingsDirty(false);
       await refreshMetrics();
     } finally {
@@ -658,7 +703,22 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       "/investing/holdings/import",
       { token, method: "POST", body },
     );
+    return mergeHoldingRows(res);
+  }
 
+  /**
+   * Pulls positions from Freedom24 (read-only) and merges them like an import: shares, average and
+   * market prices and values come from the broker; targets, industries and names stay yours. Unsaved
+   * until Save; positions the broker no longer has are kept and reported, not deleted.
+   */
+  async function syncHoldingsFromFreedom24(): Promise<InvestingHoldingsImportSummary> {
+    if (!token) throw { status: 401, message: "Not signed in" };
+    const res = await apiFetch<{ rows: InvestingHoldingImportRow[]; skipped: string[] }>("/broker/freedom24/holdings", { token });
+    return mergeHoldingRows(res);
+  }
+
+  /** Broker rows → the table: updates matching tickers, adds new ones, keeps the rest (as unsaved edits). */
+  function mergeHoldingRows(res: { rows: InvestingHoldingImportRow[]; skipped: string[] }): InvestingHoldingsImportSummary {
     const byTicker = new Map(res.rows.map((r) => [r.ticker.toUpperCase(), r]));
     const added: string[] = [];
     const updated: string[] = [];
@@ -877,6 +937,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
     return {
       holdings,
       holdingsMeta,
+      quotesSource,
       capitalEntries,
       capitalEntriesMeta,
       activities,
@@ -889,6 +950,9 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       isPickingDirty,
       refills,
       operatingExpensesUsd,
+      externalFeesUsd,
+      externalFees,
+      brokerInterestUsd,
       refillsMeta,
       isRefillsLoading,
       isRefillsSaving,
@@ -1048,6 +1112,10 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
         setRefillsDirty(true);
         setOperatingExpensesUsdState(value);
       },
+      setExternalFees: (fn) => {
+        setRefillsDirty(true);
+        setExternalFeesState(fn);
+      },
       refreshRefills,
       saveRefills,
       refreshActivities,
@@ -1059,6 +1127,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       refreshMarketPrices,
       saveHoldings,
       importHoldings,
+      syncHoldingsFromFreedom24,
       importActivities,
       autofillHoldingProfiles,
       setNotes: (next) => {

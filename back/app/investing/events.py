@@ -12,7 +12,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from app.auth.router import get_current_user
 from app.auth.schemas import UserResponse
-from app.investing.router import _BROWSER_UA
+from app.investing.router import _BROWSER_UA, get_broker_source
 from app.investing.watchlist import _fetch_snapshot
 
 router = APIRouter(prefix="/investing/events", tags=["investing"])
@@ -38,6 +38,8 @@ class DividendDate(BaseModel):
     date: str  # ISO
     amount: float | None = None  # per share, in the ticker's currency
     estimated: bool = False  # projected from the payment rhythm rather than announced
+    pay_date: str = ""  # ISO; known when the broker has announced the payment
+    source: str = ""  # "freedom24" when announced by your broker
 
 
 class TickerEvents(BaseModel):
@@ -157,12 +159,42 @@ def _events(ticker: str) -> TickerEvents:
     return out
 
 
+def _with_broker_dividends(e: TickerEvents, announced: list[dict]) -> TickerEvents:
+    """Your broker's announced dividends replace the estimate (or Finviz date) closest to them."""
+    if not announced:
+        return e
+    step = _FREQUENCIES.get(e.dividend_frequency or 4, 91)
+    rest = list(e.ex_dates)
+    confirmed = []
+    for a in announced:
+        d = date.fromisoformat(a["ex_date"])
+        rest = [u for u in rest if abs((date.fromisoformat(u.date) - d).days) >= step / 2]
+        confirmed.append(DividendDate(date=a["ex_date"], amount=round(a["amount"], 4), pay_date=a.get("pay_date", ""), source="freedom24"))
+    # Later estimates follow the latest announced amount (a raise shows up in the projection too).
+    latest = max(confirmed, key=lambda c: c.date).amount
+    rest = [u.model_copy(update={"amount": latest}) if u.estimated and u.date > max(c.date for c in confirmed) else u for u in rest]
+    out = e.model_copy()
+    out.ex_dates = sorted([*rest, *confirmed], key=lambda u: u.date)
+    out.dividend_amount = latest
+    return out
+
+
 @router.get("", response_model=EventsResponse)
 def get_events(
     user: Annotated[UserResponse, Depends(get_current_user)],
+    source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
     tickers: str = Query(min_length=1, max_length=2000),
 ):
-    """Events for up to 80 comma-separated tickers."""
+    """Events for up to 80 comma-separated tickers. For a Freedom24 account, dividends the broker has
+    announced are exact (amount, pay date) instead of estimated."""
     wanted = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))[:80]
     with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
-        return EventsResponse(events={e.ticker: e for e in pool.map(_events, wanted)})
+        events = {e.ticker: e for e in pool.map(_events, wanted)}
+    src = source_for(user)
+    if src is not None:
+        try:
+            announced = src.upcoming_dividends()
+        except Exception:  # broker unreachable: keep the estimates
+            announced = {}
+        events = {t: _with_broker_dividends(e, announced.get(t, [])) for t, e in events.items()}
+    return EventsResponse(events=events)
