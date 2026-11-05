@@ -33,7 +33,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000, register an account, and open **Investing** in the sidebar.
+Registration is closed by default and the site has no sign-up form. To create your account, set `ALLOW_REGISTRATION=true` in `back/.env`, restart the API, send `POST /api/auth/register` from http://localhost:8000/docs, then remove the setting and restart again.
+
+Open http://localhost:3000, log in, and open **Investing** in the sidebar.
 
 The frontend calls the API on port 8000 of the same host the page was opened from, so it also works from another device on your LAN. To point it somewhere else, set `NEXT_PUBLIC_API_BASE` (e.g. in `front/.env.local`).
 
@@ -44,6 +46,7 @@ The frontend calls the API on port 8000 of the same host the page was opened fro
 | `DATABASE_URL` | yes | Postgres connection string, e.g. `postgresql://user:pass@host.neon.tech/db?sslmode=require`. The API refuses to start without it. |
 | `AUTH_TOKEN_SECRET` | yes, in any shared setup | Secret used to sign login tokens. The default is for local development only. |
 | `AUTH_TOKEN_TTL_SECONDS` | no | How long a login lasts. Default `604800` (7 days). |
+| `ALLOW_REGISTRATION` | no | `true` lets `POST /auth/register` create accounts. Default `false`: it answers 403. |
 | `CORS_ORIGINS` | no | Comma-separated allowed origins, or `*`. Defaults cover `localhost:3000/3001` and the LAN IP. |
 | `APP_NAME`, `APP_VERSION` | no | Shown in `/health` and the API docs. |
 | `WIKIDATA_CONTACT` | no | Library series: a URL or email put in the Wikidata User-Agent. Wikimedia allows 200 requests a minute to identified clients and only 10 to the rest. Defaults to this repository's URL. |

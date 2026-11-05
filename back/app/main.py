@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     database_url: str = ""
     auth_token_secret: str = "dev-secret-change-me"
     auth_token_ttl_seconds: int = 60 * 60 * 24 * 7  # 7 days
+    allow_registration: bool = False  # new accounts: closed unless turned on, e.g. to create the first one
     tmdb_api_key: str = ""  # Cinematography autofill; v3 API key or v4 read access token
     # Library series (Wikidata): a URL or email for the User-Agent, which raises Wikimedia's rate limit 20×
     wikidata_contact: str = "https://github.com/Lensom/stocks"

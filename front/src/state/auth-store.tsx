@@ -23,7 +23,6 @@ type AuthStore = {
   /** True right after Logout in this tab (pages then send you to /login without ?next=). */
   loggedOut: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
   logout: () => void;
 };
 
@@ -128,17 +127,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoggedOut(false);
   }, []);
 
-  const register = useCallback(
-    async (email: string, password: string) => {
-      await apiFetch("/auth/register", {
-        method: "POST",
-        body: JSON.stringify({ email: email.trim(), password }),
-      });
-      await login(email, password);
-    },
-    [login],
-  );
-
   const logout = useCallback(() => {
     setLoggedOut(true);
     writeToken(null);
@@ -157,8 +145,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           : "loading";
 
   const value = useMemo(
-    () => ({ token, user, status, isLoading: status === "loading", sessionExpired, loggedOut, login, register, logout }),
-    [token, user, status, sessionExpired, loggedOut, login, register, logout],
+    () => ({ token, user, status, isLoading: status === "loading", sessionExpired, loggedOut, login, logout }),
+    [token, user, status, sessionExpired, loggedOut, login, logout],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

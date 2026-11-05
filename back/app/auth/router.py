@@ -24,7 +24,13 @@ def get_settings():
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, conn: Annotated[Connection, Depends(get_conn)]):
+def register(
+    payload: RegisterRequest,
+    conn: Annotated[Connection, Depends(get_conn)],
+    settings=Depends(get_settings),
+):
+    if not settings.allow_registration:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Registration is closed")
     email = payload.email.lower().strip()
     pwd_hash = hash_password(payload.password)
     try:

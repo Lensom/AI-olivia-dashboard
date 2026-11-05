@@ -15,22 +15,20 @@ function useNextParam(): string | null {
   return new URLSearchParams(search).get("next");
 }
 
-function authErrorKey(err: unknown, mode: "login" | "register"): string {
+function authErrorKey(err: unknown): string {
   const status = err && typeof err === "object" && "status" in err ? (err as ApiError).status : -1;
   if (status === 0) return "Can’t reach the server. Is the backend running?";
   if (status === 401) return "Wrong email or password.";
-  if (status === 409) return "This email is already registered — log in instead.";
-  if (status === 422) return mode === "register" ? "Enter a valid email and a password of at least 8 characters." : "Enter a valid email and password.";
+  if (status === 422) return "Enter a valid email and password.";
   return "Something went wrong — try again.";
 }
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, register, status, sessionExpired } = useAuth();
+  const { login, status, sessionExpired } = useAuth();
   const t = useT();
   const next = safeNextPath(useNextParam());
 
-  const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -47,11 +45,10 @@ export default function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      if (mode === "login") await login(email, password);
-      else await register(email, password);
+      await login(email, password);
       router.replace(next);
     } catch (err: unknown) {
-      setError(t(authErrorKey(err, mode)));
+      setError(t(authErrorKey(err)));
       setBusy(false);
     }
   }
@@ -63,9 +60,9 @@ export default function LoginPage() {
     <div className="mx-auto w-full max-w-md">
       <div className="rounded-[1.75rem] border border-black/5 bg-white/90 p-6 shadow-[0_8px_30px_rgba(18,16,13,0.05)]">
         <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">Olivia</p>
-        <h1 className="mt-2 text-2xl font-semibold text-[#1f1c17]">{mode === "login" ? t("Log in") : t("Create account")}</h1>
+        <h1 className="mt-2 text-2xl font-semibold text-[#1f1c17]">{t("Log in")}</h1>
 
-        {sessionExpired && mode === "login" ? (
+        {sessionExpired ? (
           <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
             {t("Your session has expired. Log in again to continue.")}
           </p>
@@ -99,10 +96,8 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               type={showPassword ? "text" : "password"}
               name="password"
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-              minLength={mode === "register" ? 8 : undefined}
+              autoComplete="current-password"
               className={input}
-              placeholder={mode === "register" ? t("min 8 characters") : ""}
               required
             />
           </label>
@@ -118,21 +113,11 @@ export default function LoginPage() {
             disabled={busy}
             className="w-full rounded-full bg-[#1f1c17] px-4 py-2 text-sm font-medium text-[#f8f4eb] transition hover:bg-[#2c2923] disabled:opacity-60"
           >
-            {busy ? t("Please wait…") : mode === "login" ? t("Log in") : t("Create account")}
+            {busy ? t("Please wait…") : t("Log in")}
           </button>
         </form>
 
-        <div className="mt-4 flex items-center justify-between text-xs text-[#6f675b]">
-          <button
-            type="button"
-            className="rounded-full border border-black/10 bg-white px-3 py-1.5 font-medium hover:bg-[#faf8f2]"
-            onClick={() => {
-              setMode((m) => (m === "login" ? "register" : "login"));
-              setError(null);
-            }}
-          >
-            {mode === "login" ? t("Need an account?") : t("Have an account?")}
-          </button>
+        <div className="mt-4 text-right text-xs text-[#6f675b]">
           <Link href="/" className="font-medium text-[#3b352d]">
             {t("Back home")}
           </Link>
