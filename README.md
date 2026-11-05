@@ -50,6 +50,16 @@ The frontend calls the API on port 8000 of the same host the page was opened fro
 | `GOOGLE_BOOKS_API_KEY` | no | Library: adds Google Books to search and matching, which lists Ukrainian editions far better than Open Library. Free in Google Cloud console → APIs → Books API. Without it, Library uses Open Library plus Wikidata. |
 | `TMDB_API_KEY` | no | Enables Cinematography search, posters and auto-filled genres / actors / studios. Free at themoviedb.org → Settings → API; a v3 API key or a v4 read access token both work. Without it, titles are added by hand. |
 
+## Stock page
+
+Click a stock on the Watchlist or a ticker on the Portfolio page to open `/investing/stock/<TICKER>`: price, key statistics, reported financials (about 5 quarters or 4 years, as Yahoo Finance gives them), company profile, analyst estimates, news and insider trades.
+
+**Should I buy now?** shows three checks. *Your price* (against your strong-buy and may-buy levels) and *Room in the portfolio* (against the stock's target weight, otherwise its bucket's share and position limit; capped by your cash) are plain arithmetic in `compute_fit`, `back/app/investing/analysis.py`. *Analyze* adds Gemini's view of the company and its decision. The model can refuse a buy your rules allow, but a "buy" is rejected when the price is above your levels or there's no room. The latest review per stock is saved.
+
+## AI chat
+
+The button at the bottom right of the Investing pages opens a chat with Gemini. Every question goes with your account in the system instruction (`back/app/investing/chat.py`): holdings at live prices, cash, targets, the watchlist's buy zones, notes, business figures, what your funds hold and the last written review; on a stock page, that company too. The account is reused for 2 minutes between questions. The conversation lives in the browser tab (sessionStorage) and is not saved on the server.
+
 ## Interface language
 
 The **EN / UA** switch in the header changes the whole interface. The choice is remembered in the browser. Your own data (titles, genres, notes, list and account names) stays as you entered it. Dates and numbers follow the chosen language.

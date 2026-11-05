@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import { RequireAuth } from "@/components/auth/require-auth";
+import { PortfolioChat } from "@/features/investing/chat/portfolio-chat";
 import { investingNavItems } from "@/features/investing/nav";
 import {
   investingPageStack,
@@ -31,12 +32,13 @@ export default function InvestingLayout({ children }: { children: React.ReactNod
     return investingNavItems(subs).filter((item) => item.slug !== "crypto" && item.slug !== "total");
   }, [categories, subcategoriesByCategoryId]);
 
-  if (pathname === "/investing") {
-    return <>{children}</>;
-  }
-
-  if (pathname.startsWith("/investing/crypto") || pathname.startsWith("/investing/total")) {
-    return <>{children}</>;
+  if (pathname === "/investing" || pathname.startsWith("/investing/crypto") || pathname.startsWith("/investing/total")) {
+    return (
+      <>
+        {children}
+        <PortfolioChat />
+      </>
+    );
   }
 
   return (
@@ -67,6 +69,7 @@ export default function InvestingLayout({ children }: { children: React.ReactNod
 
         {children}
       </div>
+      <PortfolioChat />
     </RequireAuth>
   );
 }

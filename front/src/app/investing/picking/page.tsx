@@ -1,7 +1,10 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { formatUsd, parseUsd } from "@/features/investing/format";
+import { stockHref } from "@/features/investing/stock/data";
 import { useSnapshots, type Period } from "@/features/investing/watchlist/data";
 import { DetailsPanel } from "@/features/investing/watchlist/details-panel";
 import { DipFinder } from "@/features/investing/watchlist/dip-finder";
@@ -57,6 +60,7 @@ export default function InvestingPickingPage() {
   } = useInvesting();
   const tr = useT();
   const locale = useLocale();
+  const router = useRouter();
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [isAutofilling, setAutofilling] = useState(false);
   const [autofillMsg, setAutofillMsg] = useState<string | null>(null);
@@ -419,17 +423,19 @@ export default function InvestingPickingPage() {
                             return (
                               <tr
                                 key={row.id}
-                                onClick={() => setSelected(t)}
+                                onClick={() => {
+                                  if (t) router.push(stockHref(t));
+                                }}
                                 className={`cursor-pointer border-t border-black/5 ${active ? "bg-[#eef4fc]" : "hover:bg-[#faf8f2]"}`}
                               >
                                 <td className="px-5 py-2.5">
-                                  <button type="button" onClick={() => setSelected(t)} className="flex items-center gap-3 text-left" aria-pressed={active}>
+                                  <Link href={stockHref(t)} onClick={(e) => e.stopPropagation()} className="flex items-center gap-3 text-left">
                                     <TickerLogo ticker={t} size={32} />
                                     <span className="min-w-0">
                                       <span className="block font-semibold text-[#1f1c17]">{row.ticker || "—"}</span>
                                       <span className="block max-w-[180px] truncate text-[11px] text-[#8f8676]">{(row.name.trim().toUpperCase() !== t && row.name.trim()) || snap?.name || row.industry || "—"}</span>
                                     </span>
-                                  </button>
+                                  </Link>
                                 </td>
                                 <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-[#1f1c17]">
                                   {Number.isFinite(px) ? formatUsd(px) : "—"}

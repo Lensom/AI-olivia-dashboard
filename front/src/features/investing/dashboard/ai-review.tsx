@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { dashCard, useCardOpen } from "@/features/investing/dashboard/widgets";
 import { formatUsd } from "@/features/investing/format";
-import { Bullets, modelName, SparkIcon } from "@/features/investing/watchlist/ai-analysis";
+import { Bullets, modelName, SparkIcon, STALE_REVIEW, StaleDataNote } from "@/features/investing/watchlist/ai-analysis";
 import { apiFetch, type ApiError } from "@/lib/api";
 import { useLang, useLocale, useT } from "@/lib/i18n";
 
 type Health = "strong" | "good" | "needs_attention" | "at_risk";
 type Move = "buy" | "add" | "hold" | "trim" | "sell" | "rebalance" | "watch";
+type AdviceKind = "remove" | "reduce" | "add" | "replace" | "keep";
 
 type PortfolioAnalysis = {
   health: Health;
@@ -22,6 +23,8 @@ type PortfolioAnalysis = {
   risks: string[];
   actions: { action: Move; ticker: string; detail: string }[];
   cash_plan: string;
+  advice: { action: AdviceKind; ticker: string; related_ticker: string; reason: string }[];
+  questions: { question: string; answer: string }[];
 };
 
 type PortfolioAnalysisResponse = {
@@ -29,6 +32,7 @@ type PortfolioAnalysisResponse = {
   model: string;
   lang: string;
   account_value: number | null;
+  stale_data?: boolean;
   created_at: string;
 };
 
@@ -47,6 +51,14 @@ const MOVES: Record<Move, { label: string; cls: string }> = {
   sell: { label: "Sell position", cls: "bg-rose-100 text-rose-800" },
   rebalance: { label: "Rebalance", cls: "bg-violet-100 text-violet-800" },
   watch: { label: "Watch", cls: "bg-amber-100 text-amber-800" },
+};
+
+const ADVICE: Record<AdviceKind, { label: string; cls: string }> = {
+  remove: { label: "Remove", cls: "bg-rose-100 text-rose-800" },
+  reduce: { label: "Reduce", cls: "bg-orange-100 text-orange-800" },
+  replace: { label: "Replace", cls: "bg-violet-100 text-violet-800" },
+  add: { label: "Add", cls: "bg-emerald-100 text-emerald-800" },
+  keep: { label: "Keep", cls: "bg-sky-100 text-sky-800" },
 };
 
 const CONFIDENCE = { low: "Low confidence", medium: "Medium confidence", high: "High confidence" } as const;
@@ -171,6 +183,7 @@ export function PortfolioAiReview({ token }: { token: string | null }) {
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${health.cls}`}>{t(health.label)}</span>
             <span className="text-[11px] text-[#8f8676]">{t(CONFIDENCE[a.confidence])}</span>
           </div>
+          {saved.stale_data ? <StaleDataNote message={t(STALE_REVIEW)} /> : null}
           <p className="mt-2 max-w-4xl text-base font-medium leading-snug text-[#1f1c17]">{a.headline}</p>
           <p className="mt-1.5 max-w-4xl text-sm leading-relaxed text-[#5f584d]">{a.summary}</p>
 
@@ -226,6 +239,48 @@ export function PortfolioAiReview({ token }: { token: string | null }) {
             </div>
           </div>
 
+          {a.questions.length ? (
+            <div className="mt-4 grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+              <div>
+                <p className={label}>{t("Portfolio advice")}</p>
+                {a.advice.length ? (
+                  <ul className="mt-2 divide-y divide-black/5 rounded-xl border border-black/5">
+                    {a.advice.map((item, i) => {
+                      const kind = ADVICE[item.action];
+                      return (
+                        <li key={i} className="px-3.5 py-2.5">
+                          <p className="flex flex-wrap items-center gap-1.5">
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${kind.cls}`}>{t(kind.label)}</span>
+                            <span className="text-xs font-semibold text-[#1f1c17]">
+                              {item.ticker}
+                              {item.related_ticker ? ` ${item.action === "replace" ? "→" : "↔"} ${item.related_ticker}` : ""}
+                            </span>
+                          </p>
+                          <p className="mt-1 text-xs leading-snug text-[#3b352d]">{item.reason}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="mt-2 rounded-xl border border-black/5 px-3.5 py-2.5 text-xs text-[#6f675b]">{t("Nothing to remove or change right now.")}</p>
+                )}
+              </div>
+              <div>
+                <p className={label}>{t("Questions to think about")}</p>
+                <ul className="mt-2 divide-y divide-black/5 rounded-xl border border-black/5">
+                  {a.questions.map((q, i) => (
+                    <li key={i} className="px-3.5 py-2.5">
+                      <p className="text-xs font-semibold leading-snug text-[#1f1c17]">{q.question}</p>
+                      <p className="mt-1 text-xs leading-snug text-[#3b352d]">{q.answer}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-4 rounded-xl bg-[#faf8f2] px-3.5 py-2.5 text-xs text-[#6f675b]">{t("Run the review again to get portfolio advice and questions to think about.")}</p>
+          )}
+
           <p className="mt-4 text-[11px] leading-snug text-[#8f8676]">
             {[
               modelName(saved.model),
@@ -240,7 +295,7 @@ export function PortfolioAiReview({ token }: { token: string | null }) {
         </div>
       ) : saved === undefined ? null : (
         <p className="mt-3 max-w-3xl text-xs leading-relaxed text-[#6f675b]">
-          {t("Get a verdict on diversification, drift from your target weights, valuation and risk, plus concrete next steps and where to put your cash.")}
+          {t("Get a verdict on diversification, drift from your target weights, valuation and risk, plus what to remove or keep, questions to think about, concrete next steps and where to put your cash.")}
         </p>
       )}
         </>

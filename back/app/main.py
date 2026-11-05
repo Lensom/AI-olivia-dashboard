@@ -15,6 +15,8 @@ from app.library.series import router as library_series_router
 from app.categories.router import router as categories_router
 import app.investing.router as investing_router_module
 from app.investing.router import router as investing_router
+from app.investing.chat import router as investing_chat_router
+from app.investing.stock import router as stock_router
 from app.investing.watchlist import router as watchlist_router
 from app.investing.events import router as events_router
 from app.tasks.router import router as tasks_router
@@ -98,6 +100,7 @@ app.include_router(auth_router_module.router, prefix=API_PREFIX)
 app.include_router(categories_router, prefix=API_PREFIX)
 app.include_router(investing_router, prefix=API_PREFIX)
 app.include_router(watchlist_router, prefix=API_PREFIX)
+app.include_router(stock_router, prefix=API_PREFIX)
 app.include_router(events_router, prefix=API_PREFIX)
 app.dependency_overrides[cinema_router_module.get_tmdb_key] = lambda: settings.tmdb_api_key.strip()
 app.include_router(cinema_router_module.router, prefix=API_PREFIX)
@@ -127,6 +130,7 @@ _llm = (
 )
 app.dependency_overrides[analysis_router_module.get_llm] = lambda: _llm
 app.include_router(analysis_router_module.router, prefix=API_PREFIX)
+app.include_router(investing_chat_router, prefix=API_PREFIX)
 app.include_router(cinema_ai_router, prefix=API_PREFIX)
 app.include_router(library_ai_router, prefix=API_PREFIX)
 app.include_router(pages_router, prefix=API_PREFIX)

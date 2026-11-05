@@ -90,6 +90,18 @@ class StructuredResult[M: BaseModel]:
     model: str  # the model that produced it
 
 
+@dataclass
+class TextResult:
+    value: str
+    model: str  # the model that produced it
+
+
+@dataclass
+class ChatMessage:
+    role: str  # "user" | "assistant"
+    content: str
+
+
 class LLMClient:
     """Thin wrapper around the Gemini client."""
 
@@ -115,6 +127,23 @@ class LLMClient:
         """Return the full reply as plain text."""
         response, _ = await self._with_fallback(lambda model: self._generate_content(model, prompt))
         return response.text or ""
+
+    async def chat(self, messages: list[ChatMessage], system_instruction: str | None = None) -> TextResult:
+        """Continue a conversation: the reply to its last message, as plain text."""
+        contents = [
+            types.Content(role="model" if m.role == "assistant" else "user", parts=[types.Part(text=m.content)])
+            for m in messages
+        ]
+        config = types.GenerateContentConfig(system_instruction=system_instruction)
+
+        async def attempt_with(model: str) -> str:
+            response = await self._generate_content(model, contents, config=config)
+            if not response.text:  # blocked or empty: another model may still answer
+                raise StructuredOutputError(1, ["empty response"])
+            return response.text.strip()
+
+        value, model = await self._with_fallback(attempt_with)
+        return TextResult(value=value, model=model)
 
     async def structured(
         self,

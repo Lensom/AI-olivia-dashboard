@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { stockHref } from "@/features/investing/stock/data";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { formatPercent, formatUsd, parsePercent, parseUsd } from "@/features/investing/format";
 import type { InvestingHolding } from "@/features/investing/types";
@@ -639,26 +641,26 @@ export default function InvestingTablePage() {
             const open = !!expandedRowIds[h.id];
             return (
               <li key={h.id} className="rounded-2xl border border-black/5 bg-white/90 shadow-[0_4px_16px_rgba(18,16,13,0.04)]">
+                <div className="flex items-start justify-between gap-3 px-4 pt-3">
+                  <Link href={stockHref(h.ticker)} className="min-w-0">
+                    <span className="block text-sm font-semibold text-[#1f1c17] underline decoration-black/20 underline-offset-2">{h.ticker}</span>
+                    <span className="block truncate text-xs text-[#8f8676]">{h.name}</span>
+                  </Link>
+                  <span className="shrink-0 text-right tabular-nums">
+                    <span className="block text-sm font-semibold text-[#1f1c17]">{formatUsd(parseUsd(h.marketValue))}</span>
+                    <span className={`block text-xs font-medium ${dayChangeCellClass(h.dayChangePercent)}`}>
+                      {h.dayChangePercent ?? "—"}
+                      {s.dayUsd != null ? <span className="font-normal text-[#8f8676]"> · {signedUsd(s.dayUsd)}</span> : null}
+                    </span>
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => toggleExpanded(h.id)}
                   aria-expanded={open}
-                  className="block w-full px-4 py-3 text-left"
+                  className="block w-full px-4 pb-3 pt-2.5 text-left"
                 >
-                  <span className="flex items-start justify-between gap-3">
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-[#1f1c17]">{h.ticker}</span>
-                      <span className="block truncate text-xs text-[#8f8676]">{h.name}</span>
-                    </span>
-                    <span className="shrink-0 text-right tabular-nums">
-                      <span className="block text-sm font-semibold text-[#1f1c17]">{formatUsd(parseUsd(h.marketValue))}</span>
-                      <span className={`block text-xs font-medium ${dayChangeCellClass(h.dayChangePercent)}`}>
-                        {h.dayChangePercent ?? "—"}
-                        {s.dayUsd != null ? <span className="font-normal text-[#8f8676]"> · {signedUsd(s.dayUsd)}</span> : null}
-                      </span>
-                    </span>
-                  </span>
-                  <span className="mt-2.5 grid grid-cols-3 gap-2 border-t border-black/5 pt-2 text-[11px] tabular-nums">
+                  <span className="grid grid-cols-3 gap-2 border-t border-black/5 pt-2 text-[11px] tabular-nums">
                     <span>
                       <span className="block text-[#8f8676]">{tr("Weight")}</span>
                       <span className="font-medium text-[#2f2922]">{formatPercent(parsePercent(h.currentWeight))}</span>
@@ -932,7 +934,11 @@ export default function InvestingTablePage() {
                           <td className="px-2 py-2 text-center text-sm text-[#8f8676]">
                             {expandedRowIds[h.id] ? "−" : "+"}
                           </td>
-                          <td className="px-2 py-2 text-sm font-semibold text-[#2f2922]">{h.ticker}</td>
+                          <td className="px-2 py-2 text-sm font-semibold text-[#2f2922]">
+                            <Link href={stockHref(h.ticker)} onClick={(e) => e.stopPropagation()} className="underline decoration-black/20 underline-offset-2 hover:text-[#2a78d6]">
+                              {h.ticker}
+                            </Link>
+                          </td>
                           <td className="px-2 py-2 text-sm text-[#2f2922]">
                             <span className="block truncate" title={h.name}>
                               {h.name}

@@ -25,6 +25,7 @@ type AnalysisResponse = {
   model: string;
   lang: string;
   price: number | null;
+  stale_data?: boolean;
   created_at: string;
 };
 
@@ -44,6 +45,8 @@ const CONFIDENCE: Record<StockAnalysis["confidence"], string> = {
 };
 
 const label = "text-[11px] font-semibold uppercase tracking-wide text-[#8f8676]";
+
+export const STALE_REVIEW = "Freedom24 didn’t answer, so this review used the saved copy of your account. Its figures may be out of date: re-analyze when the broker is back.";
 
 /** "gemini-3.1-flash-lite" → "Gemini 3.1 Flash Lite". */
 export function modelName(id: string): string {
@@ -71,6 +74,16 @@ export function Bullets({ items, tone }: { items: string[]; tone: "up" | "down" 
         </li>
       ))}
     </ul>
+  );
+}
+
+/** The broker didn't answer, so an AI review or a check was worked out from the saved copy of the account. */
+export function StaleDataNote({ message, className = "mt-2" }: { message: string; className?: string }) {
+  return (
+    <p className={`rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900 ${className}`} role="status">
+      <span aria-hidden>⚠ </span>
+      {message}
+    </p>
   );
 }
 
@@ -155,6 +168,7 @@ export function AiAnalysis({ ticker, token, own }: { ticker: string; token: stri
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${verdict.cls}`}>{t(verdict.label)}</span>
             <span className="text-[11px] text-[#8f8676]">{t(CONFIDENCE[a.confidence])}</span>
           </div>
+          {current.stale_data ? <StaleDataNote message={t(STALE_REVIEW)} /> : null}
           <p className="mt-2 text-sm font-medium leading-snug text-[#1f1c17]">{a.headline}</p>
           <p className="mt-1.5 text-xs leading-relaxed text-[#5f584d]">{a.summary}</p>
 

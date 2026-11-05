@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { formatUsd } from "@/features/investing/format";
+import { stockHref } from "@/features/investing/stock/data";
 import { AiAnalysis } from "@/features/investing/watchlist/ai-analysis";
 import {
   CHART_RANGES,
@@ -78,7 +80,7 @@ function timeAgo(iso: string | null, locale: string): string {
   return rtf.format(0, "minute");
 }
 
-function News({ ticker, token }: { ticker: string; token: string | null }) {
+export function News({ ticker, token }: { ticker: string; token: string | null }) {
   const t = useT();
   const locale = useLocale();
   const { items, loading } = useNews(ticker, token);
@@ -138,14 +140,14 @@ export function DetailsPanel({
           <h2 className="truncate text-sm font-semibold text-[#1f1c17]" title={name}>{name}</h2>
           <p className="truncate text-[11px] text-[#8f8676]">{[ticker, s?.exchange, s?.sector || row.industry].filter(Boolean).join(" · ")}</p>
         </div>
-        <a
-          href={`https://finviz.com/quote.ashx?t=${encodeURIComponent(ticker)}`}
-          target="_blank"
-          rel="noreferrer"
-          className="shrink-0 text-[11px] font-medium text-[#2a78d6] hover:underline"
-        >
-          Finviz ↗
-        </a>
+        <span className="flex shrink-0 flex-col items-end gap-0.5 text-[11px] font-medium text-[#2a78d6]">
+          <Link href={stockHref(ticker)} className="hover:underline">
+            {t("Open stock page")} →
+          </Link>
+          <a href={`https://finviz.com/quote.ashx?t=${encodeURIComponent(ticker)}`} target="_blank" rel="noreferrer" className="hover:underline">
+            Finviz ↗
+          </a>
+        </span>
       </div>
 
       <div className={section}>
