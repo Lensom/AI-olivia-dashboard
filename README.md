@@ -192,6 +192,14 @@ A Notion-like space at `/pages` for everything else: learning, goals, family, pl
 
 A simple task board at `/life/tasks`: **To do, Hold, In progress, Completed**. Type a title and press Enter to add a task to To do. Drag cards between columns or within one to reorder; hover a card for ‹ › (move without dragging), ✎ (rename, or double-click the title) and ✕ (delete). **Clear N completed** removes finished tasks. Every change saves immediately.
 
+### Jobs
+
+Front-end vacancies with relocation to the Netherlands, Norway and Denmark at `/life/jobs`. Upload your CV as a PDF (only its text is kept, and it goes to Gemini for matching), press **Refresh vacancies**, and each one gets a match score, whether English is enough, and what the ad says about relocation. Give vacancies a status (Interesting, Applied, Interview, Rejected, Hidden); they survive refreshes.
+
+Sources, in `back/app/jobs/sources.py`: career APIs of companies hiring in those countries, Norway's NAV (its English working-language filter), visajobs.xyz, the relocate.me sitemap and EURES for the Netherlands (its Dutch ads hide the employer). Indeed blocks servers and Jobindex's robots.txt forbids collecting, so neither is included. Add companies to the lists at the top of that file (`GREENHOUSE`, `ASHBY`, `LEVER`, `LEVER_EU`, `RECRUITEE`, `SMARTRECRUITERS`, `WORKABLE`).
+
+Each refresh also checks companies against the official sponsor registers (`back/app/jobs/sponsors.py`): IND for the Netherlands and SIRI's fast-track list for Denmark. Norway has no such list. A match means the company can sponsor a visa, not that it will for that role, and no match doesn't rule it out.
+
 ### Games
 
 A list of the games you've finished at `/life/games`: a title and the year you finished it (optional). Add one with the form at the top (the year defaults to this one). Sort **A–Z** or **By year** (grouped, newest first, games without a year last), search by title, and hover a row for ✎ (edit, or double-click) and ✕ (delete). Every change saves immediately.
@@ -249,6 +257,7 @@ All endpoints are under the `/api` prefix (e.g. `/api/investing/holdings`); the 
 | Library | `GET/PUT /library`, `GET /library/search?q=&kind=`, `GET /library/details?source=&source_id=`, `POST /library/match-many`, `POST /library/import`, `POST /library/wikidata`, `POST /library/series?lang=`, `GET/POST /library/ai?lang=` |
 | Tasks | `GET/PUT /tasks` |
 | Games | `GET/PUT /games` |
+| Jobs | `GET /life/jobs`, `POST /life/jobs/refresh`, `POST /life/jobs/score`, `POST/DELETE /life/jobs/cv`, `PATCH /life/jobs/{id}` |
 | Life | `GET/POST /pages`, `GET/PATCH/DELETE /pages/{id}` (PATCH moves too: `parent_id`, `sort_order`) |
 | Sections | `GET/PUT` on `/investing/holdings`, `/refills`, `/activities`, `/capital-entries`, `/picking`, `/notes`, `/crypto`, `/total`, `/broker` (cash, dividends, attention thresholds) |
 

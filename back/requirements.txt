@@ -7,3 +7,5 @@ psycopg-pool
 openpyxl
 python-multipart
 google-genai
+certifi
+pypdf

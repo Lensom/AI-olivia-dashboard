@@ -21,6 +21,7 @@ from app.investing.watchlist import router as watchlist_router
 from app.investing.events import router as events_router
 from app.tasks.router import router as tasks_router
 from app.games.router import router as games_router
+from app.jobs.router import router as jobs_router
 from app.pages.router import router as pages_router
 from app.db import create_pool, init_db
 from app.llm.client import DEFAULT_FALLBACK_MODELS, DEFAULT_MODEL, LLMClient
@@ -121,6 +122,7 @@ library_wikidata_module.CONTACT = settings.wikidata_contact.strip()
 app.include_router(library_series_router, prefix=API_PREFIX)
 app.include_router(tasks_router, prefix=API_PREFIX)
 app.include_router(games_router, prefix=API_PREFIX)
+app.include_router(jobs_router, prefix=API_PREFIX)
 _llm = (
     LLMClient(
         api_key=settings.gemini_api_key.strip(),

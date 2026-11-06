@@ -2,6 +2,7 @@
 export const LIFE_PAGES = [
   { slug: "tasks", label: "Tasks" },
   { slug: "games", label: "Games" },
+  { slug: "jobs", label: "Jobs" },
 ];
 
 export const lifePageHref = (slug: string) => (LIFE_PAGES.some((p) => p.slug === slug) ? `/life/${slug}` : `/c/life/${slug}`);

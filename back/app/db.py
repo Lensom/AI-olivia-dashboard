@@ -196,6 +196,33 @@ def init_db(pool: ConnectionPool) -> None:
             );
             """
         )
+        # Life → Jobs (app/jobs/router.py): your CV's text and last refresh; the vacancies found, with your status.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_search_profiles (
+                user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                cv_text TEXT,
+                cv_name TEXT,
+                cv_updated_at TIMESTAMPTZ,
+                last_refresh_at TIMESTAMPTZ,
+                sources JSONB NOT NULL DEFAULT '[]'::jsonb
+            );
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_search_jobs (
+                user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                id TEXT NOT NULL,
+                data JSONB NOT NULL,
+                status TEXT NOT NULL DEFAULT 'new',
+                first_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                last_seen TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                assessed_at TIMESTAMPTZ,
+                PRIMARY KEY (user_id, id)
+            );
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS task_boards (
