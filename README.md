@@ -204,6 +204,10 @@ Each refresh also checks companies against the official sponsor registers (`back
 
 A list of the games you've finished at `/life/games`: a title and the year you finished it (optional). Add one with the form at the top (the year defaults to this one). Sort **A–Z** or **By year** (grouped, newest first, games without a year last), search by title, and hover a row for ✎ (edit, or double-click) and ✕ (delete). Every change saves immediately.
 
+### Collecting
+
+What you collect at `/life/collection`, by category (Comics, Books, LEGO…). Each line has a status: **Collecting now** (yellow), **Collected** (green), **To decide** (plain) or **Declined** (red), plus an optional note, link, how many you have and a goal. A line can have sub-lines (an edition → its authors). Open a line to edit it and to add what to buy, with a price and link; **To buy** lists all of it across the collection with totals per currency. Filter by status or search. Every change saves immediately.
+
 ## Deploy (Vercel)
 
 `vercel.json` deploys the repo as one Vercel project with two services:
@@ -257,6 +261,7 @@ All endpoints are under the `/api` prefix (e.g. `/api/investing/holdings`); the 
 | Library | `GET/PUT /library`, `GET /library/search?q=&kind=`, `GET /library/details?source=&source_id=`, `POST /library/match-many`, `POST /library/import`, `POST /library/wikidata`, `POST /library/series?lang=`, `GET/POST /library/ai?lang=` |
 | Tasks | `GET/PUT /tasks` |
 | Games | `GET/PUT /games` |
+| Collecting | `GET/PUT /life/collection` |
 | Jobs | `GET /life/jobs`, `POST /life/jobs/refresh`, `POST /life/jobs/score`, `POST/DELETE /life/jobs/cv`, `PATCH /life/jobs/{id}` |
 | Life | `GET/POST /pages`, `GET/PATCH/DELETE /pages/{id}` (PATCH moves too: `parent_id`, `sort_order`) |
 | Sections | `GET/PUT` on `/investing/holdings`, `/refills`, `/activities`, `/capital-entries`, `/picking`, `/notes`, `/crypto`, `/total`, `/broker` (cash, dividends, attention thresholds) |

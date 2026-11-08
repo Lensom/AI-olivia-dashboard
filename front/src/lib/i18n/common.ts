@@ -20,6 +20,7 @@ export const COMMON: Record<string, string | string[]> = {
   Tasks: "Завдання",
   Games: "Ігри",
   Jobs: "Вакансії",
+  Collecting: "Колекціонування",
   // Global search
   Search: "Пошук",
   "Search films, books, games, stocks…": "Пошук фільмів, книжок, ігор, акцій…",

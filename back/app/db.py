@@ -196,6 +196,16 @@ def init_db(pool: ConnectionPool) -> None:
             );
             """
         )
+        # Life → Collecting (app/collection/router.py): categories, lines with a status, and what to buy, as one document.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS collection_lists (
+                user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
         # Life → Jobs (app/jobs/router.py): your CV's text and last refresh; the vacancies found, with your status.
         conn.execute(
             """

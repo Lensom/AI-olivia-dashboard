@@ -259,7 +259,7 @@ def _ensure_life_defaults(conn: Connection, *, user_id: int, category_id: int) -
     if not category or category[0] != "life":
         return
     # Same names and order as the frontend's Life nav (front/src/features/life/nav.ts).
-    defaults = [("Tasks", "tasks"), ("Games", "games"), ("Jobs", "jobs")]
+    defaults = [("Tasks", "tasks"), ("Games", "games"), ("Jobs", "jobs"), ("Collecting", "collection")]
     for name, slug in defaults:
         exists = conn.execute(
             "SELECT 1 FROM subcategories WHERE category_id = %s AND slug = %s",

@@ -16,15 +16,17 @@ import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useCategories } from "@/state/categories-store";
 import { useInvesting } from "@/state/investing-store";
+import { statusMeta, type Status as CollectionStatus } from "@/features/life/collection/types";
 
 type Game = { id: string; title: string; year: number | null };
 type Task = { id: string; title: string; status: string };
-type Data = { cinema: CinemaTitle[]; library: LibraryItem[]; games: Game[]; tasks: Task[] };
+type CollectionLine = { id: string; title: string; note: string; status: CollectionStatus; children?: CollectionLine[] };
+type Data = { cinema: CinemaTitle[]; library: LibraryItem[]; games: Game[]; tasks: Task[]; collection: { name: string; items: CollectionLine[] }[] };
 
-type Group = "Pages" | "Films and series" | "Books" | "Games" | "Tasks" | "Stocks";
+type Group = "Pages" | "Films and series" | "Books" | "Games" | "Collection" | "Tasks" | "Stocks";
 type Result = { id: string; group: Group; title: string; sub: string; href: string; thumb?: { src: string } | { ticker: string } };
 
-const GROUPS: Group[] = ["Pages", "Stocks", "Films and series", "Books", "Games", "Tasks"];
+const GROUPS: Group[] = ["Pages", "Stocks", "Films and series", "Books", "Games", "Collection", "Tasks"];
 const PER_GROUP = 6;
 const TTL = 2 * 60 * 1000;
 
@@ -37,13 +39,14 @@ async function loadData(token: string): Promise<Data> {
     apiFetch<never>(path, { token })
       .then(pick)
       .catch(() => [] as T[]);
-  const [cinema, library, games, tasks] = await Promise.all([
+  const [cinema, library, games, tasks, collection] = await Promise.all([
     get<CinemaTitle>("/cinema", (r: { items: CinemaTitle[] }) => r.items),
     get<LibraryItem>("/library", (r: { items: LibraryItem[] }) => r.items),
     get<Game>("/games", (r: { games: Game[] }) => r.games),
     get<Task>("/tasks", (r: { tasks: Task[] }) => r.tasks),
+    get<{ name: string; items: CollectionLine[] }>("/life/collection", (r: { categories: { name: string; items: CollectionLine[] }[] }) => r.categories),
   ]);
-  const data = { cinema, library, games, tasks };
+  const data = { cinema, library, games, tasks, collection };
   cache = { at: Date.now(), token, data };
   return data;
 }
@@ -178,6 +181,14 @@ export function GlobalSearch() {
     for (const x of data?.games ?? []) {
       add({ id: `g-${x.id}`, group: "Games", title: x.title, sub: x.year ? String(x.year) : "", href: `/life/games?q=${encodeURIComponent(x.title)}` }, [x.title]);
     }
+    for (const c of data?.collection ?? []) {
+      for (const x of c.items.flatMap((i) => [i, ...(i.children ?? [])])) {
+        add(
+          { id: `k-${x.id}`, group: "Collection", title: x.title, sub: [c.name, t(statusMeta(x.status).label)].join(" · "), href: `/life/collection?q=${encodeURIComponent(x.title)}` },
+          [x.title, x.note],
+        );
+      }
+    }
     for (const x of data?.tasks ?? []) {
       add({ id: `t-${x.id}`, group: "Tasks", title: x.title, sub: t(TASK_STATUS[x.status] ?? "To do"), href: "/life/tasks" }, [x.title]);
     }
@@ -284,7 +295,7 @@ export function GlobalSearch() {
                             <Poster src={r.thumb.src} title={r.title} className="h-10 w-7 shrink-0" />
                           ) : (
                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f3efe5] text-xs text-[#8f8676]" aria-hidden>
-                              {r.group === "Pages" ? "↗" : r.group === "Games" ? "◆" : "✓"}
+                              {r.group === "Pages" ? "↗" : r.group === "Games" ? "◆" : r.group === "Collection" ? "❖" : "✓"}
                             </span>
                           )}
                           <span className="min-w-0 flex-1">

@@ -20,6 +20,7 @@ from app.investing.stock import router as stock_router
 from app.investing.watchlist import router as watchlist_router
 from app.investing.events import router as events_router
 from app.tasks.router import router as tasks_router
+from app.collection.router import router as collection_router
 from app.games.router import router as games_router
 from app.jobs.router import router as jobs_router
 from app.pages.router import router as pages_router
@@ -123,6 +124,7 @@ app.include_router(library_series_router, prefix=API_PREFIX)
 app.include_router(tasks_router, prefix=API_PREFIX)
 app.include_router(games_router, prefix=API_PREFIX)
 app.include_router(jobs_router, prefix=API_PREFIX)
+app.include_router(collection_router, prefix=API_PREFIX)
 _llm = (
     LLMClient(
         api_key=settings.gemini_api_key.strip(),
