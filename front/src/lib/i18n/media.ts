@@ -183,7 +183,6 @@ export const MEDIA: Record<string, string | string[]> = {
   "+{n} new": ["+{n} новий", "+{n} нові", "+{n} нових"],
   Directors: "Режисери",
   Studios: "Студії",
-  "Recreate my Notion tops": "Відтворити мої топи з Notion",
   "ties broken by IMDb rating": "за рівності — за рейтингом IMDb",
 
   // Cinematography: backend and load messages

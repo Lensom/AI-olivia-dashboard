@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { CINEMA_KINDS } from "@/features/cinema/nav";
-import { CINEMA_TOP_DIMENSIONS, cinemaTopItem, notionTopsStarter } from "@/features/cinema/tops";
+import { CINEMA_TOP_DIMENSIONS, cinemaTopItem } from "@/features/cinema/tops";
 import { TopsBoard } from "@/features/shared/tops-board";
 import { useT } from "@/lib/i18n";
 import { useCinema } from "@/state/cinema-store";
@@ -24,7 +24,6 @@ export default function CinemaTopsPage() {
       updateLists={updateLists}
       dimensions={CINEMA_TOP_DIMENSIONS}
       kinds={KINDS}
-      starter={notionTopsStarter}
       tieBreak="ties broken by IMDb rating"
     />
   );

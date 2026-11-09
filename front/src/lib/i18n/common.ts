@@ -117,6 +117,7 @@ export const COMMON: Record<string, string | string[]> = {
   "You’re still signed in. Retrying every few seconds…": "Ви й далі в акаунті. Повторюємо спробу кожні кілька секунд…",
   "Can’t reach the server. Is the backend running?": "Немає зв’язку із сервером. Бекенд запущено?",
   "Wrong email or password.": "Неправильна пошта або пароль.",
+  "Too many failed attempts. Try again in 15 minutes.": "Забагато невдалих спроб. Спробуйте через 15 хвилин.",
   "This email is already registered — log in instead.": "Ця пошта вже зареєстрована — просто увійдіть.",
   "Enter a valid email and a password of at least 8 characters.": "Введіть правильну пошту й пароль щонайменше з 8 символів.",
   "Enter a valid email and password.": "Введіть правильну пошту й пароль.",

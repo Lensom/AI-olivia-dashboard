@@ -48,14 +48,8 @@ class Settings(BaseSettings):
     freedom24_private_key: str = ""
     # Only this account (its login email) can see the Freedom24 data; empty = nobody.
     freedom24_owner_email: str = ""
-    cors_origins: str = (
-        "http://localhost:3000,"
-        "http://127.0.0.1:3000,"
-        "http://localhost:3001,"
-        "http://127.0.0.1:3001,"
-        "http://192.168.100.150:3000,"
-        "http://192.168.100.150:3001"
-    )
+    # Other origins, such as this machine's address on your network for a phone, go in CORS_ORIGINS in .env.
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

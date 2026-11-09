@@ -2,7 +2,7 @@ import { createElement, Fragment } from "react";
 import { cinemaKindMeta } from "@/features/cinema/nav";
 import type { CinemaTitle } from "@/features/cinema/types";
 import { ImdbRating, ScoreBadge } from "@/features/cinema/ui";
-import { listFromTexts, type TopDimension, type TopItem } from "@/features/shared/tops-board";
+import type { TopDimension, TopItem } from "@/features/shared/tops-board";
 import type { T } from "@/lib/i18n";
 
 export const CINEMA_TOP_DIMENSIONS: TopDimension[] = [
@@ -43,22 +43,3 @@ export function cinemaTopItem(t: CinemaTitle, tr: T): TopItem {
     ),
   };
 }
-
-/** The lists from your Notion page, to start from. */
-const NOTION_TOPS: { title: string; entries: string[] }[] = [
-  { title: "Топ фільмів", entries: ["Початок", "Престиж", "Інтерстеллар"] },
-  { title: "Топ мультфільмів", entries: ["Зоотрополіс", "Місто Героїв", "Тайна Коко", "Моана", "Кунг-Фу Панда"] },
-  { title: "Серії фільмів", entries: ["Темний лицар", "Володар перснів та хоббіти", "Гаррі Поттер", "Пірати Карибського моря"] },
-  { title: "Наукова фантастика", entries: ["Початок", "Престиж", "Інтерстеллар"] },
-  { title: "Трилери", entries: ["Острів проклятих", "Престиж"] },
-  { title: "Комедії", entries: ["Вартові галактики", "Похмілля у Вегасі"] },
-  { title: "Пригоди", entries: ["Пірати Карибського моря", "Похмілля у Вегасі", "Залізна людина", "Шалений Макс: Дорога гніву"] },
-  { title: "Драма", entries: ["Великий Гетсбі", "Спокута", "Батько", "Джокер", "Спілка мертвих поетів", "Ігри розуму", "Я лаюсь"] },
-  { title: "Історії", entries: ["Великий Гетсбі", "Джанго вільний"] },
-  { title: "Кращі злодеї", entries: ["Смерть (Кіт у чоботях 2)"] },
-];
-
-export const notionTopsStarter = {
-  label: "Recreate my Notion tops",
-  build: (items: TopItem[]) => NOTION_TOPS.map((l) => listFromTexts(l.title, l.entries, items)),
-};

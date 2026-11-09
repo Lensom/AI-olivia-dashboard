@@ -24,7 +24,6 @@ import {
   type Status,
   type Wish,
 } from "@/features/life/collection/types";
-import { NOTION_START } from "@/features/life/collection/starter";
 import { apiFetch } from "@/lib/api";
 import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
@@ -662,12 +661,7 @@ function CollectionPage({ initialQuery }: { initialQuery: string }) {
             ) : (
               <div className="space-y-3">
                 {!collection.categories.length ? (
-                  <div className="space-y-3 rounded-2xl border border-dashed border-black/10 bg-white/70 px-6 py-10 text-center text-sm text-[#6f675b]">
-                    <p>{t("Start with a category, such as Comics or LEGO, or bring over the list from Notion.")}</p>
-                    <button type="button" onClick={() => edit(() => NOTION_START)} className={investingToolbarBtn}>
-                      {t("Start from my Notion list")}
-                    </button>
-                  </div>
+                  <p className="rounded-2xl border border-dashed border-black/10 bg-white/70 px-6 py-10 text-center text-sm text-[#6f675b]">{t("Start with a category, such as Comics or LEGO.")}</p>
                 ) : filtering && !shown.length ? (
                   <p className="text-sm text-[#8f8676]">{t("Nothing matches these filters.")}</p>
                 ) : null}

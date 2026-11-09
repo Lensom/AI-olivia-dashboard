@@ -3,15 +3,17 @@ from __future__ import annotations
 import datetime as dt
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from psycopg import Connection
 
+from app.auth import limits
 from app.auth.schemas import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 from app.auth.security import create_token, hash_password, verify_password, verify_token
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+_UNKNOWN_USER_HASH = hash_password("no account has this password")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")  # routes are mounted under /api in main.py
 
 
@@ -70,16 +72,30 @@ def register(
 @router.post("/login", response_model=TokenResponse)
 def login(
     payload: LoginRequest,
+    request: Request,
     conn: Annotated[Connection, Depends(get_conn)],
     settings=Depends(get_settings),
 ):
     email = payload.email.lower().strip()
+    now = dt.datetime.now(dt.timezone.utc)
+    email_key = limits.key("email", email)
+    keys = [email_key, limits.key("ip", limits.client_address(request))]
+    wait = limits.wait_seconds(conn, keys, now)
+    if wait:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed attempts. Try again later.",
+            headers={"Retry-After": str(wait)},
+        )
     row = conn.execute(
         "SELECT id, email, password_hash FROM users WHERE email = %s",
         (email,),
     ).fetchone()
-    if not row or not verify_password(payload.password, row[2]):
+    # An unknown email still costs one hash check, so the answer's timing doesn't tell which emails have accounts.
+    if not verify_password(payload.password, row[2] if row else _UNKNOWN_USER_HASH) or not row:
+        limits.record_failure(conn, keys, now)
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    limits.clear(conn, email_key)
 
     token = create_token(
         secret=settings.auth_token_secret,

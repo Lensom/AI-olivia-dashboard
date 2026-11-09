@@ -46,30 +46,6 @@ export const rankItems = (list: TopItem[]) => [...list].sort(compareRank);
 
 export const entryFor = (t: TopItem): RankedListEntry => ({ id: newEntryId(), title_id: t.id, text: t.title, note: "" });
 
-const norm = (s: string) => s.toLowerCase().replace(/ґ/g, "г").replace(/[^\p{L}\p{N}]+/gu, "");
-
-/** Links free text to an item when exactly one has that name (or starts with it). */
-export function matchItem(text: string, items: TopItem[]): TopItem | null {
-  const q = norm(text);
-  if (!q) return null;
-  const exact = items.filter((t) => norm(t.title) === q || norm(t.altTitle) === q);
-  if (exact.length) return rankItems(exact)[0];
-  const prefix = items.filter((t) => norm(t.title).startsWith(q));
-  return prefix.length === 1 ? prefix[0] : null;
-}
-
-export function listFromTexts(title: string, texts: string[], items: TopItem[], size = 5): RankedList {
-  return {
-    id: newEntryId(),
-    title,
-    size: Math.max(size, texts.length),
-    entries: texts.map((text) => {
-      const t = matchItem(text, items);
-      return t ? entryFor(t) : { id: newEntryId(), title_id: "", text, note: "" };
-    }),
-  };
-}
-
 type AutoTop = { key: string; count: number; avg: number; top: TopItem[] };
 
 function autoTops(items: TopItem[], dim: TopDimension, kind: string, n = 5): AutoTop[] {
@@ -343,14 +319,12 @@ type Props = {
   updateLists: (change: (lists: RankedList[]) => RankedList[]) => Promise<void>;
   dimensions: TopDimension[];
   kinds: { value: string; label: string }[];
-  /** Shown while there are no lists, e.g. "Recreate my Notion tops". */
-  starter?: { label: string; build: (items: TopItem[]) => RankedList[] };
   /** How ties are broken in the automatic tops, for the subtitle. */
   tieBreak: string;
 };
 
 /** "My tops" (curated lists) plus "Built from your ratings" (automatic tops per genre, author…). */
-export function TopsBoard({ items, lists, updateLists, dimensions, kinds, starter, tieBreak }: Props) {
+export function TopsBoard({ items, lists, updateLists, dimensions, kinds, tieBreak }: Props) {
   const t = useT();
   const [dim, setDim] = useState(dimensions[0]);
   const [kind, setKind] = useState("all");
@@ -374,11 +348,6 @@ export function TopsBoard({ items, lists, updateLists, dimensions, kinds, starte
             <p className="text-xs text-[#6f675b]">{t("Lists you rank yourself. Hover a list and press Edit to reorder, add or rename.")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {!lists.length && starter ? (
-              <button type="button" onClick={() => void addLists(starter.build(items))} className={investingToolbarBtn}>
-                {t(starter.label)}
-              </button>
-            ) : null}
             <button type="button" onClick={() => void addLists([{ id: newEntryId(), title: "", size: 5, entries: [] }])} className={investingPrimarySaveActive}>
               + {t("New list")}
             </button>

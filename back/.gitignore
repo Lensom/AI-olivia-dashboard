@@ -4,6 +4,10 @@
 # Local env config
 .env
 
+# Local databases: the app uses Postgres, and a database file can hold accounts
+*.sqlite3
+*.db
+
 # Python cache / artifacts
 __pycache__/
 *.py[cod]

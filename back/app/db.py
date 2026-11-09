@@ -30,6 +30,16 @@ def init_db(pool: ConnectionPool) -> None:
         );
         """
     )
+        # Failed logins per hashed email or address, for the limits in app/auth/limits.py.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS login_failures (
+                key TEXT PRIMARY KEY,
+                failures INT NOT NULL,
+                window_start TIMESTAMPTZ NOT NULL
+            );
+            """
+        )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS categories (

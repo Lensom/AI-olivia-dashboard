@@ -281,4 +281,4 @@ All endpoints are under the `/api` prefix (e.g. `/api/investing/holdings`); the 
 - **Lint and type checks:** `npm run lint` and `npx tsc --noEmit` from `front/`.
 - **Next.js version:** this project uses Next.js 16, which differs from older versions. See `front/AGENTS.md` and the bundled docs in `front/node_modules/next/dist/docs/`.
 - **Auto-reload on Windows:** `uvicorn --reload` sometimes misses file changes. If a new endpoint returns 404, restart the server.
-- **SQLite file:** `back/data/olivia.sqlite3` is left over from an earlier version. The app uses Postgres only.
+- **Login limits:** 5 failed logins per email and 30 per address within 15 minutes, then `429` until the window ends (`back/app/auth/limits.py`). Counts are kept in Postgres, as hashes.

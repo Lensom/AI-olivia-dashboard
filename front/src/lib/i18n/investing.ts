@@ -1020,8 +1020,7 @@ export const INVESTING: Record<string, string | string[]> = {
   "for {title}": "для «{title}»",
   "Could not load your collection. Is the backend running?": "Не вдалося завантажити колекцію. Бекенд запущено?",
   "Search the collection…": "Пошук у колекції…",
-  "Start with a category, such as Comics or LEGO, or bring over the list from Notion.": "Почніть з категорії, наприклад «Комікси» чи «LEGO», або перенесіть список із Notion.",
-  "Start from my Notion list": "Почати з мого списку з Notion",
+  "Start with a category, such as Comics or LEGO.": "Почніть з категорії, наприклад «Комікси» чи «LEGO».",
   "New category": "Нова категорія",
   "Add category": "Додати категорію",
 

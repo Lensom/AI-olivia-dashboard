@@ -20,6 +20,7 @@ function authErrorKey(err: unknown): string {
   if (status === 0) return "Can’t reach the server. Is the backend running?";
   if (status === 401) return "Wrong email or password.";
   if (status === 422) return "Enter a valid email and password.";
+  if (status === 429) return "Too many failed attempts. Try again in 15 minutes.";
   return "Something went wrong — try again.";
 }
 
