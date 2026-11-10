@@ -90,12 +90,12 @@ class RawJob:
 
     @property
     def id(self) -> str:
-        return sha1(f"{self.source}:{self.external_id}".encode()).hexdigest()[:20]
+        return sha1(f"{self.source}:{self.external_id}".encode(), usedforsecurity=False).hexdigest()[:20]  # an id, not security
 
     def to_data(self) -> dict[str, Any]:
         data = asdict(self)
         # With no employer named, "same title" isn't the same job: only the same ad text is.
-        who = self.company or sha1((self.description or self.external_id).encode()).hexdigest()
+        who = self.company or sha1((self.description or self.external_id).encode(), usedforsecurity=False).hexdigest()
         data["dedupe_key"] = dedupe_key(who, self.title, self.country)
         return data
 

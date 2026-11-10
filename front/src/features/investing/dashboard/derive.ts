@@ -23,7 +23,7 @@ export type Position = {
   dayUsd: number | null;
 };
 
-export function parseDayPct(s: string | undefined): number | null {
+function parseDayPct(s: string | undefined): number | null {
   const raw = String(s ?? "").trim();
   if (!raw || raw === "—") return null;
   const n = Number.parseFloat(raw.replace(/[%+]/g, "").replace(",", "."));

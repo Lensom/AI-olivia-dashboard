@@ -32,7 +32,7 @@ export const TIERS: Record<FranchiseTier, { label: string; ring: string; badge: 
  * Big franchises (TMDB collection ids) shown even before you've added any of their films,
  * as "Not started" — so Star Wars is there to start collecting.
  */
-export const FEATURED_COLLECTIONS = [
+const FEATURED_COLLECTIONS = [
   10, // Star Wars
   1241, // Harry Potter
   119, // The Lord of the Rings

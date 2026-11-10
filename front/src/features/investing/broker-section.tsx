@@ -22,7 +22,7 @@ const CURRENCIES = ["USD", "EUR", "RON", "UAH", "GBP", "RUB"];
 const DAY = 24 * 60 * 60 * 1000;
 
 /** Net dividend (gross − withheld tax) in USD. */
-export function dividendNetUsd(d: BrokerDividend): number {
+function dividendNetUsd(d: BrokerDividend): number {
   return d.amount_usd - d.tax_usd;
 }
 

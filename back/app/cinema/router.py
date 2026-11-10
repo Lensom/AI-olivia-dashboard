@@ -534,7 +534,7 @@ async def import_titles(
             columns[key] = i
     if "recommended" not in columns:
         # Notion's checkbox column may have no name: take the first unnamed column holding only yes/no values.
-        for i, cell in enumerate(header):
+        for i in range(len(header)):
             if i in columns.values():
                 continue
             values = {_cell(r[i]).lower() for r in body if i < len(r)}

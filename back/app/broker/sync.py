@@ -16,7 +16,8 @@ import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from app.broker.freedom24 import Freedom24ReadOnly
 from app.investing.router import _fetch_fx_rate_to_usd, _to_trade_currency

@@ -46,7 +46,7 @@ export const CINEMA_EXTRA_PAGES = [
   { slug: "tops", label: "Tops" },
 ];
 
-export const isBuiltInCinemaPage = (slug: string) =>
+const isBuiltInCinemaPage = (slug: string) =>
   CINEMA_KINDS.some((k) => k.slug === slug) || CINEMA_EXTRA_PAGES.some((p) => p.slug === slug);
 
 export const cinemaPageHref = (slug: string) =>

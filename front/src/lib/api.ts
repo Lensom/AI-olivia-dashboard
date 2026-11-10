@@ -11,7 +11,7 @@ function getDefaultApiBase(): string {
   return "http://127.0.0.1:8000/api";
 }
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? getDefaultApiBase();
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? getDefaultApiBase();
 
 /** `status` 0 means the request never got an answer (server down, no network); 408, that it took too long. */
 export type ApiError = {

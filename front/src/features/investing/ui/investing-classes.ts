@@ -28,9 +28,6 @@ export const investingPrimarySaveDisabled =
  */
 export const scrollRow = "scroll-row flex flex-wrap items-center gap-2";
 
-/** Horizontal pill tabs (Crypto + Stocks workspaces, Cinematography, Library, Life). */
-export const investingTabNavWrap = "scroll-row flex flex-wrap gap-2 border-b border-black/5 pb-3";
-
 const investingTabPillBase = "rounded-full px-3.5 py-1.5 text-xs font-medium transition";
 
 export const investingTabPillActive = `${investingTabPillBase} bg-[#1f1c17] text-[#f8f4eb]`;

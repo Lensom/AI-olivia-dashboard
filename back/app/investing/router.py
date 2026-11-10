@@ -3,7 +3,8 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from html import unescape
-from typing import Annotated, Any, Callable
+from typing import Annotated, Any
+from collections.abc import Callable
 import json
 import re
 import time
@@ -112,8 +113,8 @@ def _parse_date(value: str) -> datetime:
     for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%d-%m-%Y"):
         try:
             return datetime.strptime(raw, fmt)
-        except Exception:
-            pass
+        except ValueError:
+            continue
     return datetime.min
 
 

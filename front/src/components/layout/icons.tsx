@@ -18,49 +18,49 @@ export const HomeIcon = (p: IconProps) => (
   </Svg>
 );
 
-export const TasksIcon = (p: IconProps) => (
+const TasksIcon = (p: IconProps) => (
   <Svg {...p}>
     <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
     <path d="m8 12 3 3 5-6" />
   </Svg>
 );
 
-export const BookIcon = (p: IconProps) => (
+const BookIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" />
     <path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" />
   </Svg>
 );
 
-export const FilmIcon = (p: IconProps) => (
+const FilmIcon = (p: IconProps) => (
   <Svg {...p}>
     <rect x="3" y="4" width="18" height="16" rx="2.5" />
     <path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4" />
   </Svg>
 );
 
-export const ChartIcon = (p: IconProps) => (
+const ChartIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 3v18h18" />
     <path d="m7 15 4-4 3 3 6-7" />
   </Svg>
 );
 
-export const LeafIcon = (p: IconProps) => (
+const LeafIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M5 21c0-9 5-15 16-16-1 11-7 16-16 16Z" />
     <path d="M5 21 14 12" />
   </Svg>
 );
 
-export const GamepadIcon = (p: IconProps) => (
+const GamepadIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M7 7h10a5 5 0 0 1 4.6 7l-1 2.3a2.3 2.3 0 0 1-3.8.6L14.5 14h-5l-2.3 2.9a2.3 2.3 0 0 1-3.8-.6l-1-2.3A5 5 0 0 1 7 7Z" />
     <path d="M8 9.5v3M6.5 11h3M15.5 10h.01M17.5 12h.01" />
   </Svg>
 );
 
-export const FolderIcon = (p: IconProps) => (
+const FolderIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z" />
   </Svg>
@@ -91,7 +91,7 @@ export const PlusIcon = (p: IconProps) => (
 );
 
 /** Icon and accent per built-in category; custom categories get a folder. */
-export const CATEGORY_LOOK: Record<string, { Icon: (p: IconProps) => React.ReactElement; tile: string }> = {
+const CATEGORY_LOOK: Record<string, { Icon: (p: IconProps) => React.ReactElement; tile: string }> = {
   tasks: { Icon: TasksIcon, tile: "bg-sky-100 text-sky-700" },
   library: { Icon: BookIcon, tile: "bg-amber-100 text-amber-800" },
   cinematography: { Icon: FilmIcon, tile: "bg-rose-100 text-rose-700" },

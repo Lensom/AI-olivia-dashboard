@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-from psycopg import Connection
+from psycopg import Connection, errors
 
 from app.auth import limits
 from app.auth.schemas import LoginRequest, RegisterRequest, TokenResponse, UserResponse
@@ -64,8 +64,12 @@ def register(
             ),
         )
         conn.commit()
+    except errors.UniqueViolation:
+        conn.rollback()  # the connection goes back to the pool: it mustn't stay in a failed transaction
+        raise HTTPException(status_code=409, detail="Email already registered") from None
     except Exception:
-        raise HTTPException(status_code=409, detail="Email already registered")
+        conn.rollback()  # any other database error is a 500, not "already registered"
+        raise
     return UserResponse(id=user_id, email=email)
 
 

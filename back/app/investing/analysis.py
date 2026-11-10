@@ -370,7 +370,7 @@ class PortfolioAdvice(BaseModel):
         return _no_field_names(StockAnalysis._language(StockAnalysis._not_blank(v), info))
 
     @model_validator(mode="after")
-    def _about_something_real(self, info: ValidationInfo) -> "PortfolioAdvice":
+    def _about_something_real(self, info: ValidationInfo) -> PortfolioAdvice:
         if not self.ticker:
             raise ValueError("advice must name a ticker")
         owned = (info.context or {}).get("owned")

@@ -1,11 +1,12 @@
-fastapi
-uvicorn[standard]
-pydantic-settings
-pydantic[email]
-psycopg[binary]
-psycopg-pool
-openpyxl
-python-multipart
-google-genai
-certifi
-pypdf
+# Exact versions, so a new release can't break a deploy. Upgrade on purpose: pip install -U <name>, run the tests, update here.
+fastapi==0.162.4
+uvicorn[standard]==0.54.0
+pydantic-settings==2.16.2
+pydantic[email]==2.14.3
+psycopg[binary]==3.3.8
+psycopg-pool==3.3.3
+openpyxl==3.1.5
+python-multipart==0.0.33
+google-genai==3.1.0
+certifi==2026.10.23
+pypdf==7.0.1

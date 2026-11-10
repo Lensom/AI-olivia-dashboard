@@ -5,8 +5,8 @@ import { useMemo, useState } from "react";
 import { formatUsd } from "@/features/investing/format";
 
 /** Categorical slots 1–2 of the validated palette: blue = you, orange = comparison series. */
-export const SERIES_YOU = "#2a78d6";
-export const SERIES_OTHER = "#eb6834";
+const SERIES_YOU = "#2a78d6";
+const SERIES_OTHER = "#eb6834";
 
 const W = 640;
 const H = 260;

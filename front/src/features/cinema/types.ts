@@ -119,7 +119,7 @@ export const STATUSES: { value: CinemaStatus; label: string; dot: string; pill: 
 
 export const statusMeta = (s: CinemaStatus) => STATUSES.find((x) => x.value === s) ?? STATUSES[0];
 
-export function newCinemaId(): string {
+function newCinemaId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID().replace(/-/g, "")
     : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;

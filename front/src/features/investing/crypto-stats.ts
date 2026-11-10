@@ -4,7 +4,7 @@ import type { CryptoHoldingRow, CryptoPurchaseRow, CryptoRefillRow, CryptoRules 
 /** The purchase history tracks BTC and ETH legs only. */
 export type TrackedCoin = "BTC" | "ETH";
 
-export function trackedCoin(symbol: string): TrackedCoin | null {
+function trackedCoin(symbol: string): TrackedCoin | null {
   const s = symbol.trim().toUpperCase().replace(/-USD$/, "");
   return s === "BTC" || s === "ETH" ? s : null;
 }

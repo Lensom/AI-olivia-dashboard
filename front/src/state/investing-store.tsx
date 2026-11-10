@@ -291,6 +291,8 @@ function applyMarketPrices(
   return normalizeHoldings(updated);
 }
 
+const newActivityId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`);
+
 export function InvestingProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
   const [holdings, setHoldings] = useState<InvestingHolding[]>([]);
@@ -479,8 +481,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
 
   async function createActivity(init: Omit<InvestingActivity, "id">) {
     if (!token) return;
-    const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
-    await putActivities([{ id, ...init }, ...activities]);
+    await putActivities([{ id: newActivityId(), ...init }, ...activities]);
   }
 
   async function putActivities(next: InvestingActivity[]) {

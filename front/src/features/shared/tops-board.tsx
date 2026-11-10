@@ -31,7 +31,7 @@ export type TopItem = {
 /** `format` turns a group key into its heading (e.g. "1990" → "1990s" / "1990-ті"); default shows the key as is. */
 export type TopDimension = { value: string; label: string; min: number; newestFirst?: boolean; format?: (key: string, t: T) => string };
 
-export const newEntryId = () =>
+const newEntryId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID().replace(/-/g, "") : `${Date.now()}${Math.random()}`;
 
 const compareRank = (a: TopItem, b: TopItem) => {
@@ -42,9 +42,9 @@ const compareRank = (a: TopItem, b: TopItem) => {
   return a.title.localeCompare(b.title);
 };
 
-export const rankItems = (list: TopItem[]) => [...list].sort(compareRank);
+const rankItems = (list: TopItem[]) => [...list].sort(compareRank);
 
-export const entryFor = (t: TopItem): RankedListEntry => ({ id: newEntryId(), title_id: t.id, text: t.title, note: "" });
+const entryFor = (t: TopItem): RankedListEntry => ({ id: newEntryId(), title_id: t.id, text: t.title, note: "" });
 
 type AutoTop = { key: string; count: number; avg: number; top: TopItem[] };
 

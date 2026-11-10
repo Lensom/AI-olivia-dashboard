@@ -21,7 +21,7 @@ const PAGES: Record<string, Omit<InvestingNavItem, "slug">> = {
 };
 
 /** Used before subcategories load (and for any built-in page missing from the DB). */
-export const DEFAULT_INVESTING_ORDER = [
+const DEFAULT_INVESTING_ORDER = [
   "dashboard",
   "table",
   "picking",

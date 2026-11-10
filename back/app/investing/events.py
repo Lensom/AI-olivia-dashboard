@@ -12,7 +12,8 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
-from typing import Annotated, Any, Callable
+from typing import Annotated, Any
+from collections.abc import Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen

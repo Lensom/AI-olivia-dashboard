@@ -42,7 +42,7 @@ function ukForm(n: number): 0 | 1 | 2 {
   return 2;
 }
 
-export function translate(lang: Lang, key: string, vars?: TVars): string {
+function translate(lang: Lang, key: string, vars?: TVars): string {
   const n = typeof vars?.n === "number" ? vars.n : null;
   let s: string;
   if (lang === "uk") {

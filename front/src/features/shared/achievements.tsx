@@ -8,7 +8,7 @@ import { CollapseScope, CollapseToggle, useCardOpen } from "@/features/investing
 /** Medals for counted milestones, shared by Cinematography and Library. */
 export type Medal = "none" | "bronze" | "silver" | "gold";
 
-export const MEDALS: Record<Medal, { label: string; ring: string; badge: string }> = {
+const MEDALS: Record<Medal, { label: string; ring: string; badge: string }> = {
   gold: { label: "Gold", ring: "#d4a017", badge: "bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950" },
   silver: { label: "Silver", ring: "#8f9bab", badge: "bg-gradient-to-br from-slate-200 to-slate-400 text-slate-900" },
   bronze: { label: "Bronze", ring: "#b8733a", badge: "bg-gradient-to-br from-orange-200 to-orange-400 text-orange-950" },
@@ -55,12 +55,12 @@ export function mostCommon<T>(list: T[], pick: (t: T) => string[]): { n: number;
 }
 
 /** Closest to the next medal first. */
-export const byNextMedal = (a: Achievement, b: Achievement) => b.progress - a.progress;
+const byNextMedal = (a: Achievement, b: Achievement) => b.progress - a.progress;
 
 const nextMedal = (m: Medal): Medal => (m === "none" ? "bronze" : m === "bronze" ? "silver" : "gold");
 
 /** A ring of progress to the next medal, with the current count inside. */
-export function MedalRing({ a, size = 72 }: { a: Achievement; size?: number }) {
+function MedalRing({ a, size = 72 }: { a: Achievement; size?: number }) {
   const t = useT();
   const locale = useLocale();
   const medal = MEDALS[a.medal];
@@ -103,7 +103,7 @@ const NEXT_TEXT: Record<Medal, string> = {
 };
 
 /** "23 more for silver", or the gold note. */
-export function useNextText() {
+function useNextText() {
   const t = useT();
   const locale = useLocale();
   return (a: Achievement) =>
