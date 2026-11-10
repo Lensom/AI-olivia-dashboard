@@ -63,6 +63,8 @@ Click a stock on the Watchlist or a ticker on the Portfolio page to open `/inves
 
 The button at the bottom right of the Investing pages opens a chat with Gemini. Every question goes with your account in the system instruction (`back/app/investing/chat.py`): holdings at live prices, cash, targets, the watchlist's buy zones, notes, business figures, what your funds hold and the last written review; on a stock page, that company too. The account is reused for 2 minutes between questions. The conversation lives in the browser tab (sessionStorage) and is not saved on the server.
 
+For any other stock or fund, the model calls a `get_stock` tool (price, company figures, your buy levels, headlines; up to 5 per message). Before an answer is shown, `back/app/investing/chat_check.py` checks its money amounts and percentages against the data and lookups, allowing for rounding, and flags tickers quoted with figures but no data. If something doesn't match, the model rewrites the answer once; a correct answer costs no extra request.
+
 ## Interface language
 
 The **EN / UA** switch in the header changes the whole interface. The choice is remembered in the browser. Your own data (titles, genres, notes, list and account names) stays as you entered it. Dates and numbers follow the chosen language.

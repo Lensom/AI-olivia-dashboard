@@ -1,9 +1,14 @@
 """Chat about your investments with Gemini. Each request carries the conversation; the account itself goes into
-the system instruction, built from the same data the pages show, so every answer sees current numbers."""
+the system instruction, built from the same data the pages show, so every answer sees current numbers.
+
+The model can look up any other stock with the get_stock tool. Before an answer is shown, its figures and tickers are
+checked against the data and tool results (chat_check.py); if some aren't there, the model rewrites it once."""
 
 from __future__ import annotations
 
 import json
+import logging
+import re
 import time
 from datetime import datetime, timezone
 from typing import Annotated, Any, Literal
@@ -30,21 +35,28 @@ from app.investing.analysis import (
 from app.investing.router import get_broker_source
 from app.investing.stock import fetch_detail
 from app.investing.watchlist import get_news
-from app.llm.client import ChatMessage, LLMClient
+from app.investing.chat_check import check, repair_message
+from app.llm.client import ChatMessage, LLMClient, Tool
 
 router = APIRouter(prefix="/investing/chat", tags=["investing"])
+logger = logging.getLogger(__name__)
 
 _MAX_HISTORY = 20  # messages sent to the model; older ones fall out of its memory
 _ACCOUNT_TTL = 120.0  # a conversation sends many requests in a row, and building the account takes seconds
 _account_cache: dict[int, tuple[dict[str, Any], float]] = {}
+_MAX_LOOKUPS = 5  # get_stock calls per message
+_TICKER = re.compile(r"^[A-Z0-9.\-^=]{1,20}$")
 
 _SYSTEM = """You are the investing assistant inside one private long-term investor's personal dashboard. You can
 see their account in the data below, and you answer their questions about it.
 
 - Use the data for anything about their account, and quote its figures exactly as written; never invent figures,
   holdings, events or dates. Everything is already computed: reuse it rather than recalculating.
+- For a stock or fund that isn't in the data, call get_stock with its ticker before saying anything about its price
+  or numbers. Don't call it for one already in the data. Figures come only from the data or get_stock results; if
+  you work one out yourself, say it's your estimate.
 - General investing knowledge is welcome when it helps, but keep it apart from what the data shows. You have no
-  live news or web access beyond the data; say so if asked for something you can't see.
+  web access beyond the data and get_stock; say so if asked for something you can't see.
 - When something isn't in the data, say what's missing instead of guessing.
 - Be direct and specific: answer first, then the reasons. Give an opinion when asked for one. Keep it short unless
   asked for more.
@@ -88,6 +100,8 @@ class ChatResponse(BaseModel):
     reply: str
     model: str
     stale_data: bool = False
+    corrected: bool = False  # the first answer had figures the data doesn't have, and was rewritten
+    looked_up: list[str] = Field(default_factory=list)  # tickers fetched with get_stock for this answer
 
 
 def _account_facts(conn: Connection, user: UserResponse, source_for: BrokerSource) -> dict[str, Any]:
@@ -143,6 +157,36 @@ def system_instruction(context: dict[str, Any]) -> str:
     return f"{_SYSTEM}\n\n## Data (JSON)\n{json.dumps(context, ensure_ascii=False, default=str)}"
 
 
+def stock_tool(conn: Connection, user: UserResponse, source_for: BrokerSource, found: dict[str, Any]) -> Tool:
+    """get_stock: the same facts as for the stock open on screen. What it returns is kept in `found` for the check."""
+
+    async def run(args: dict[str, Any]) -> dict[str, Any]:
+        ticker = str(args.get("ticker") or "").strip().upper()
+        if not _TICKER.match(ticker):
+            return {"error": "That isn't a ticker."}
+        if ticker in found:
+            return found[ticker]
+        if len(found) >= _MAX_LOOKUPS:
+            return {"error": f"At most {_MAX_LOOKUPS} lookups per message. Answer with what you have."}
+        facts = await run_in_threadpool(_focus_facts, conn, user, ticker, source_for)
+        found[ticker] = facts or {"error": f"No market data found for {ticker}. Check the ticker."}
+        return found[ticker]
+
+    return Tool(
+        name="get_stock",
+        description=(
+            "Current data for one stock or fund by its ticker (e.g. NVDA, VOO, ASML.AS): price, company figures, the "
+            "investor's own buy levels and whether a buy fits their portfolio, and recent headlines."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {"ticker": {"type": "string", "description": "Ticker as listed, e.g. NVDA"}},
+            "required": ["ticker"],
+        },
+        run=run,
+    )
+
+
 @router.post("", response_model=ChatResponse)
 async def chat(
     payload: ChatRequest,
@@ -158,9 +202,27 @@ async def chat(
     history = payload.messages[-_MAX_HISTORY:]
     while history[0].role != "user":
         history = history[1:]
-    result = await _guarded(
-        llm,
-        "chat",
-        lambda: llm.chat([ChatMessage(role=m.role, content=m.content) for m in history], system_instruction(context)),
+    messages = [ChatMessage(role=m.role, content=m.content) for m in history]
+    system = system_instruction(context)
+    found: dict[str, Any] = {}
+    tools = [stock_tool(conn, user, source_for, found)]
+    result = await _guarded(llm, "chat", lambda: llm.chat(messages, system, tools=tools))
+
+    reply, model, corrected = result.value, result.model, False
+    findings = check(reply, system + json.dumps(found, ensure_ascii=False, default=str))
+    if findings:
+        logger.info("Chat answer rewritten: figures %s, tickers %s", findings.figures, findings.tickers)
+        retry = [*messages, ChatMessage(role="assistant", content=reply), ChatMessage(role="user", content=repair_message(findings))]
+        try:
+            second = await llm.chat(retry, system, tools=tools)
+        except Exception:  # the first answer is still worth showing; the check is a bonus
+            logger.warning("Chat rewrite failed; showing the first answer", exc_info=True)
+        else:
+            reply, model, corrected = second.value, second.model, True
+    return ChatResponse(
+        reply=reply,
+        model=model,
+        stale_data=bool(context["account"].get("broker_data_unavailable")),
+        corrected=corrected,
+        looked_up=[t for t, facts in found.items() if "error" not in facts],
     )
-    return ChatResponse(reply=result.value, model=result.model, stale_data=bool(context["account"].get("broker_data_unavailable")))

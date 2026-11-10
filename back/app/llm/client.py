@@ -102,6 +102,19 @@ class ChatMessage:
     content: str
 
 
+@dataclass
+class Tool:
+    """A function the model may call during a chat to get data it doesn't have."""
+
+    name: str
+    description: str
+    parameters: dict[str, Any]  # JSON schema of the arguments
+    run: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
+
+
+MAX_TOOL_CALLS_PER_ROUND = 4
+
+
 class LLMClient:
     """Thin wrapper around the Gemini client."""
 
@@ -128,19 +141,58 @@ class LLMClient:
         response, _ = await self._with_fallback(lambda model: self._generate_content(model, prompt))
         return response.text or ""
 
-    async def chat(self, messages: list[ChatMessage], system_instruction: str | None = None) -> TextResult:
-        """Continue a conversation: the reply to its last message, as plain text."""
-        contents = [
+    async def chat(
+        self,
+        messages: list[ChatMessage],
+        system_instruction: str | None = None,
+        tools: list[Tool] | None = None,
+        max_tool_rounds: int = 3,
+    ) -> TextResult:
+        """Continue a conversation: the reply to its last message, as plain text.
+
+        With tools, the model may ask for data first: each round runs what it asked for and sends the results back.
+        After `max_tool_rounds` rounds it must answer with what it has."""
+        history = [
             types.Content(role="model" if m.role == "assistant" else "user", parts=[types.Part(text=m.content)])
             for m in messages
         ]
-        config = types.GenerateContentConfig(system_instruction=system_instruction)
+        by_name = {t.name: t for t in tools or []}
+        declared = (
+            [types.Tool(function_declarations=[
+                types.FunctionDeclaration(name=t.name, description=t.description, parameters_json_schema=t.parameters)
+                for t in by_name.values()
+            ])]
+            if by_name
+            else None
+        )
+
+        def config(final: bool) -> types.GenerateContentConfig:
+            if not declared:
+                return types.GenerateContentConfig(system_instruction=system_instruction)
+            return types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                tools=declared,
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),  # we run them, below
+                tool_config=types.ToolConfig(function_calling_config=types.FunctionCallingConfig(mode="NONE")) if final else None,
+            )
 
         async def attempt_with(model: str) -> str:
-            response = await self._generate_content(model, contents, config=config)
-            if not response.text:  # blocked or empty: another model may still answer
-                raise StructuredOutputError(1, ["empty response"])
-            return response.text.strip()
+            contents = list(history)
+            for round_ in range(max_tool_rounds + 1):
+                final = round_ == max_tool_rounds
+                response = await self._generate_content(model, contents, config=config(final))
+                calls = (response.function_calls or []) if declared and not final else []
+                if not calls:
+                    text = "".join(p.text for p in _parts(response) if p.text and not p.thought)
+                    if not text.strip():  # blocked or empty: another model may still answer
+                        raise StructuredOutputError(1, ["empty response"])
+                    return text.strip()
+                contents.append(response.candidates[0].content)  # as sent: it may carry the model's thought signature
+                answers = []
+                for i, call in enumerate(calls):
+                    answers.append(types.Part.from_function_response(name=call.name or "", response=await _run_tool(by_name, call, i)))
+                contents.append(types.Content(role="user", parts=answers))
+            raise RuntimeError("tool loop exited unexpectedly")
 
         value, model = await self._with_fallback(attempt_with)
         return TextResult(value=value, model=model)
@@ -253,6 +305,25 @@ class LLMClient:
             raise ValueError(f"empty response (finish_reason={reason})")
         # Always validate the raw text ourselves: response.parsed skips our context validators.
         return schema.model_validate_json(response.text, context=context)
+
+
+def _parts(response: types.GenerateContentResponse) -> list[types.Part]:
+    candidate = response.candidates[0] if response.candidates else None
+    return list(candidate.content.parts or []) if candidate and candidate.content else []
+
+
+async def _run_tool(by_name: dict[str, Tool], call: types.FunctionCall, index: int) -> dict[str, Any]:
+    """Every call gets an answer, even a refusal: the model expects one per call."""
+    if index >= MAX_TOOL_CALLS_PER_ROUND:
+        return {"error": f"Too many calls at once: at most {MAX_TOOL_CALLS_PER_ROUND}. Answer with what you have."}
+    tool = by_name.get(call.name or "")
+    if tool is None:
+        return {"error": f"There is no tool called {call.name!r}."}
+    try:
+        return await tool.run(dict(call.args or {}))
+    except Exception:  # a failing data source mustn't end the conversation
+        logger.exception("Chat tool %s failed", call.name)
+        return {"error": "The data couldn't be loaded right now."}
 
 
 def _server_retry_delay(exc: errors.APIError) -> float | None:

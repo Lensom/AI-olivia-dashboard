@@ -22,7 +22,7 @@ class FakeLLM:
         self.calls = []
         self.usage = SimpleNamespace(summary=lambda: "")
 
-    async def chat(self, messages, system_instruction):
+    async def chat(self, messages, system_instruction, tools=None):
         self.calls.append((messages, system_instruction))
         return StructuredResult(value="Reply", model="m")
 
