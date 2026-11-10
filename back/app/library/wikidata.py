@@ -39,6 +39,9 @@ def api(params: dict[str, object]) -> dict:
     if hit and time.time() - hit[0] < _TTL:
         return hit[1]
     with _lock:
+        hit = _cache.get(url)  # a request that waited here may find its answer already fetched by the one before
+        if hit and time.time() - hit[0] < _TTL:
+            return hit[1]
         for attempt in range(4):
             wait = _GAP - (time.time() - _last_call)
             if wait > 0:

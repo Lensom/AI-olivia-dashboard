@@ -114,6 +114,7 @@ export const COMMON: Record<string, string | string[]> = {
   "Log in": "Увійти",
   "Your session has expired. Log in again to continue.": "Сесія завершилася. Увійдіть знову, щоб продовжити.",
   "Can’t reach the server": "Немає зв’язку із сервером",
+  "The server took too long to answer. Try again.": "Сервер надто довго не відповідає. Спробуйте ще раз.",
   "You’re still signed in. Retrying every few seconds…": "Ви й далі в акаунті. Повторюємо спробу кожні кілька секунд…",
   "Can’t reach the server. Is the backend running?": "Немає зв’язку із сервером. Бекенд запущено?",
   "Wrong email or password.": "Неправильна пошта або пароль.",

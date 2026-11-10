@@ -67,7 +67,9 @@ _PRICE_CACHE_TTL_SECONDS = 120
 _FUNDAMENTALS_CACHE_TTL_SECONDS = 60 * 60
 _price_cache: dict[str, tuple[float, float]] = {}
 _fundamentals_cache: dict[str, tuple[float | None, float | None, float]] = {}
-_fx_cache: dict[str, tuple[float, float]] = {}
+_fx_cache: dict[str, tuple[float | None, float]] = {}  # rate (None: the source has none), when it was fetched
+_FX_TTL = 6 * 60 * 60  # today's rate, and a failed lookup: try again later
+_FX_PAST_TTL = 30 * 24 * 60 * 60  # a past day's rate never changes
 DEFAULT_INVESTING_NOTES = """* Distribution of money ~ 15% of shares
 * Main goal - general money to ETFs
 * Operating expenses are no more than 3,5%
@@ -165,12 +167,15 @@ def _fetch_fx_rate_to_usd(currency: str, trade_date: str) -> float | None:
     cache_key = f"{cur}:{iso_date}"
     now = time.time()
     cached = _fx_cache.get(cache_key)
-    if cached and now - cached[1] < 60 * 60 * 6:
+    past = iso_date < datetime.utcnow().strftime("%Y-%m-%d")
+    # A failure is remembered too: the ECB has no rouble rates after March 2022, and asking again on every page
+    # load cost a network round trip per trade, or a 6 s timeout each when the service was slow.
+    if cached and now - cached[1] < (_FX_PAST_TTL if past and cached[0] is not None else _FX_TTL):
         return cached[0]
 
-    urls = [
-        f"https://api.frankfurter.app/{iso_date}?from={quote(cur)}&to=USD",
-        f"https://api.frankfurter.app/latest?from={quote(cur)}&to=USD",
+    urls = [  # .dev directly: .app answers every call with a redirect there
+        f"https://api.frankfurter.dev/v1/{iso_date}?from={quote(cur)}&to=USD",
+        f"https://api.frankfurter.dev/v1/latest?from={quote(cur)}&to=USD",
     ]
     for url in urls:
         req = Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
@@ -185,6 +190,7 @@ def _fetch_fx_rate_to_usd(currency: str, trade_date: str) -> float | None:
             value = float(rate)
             _fx_cache[cache_key] = (value, now)
             return value
+    _fx_cache[cache_key] = (None, now)
     return None
 
 

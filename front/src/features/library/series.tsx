@@ -37,6 +37,21 @@ export type BookSeries = {
 
 const norm = (s: string) => s.toLowerCase().replace(/ґ/g, "г").replace(/[^\p{L}\p{N}]+/gu, "");
 
+/** Requests in flight, so the several parts of a page that show series share one request instead of each sending it. */
+const pending = new Map<string, Promise<LibrarySeries[]>>();
+
+function loadSeries(token: string, lang: string, idsKey: string): Promise<LibrarySeries[]> {
+  const key = `${token}|${lang}|${idsKey}`;
+  let request = pending.get(key);
+  if (!request) {
+    request = apiFetch<LibrarySeries[]>(`/library/series?lang=${lang}`, { token, method: "POST", body: JSON.stringify(idsKey.split(",")) }).finally(() =>
+      pending.delete(key),
+    );
+    pending.set(key, request);
+  }
+  return request;
+}
+
 /** Wikidata series of the books in your library, with your progress through each. */
 export function useBookSeries(): { series: BookSeries[]; isLoading: boolean } {
   const { token } = useAuth();
@@ -50,7 +65,7 @@ export function useBookSeries(): { series: BookSeries[]; isLoading: boolean } {
   useEffect(() => {
     if (!token || !idsKey) return;
     let alive = true;
-    apiFetch<LibrarySeries[]>(`/library/series?lang=${lang}`, { token, method: "POST", body: JSON.stringify(idsKey.split(",")) })
+    loadSeries(token, lang, idsKey)
       .then((list) => alive && setLoaded({ key, list }))
       .catch(() => alive && setLoaded({ key, list: [] }));
     return () => {

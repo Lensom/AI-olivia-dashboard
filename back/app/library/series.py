@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated, Literal
@@ -23,6 +24,8 @@ logger = logging.getLogger(__name__)
 _TTL = 7 * 24 * 60 * 60
 _MAX_PARTS = 100  # bigger "series" are bibliographies or whole universes, not something to complete
 _series_cache: dict[tuple[str, str], tuple[float, LibrarySeries | None]] = {}
+_series_locks: dict[tuple[str, str], threading.Lock] = {}
+_locks_guard = threading.Lock()
 
 
 def _ordinal(entity: dict, series_id: str) -> str:
@@ -100,9 +103,20 @@ def _lookup(items: list[LibraryWikidataRequest], lang: str) -> list[LibraryWikid
 
 
 def _series(series_id: str, lang: str) -> LibrarySeries | None:
+    """One series, built once even when several requests ask for it together: the others wait and reuse it."""
     hit = _series_cache.get((series_id, lang))
     if hit and time.time() - hit[0] < _TTL:
         return hit[1]
+    with _locks_guard:
+        lock = _series_locks.setdefault((series_id, lang), threading.Lock())
+    with lock:
+        hit = _series_cache.get((series_id, lang))
+        if hit and time.time() - hit[0] < _TTL:
+            return hit[1]
+        return _build_series(series_id, lang)
+
+
+def _build_series(series_id: str, lang: str) -> LibrarySeries | None:
     members, total = wd.search_statement(f"P179={series_id}", limit=_MAX_PARTS)
     name = wd.label(wd.entities([series_id], props="labels").get(series_id, {}), lang, "en")
     result: LibrarySeries | None = None
