@@ -9,6 +9,7 @@ import {
 } from "@/features/investing/ui/investing-classes";
 import { useT } from "@/lib/i18n";
 import { CinemaProvider } from "@/state/cinema-store";
+import { RatePrompt } from "@/features/cinema/rate-prompt";
 
 const TABS = [
   { href: "/cinematography", label: "Overview" },
@@ -34,6 +35,7 @@ export default function CinematographyLayout({ children }: { children: React.Rea
           />
           {children}
         </div>
+        <RatePrompt />
       </CinemaProvider>
     </RequireAuth>
   );

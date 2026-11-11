@@ -41,6 +41,9 @@ export const cinemaKindMeta = (kind: CinemaKind) => CINEMA_KINDS.find((k) => k.k
 
 /** Pages that aren't a kind of title. */
 export const CINEMA_EXTRA_PAGES = [
+  { slug: "upcoming", label: "Coming up" },
+  { slug: "year", label: "Year in film" },
+  { slug: "people", label: "People" },
   { slug: "achievements", label: "Achievements" },
   { slug: "franchises", label: "Franchises" },
   { slug: "tops", label: "Tops" },

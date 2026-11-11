@@ -143,6 +143,25 @@ class CinemaCollectionPart(BaseModel):
     animation: bool = False
 
 
+class CinemaPersonFilm(CinemaCollectionPart):
+    vote_average: float | None = None
+    vote_count: int = 0
+
+
+class CinemaPerson(BaseModel):
+    """A director's or actor's released films (TMDB), to see which of them you haven't watched."""
+
+    name: str  # as asked: the name in your library
+    tmdb_id: int
+    profile: str = ""
+    films: list[CinemaPersonFilm] = Field(default_factory=list)
+
+
+class CinemaPeopleRequest(BaseModel):
+    names: list[str] = Field(min_length=1, max_length=24)
+    role: Literal["director", "actor"]
+
+
 class CinemaCollection(BaseModel):
     """A TMDB collection (franchise): its films in release order."""
 

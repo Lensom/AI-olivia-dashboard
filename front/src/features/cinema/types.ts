@@ -67,6 +67,14 @@ export type CinemaCollection = {
   parts: { tmdb_id: number; title: string; original_title: string; year: number | null; release_date: string; poster: string; animation: boolean }[];
 };
 
+/** POST /cinema/people: a director's or actor's released films, to see what of theirs you haven't watched. */
+export type CinemaPerson = {
+  name: string;
+  tmdb_id: number;
+  profile: string;
+  films: (CinemaCollection["parts"][number] & { vote_average: number | null; vote_count: number })[];
+};
+
 /** A ranked list you curate on the Tops page (shared with Library). */
 export type { RankedList as CinemaList, RankedListEntry as CinemaListEntry } from "@/features/shared/tops-board";
 
@@ -239,6 +247,16 @@ export const newSeasons = (t: Pick<CinemaTitle, "seasons" | "watched_seasons">) 
  * Minutes you've spent on a title: a watched film's runtime, or the aired minutes of the seasons of a
  * series you've watched (all of them when it's marked watched without a season). 0 when unknown.
  */
+/**
+ * Titles an edit has just marked watched without a score: the ones to ask "how was it?" about.
+ * A bulk change (an import) asks about nothing: a dozen questions in a row would be a chore.
+ */
+export function newlyWatchedUnrated(prev: CinemaTitle[], next: CinemaTitle[]): string[] {
+  const before = new Map(prev.map((t) => [t.id, t.status]));
+  const ids = next.filter((t) => t.status === "watched" && t.score == null && before.get(t.id) !== "watched").map((t) => t.id);
+  return ids.length <= 3 ? ids : [];
+}
+
 export function watchedMinutes(t: CinemaTitle): number {
   if (t.status === "planned" || t.status === "dropped") return 0;
   if (t.tmdb_media === "movie" || (!t.tmdb_media && !isSeries(t.kind))) return t.status === "watched" ? (t.runtime ?? 0) : 0;

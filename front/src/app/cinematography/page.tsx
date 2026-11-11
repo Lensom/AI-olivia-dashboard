@@ -11,6 +11,7 @@ import { downloadCsv } from "@/features/cinema/export";
 import { Franchises } from "@/features/cinema/franchises";
 import { CinemaAnalytics } from "@/features/cinema/overview-analytics";
 import { TonightPicker } from "@/features/cinema/tonight";
+import { UpcomingCard } from "@/features/cinema/upcoming";
 import { investingToolbarBtn } from "@/features/investing/ui/investing-classes";
 import { useLocale, useT } from "@/lib/i18n";
 import { useCinema } from "@/state/cinema-store";
@@ -103,6 +104,7 @@ export default function CinematographyOverview() {
         ))}
       </section>
 
+      <UpcomingCard />
       {/* Phones: two per row, three posters each. */}
       <section className="grid grid-cols-2 gap-3 [&>*]:min-w-0 xl:grid-cols-3">
         {CINEMA_KINDS.map((k) => {

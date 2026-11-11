@@ -31,6 +31,9 @@ from app.cinema.schemas import (
     CinemaImdbRating,
     CinemaImportResponse,
     CinemaKind,
+    CinemaPeopleRequest,
+    CinemaPerson,
+    CinemaPersonFilm,
     CinemaResponse,
     CinemaSearchResult,
     CinemaTitle,
@@ -50,7 +53,18 @@ _TMDB = "https://api.themoviedb.org/3"
 _IMG = "https://image.tmdb.org/t/p"
 _ANIMATION_GENRE = 16
 _TMDB_TTL = 60 * 60
-_COLLECTION_TTL = timedelta(days=1)  # a franchise gains a film rarely; kept in Postgres too (app/cache.py)
+_COLLECTION_TTL = timedelta(days=1)
+_PERSON_TTL = timedelta(days=7)  # a filmography grows by a film a year or so
+_MIN_ACTOR_VOTES = 300  # an actor's cameos and obscure early work aren't what "films you haven't seen" means
+_MIN_SHARE_OF_TOP = 0.02  # a director's student shorts and compilations: next to nobody has seen them (Nolan's have 1-500 votes)
+
+
+def _notable(person: CinemaPerson) -> CinemaPerson:
+    """Leave out films hardly anyone has seen next to the person's best known one. Applied when answering, so a
+    filmography cached before this rule (or before a change to it) comes out the same as a fresh one."""
+    top = max((f.vote_count for f in person.films), default=0)
+    floor = max(50, top * _MIN_SHARE_OF_TOP)
+    return person.model_copy(update={"films": [f for f in person.films if f.vote_count >= floor]})  # a franchise gains a film rarely; kept in Postgres too (app/cache.py)
 _tmdb_cache: dict[str, tuple[float, dict]] = {}
 
 # Which TMDB catalogue each page searches.
@@ -708,3 +722,65 @@ def collections(
     cache.put_many({key(c): v.model_dump() for c, v in fetched.items() if v is not None})
     found.update({c: v for c, v in fetched.items() if v is not None})
     return [found[c] for c in ids if c in found]
+
+
+@router.post("/people", response_model=list[CinemaPerson])
+def people(
+    payload: CinemaPeopleRequest,
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+    tmdb_key: Annotated[str, Depends(get_tmdb_key)],
+):
+    """Released films of each director or actor, found on TMDB by name: what of theirs you haven't seen.
+    Names TMDB can't place are left out. Answers are kept a week (app/cache.py)."""
+    if not tmdb_key:
+        return []
+    language = _language(conn, user.id)
+    department = "Directing" if payload.role == "director" else "Acting"
+    today = date.today().isoformat()
+    names = list(dict.fromkeys(n.strip() for n in payload.names if n.strip()))
+    key = lambda name: f"tmdb:person:{payload.role}:{name.casefold()}:{language}"  # noqa: E731
+
+    def one(name: str) -> CinemaPerson | None:
+        try:
+            found = _tmdb_get(tmdb_key, "/search/person", {"query": name, "language": language}).get("results") or []
+            # The same name can be several people: prefer the one known for this kind of work, then the best known.
+            best = sorted(found, key=lambda p: (p.get("known_for_department") != department, -(p.get("popularity") or 0)))
+            if not best:
+                return None
+            person = best[0]
+            credits = _tmdb_get(tmdb_key, f"/person/{person['id']}/movie_credits", {"language": language})
+        except HTTPException:
+            return None
+        rows = (
+            [c for c in credits.get("crew") or [] if c.get("job") == "Director"]
+            if payload.role == "director"
+            else [c for c in credits.get("cast") or [] if (c.get("vote_count") or 0) >= _MIN_ACTOR_VOTES]
+        )
+        films: dict[int, CinemaPersonFilm] = {}
+        for c in rows:
+            released = c.get("release_date") or ""
+            if not c.get("id") or not released or released > today:
+                continue
+            films[int(c["id"])] = CinemaPersonFilm(
+                tmdb_id=int(c["id"]),
+                title=c.get("title") or "",
+                original_title=c.get("original_title") or "",
+                year=_year(released),
+                release_date=released,
+                poster=_img(c.get("poster_path"), "w185"),
+                animation=_ANIMATION_GENRE in (c.get("genre_ids") or []),
+                vote_average=c.get("vote_average"),
+                vote_count=c.get("vote_count") or 0,
+            )
+        ranked = sorted(films.values(), key=lambda f: -f.vote_count)[:60]
+        return CinemaPerson(name=name, tmdb_id=int(person["id"]), profile=_img(person.get("profile_path"), "w185"), films=ranked)
+
+    stored = cache.get_many([key(n) for n in names], _PERSON_TTL)
+    found = {n: CinemaPerson(**stored[key(n)]) for n in names if stored.get(key(n))}
+    missing = [n for n in names if n not in found]
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        fetched = dict(zip(missing, pool.map(one, missing)))
+    cache.put_many({key(n): p.model_dump() for n, p in fetched.items() if p is not None})
+    found.update({n: p for n, p in fetched.items() if p is not None})
+    return [_notable(found[n]) for n in names if n in found]

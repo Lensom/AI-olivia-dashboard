@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
-import type { CinemaAiring, CinemaList, CinemaTitle } from "@/features/cinema/types";
+import { newlyWatchedUnrated, type CinemaAiring, type CinemaList, type CinemaTitle } from "@/features/cinema/types";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "./auth-store";
 
@@ -20,6 +20,9 @@ type CinemaStore = {
   /** Same as `update`, for the Tops lists. */
   updateLists: (change: (lists: CinemaList[]) => CinemaList[]) => Promise<void>;
   setLanguage: (language: string) => Promise<void>;
+  /** Titles just marked watched without a score, waiting for "how was it?" (oldest first). */
+  toRate: string[];
+  dismissRate: (id: string) => void;
 };
 
 const CinemaContext = createContext<CinemaStore | null>(null);
@@ -32,6 +35,7 @@ export function CinemaProvider({ children }: { children: ReactNode }) {
   const [tmdbEnabled, setTmdbEnabled] = useState(false);
   const [isLoaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [toRate, setToRate] = useState<string[]>([]);
   // Saves read from here so quick successive edits (e.g. two checkbox clicks) build on each other.
   const latest = useRef<Saved>({ items: [], language: "uk-UA", lists: [] });
 
@@ -158,10 +162,18 @@ export function CinemaProvider({ children }: { children: ReactNode }) {
   );
 
   const update = useCallback(
-    (change: (items: CinemaTitle[]) => CinemaTitle[]) =>
-      persist({ ...latest.current, items: change(latest.current.items) }),
+    (change: (items: CinemaTitle[]) => CinemaTitle[]) => {
+      const items = change(latest.current.items);
+      const ask = newlyWatchedUnrated(latest.current.items, items);
+      // Asked only once it's saved: a failed save puts the title back, and there'd be nothing to rate.
+      return persist({ ...latest.current, items }).then(() => {
+        if (ask.length) setToRate((q) => [...q, ...ask.filter((id) => !q.includes(id))]);
+      });
+    },
     [persist],
   );
+
+  const dismissRate = useCallback((id: string) => setToRate((q) => q.filter((x) => x !== id)), []);
 
   const updateLists = useCallback(
     (change: (lists: CinemaList[]) => CinemaList[]) => persist({ ...latest.current, lists: change(latest.current.lists) }),
@@ -171,7 +183,7 @@ export function CinemaProvider({ children }: { children: ReactNode }) {
   const setLanguage = useCallback((lang: string) => persist({ ...latest.current, language: lang }), [persist]);
 
   return (
-    <CinemaContext.Provider value={{ items, lists, language, tmdbEnabled, isLoaded, loadError, update, updateLists, setLanguage }}>
+    <CinemaContext.Provider value={{ items, lists, language, tmdbEnabled, isLoaded, loadError, update, updateLists, setLanguage, toRate, dismissRate }}>
       {children}
     </CinemaContext.Provider>
   );
