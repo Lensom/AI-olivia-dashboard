@@ -121,8 +121,9 @@ export function tierOf(watched: number, released: number): FranchiseTier {
 /** TMDB collections of the films in your library, with your progress through each. */
 export function useFranchises(): { franchises: Franchise[]; isLoading: boolean } {
   const { token } = useAuth();
-  const { items } = useCinema();
-  const [collections, setCollections] = useState<CinemaCollection[] | null>(null);
+  const { items, isLoaded } = useCinema();
+  // Kept with the ids they answer: an answer for an older list of titles isn't the current one.
+  const [loaded, setLoaded] = useState<{ key: string; list: CinemaCollection[] } | null>(null);
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
 
   const idsKey = useMemo(
@@ -134,19 +135,20 @@ export function useFranchises(): { franchises: Franchise[]; isLoading: boolean }
   );
 
   useEffect(() => {
-    if (!token || !idsKey) return;
+    // Not before your titles are in: asked earlier, it would answer for the featured collections only.
+    if (!token || !idsKey || !isLoaded) return;
     let alive = true;
     apiFetch<CinemaCollection[]>("/cinema/collections", { token, method: "POST", body: JSON.stringify(idsKey.split(",").map(Number)) })
-      .then((c) => alive && setCollections(c))
-      .catch(() => alive && setCollections([]));
+      .then((list) => alive && setLoaded({ key: idsKey, list }))
+      .catch(() => alive && setLoaded({ key: idsKey, list: [] }));
     return () => {
       alive = false;
     };
-  }, [token, idsKey]);
+  }, [token, idsKey, isLoaded]);
 
   const franchises = useMemo(() => {
     const byId = new Map(items.filter((x) => x.tmdb_media === "movie" && x.tmdb_id).map((x) => [x.tmdb_id!, x]));
-    return (collections ?? [])
+    return (loaded?.list ?? [])
       .map((c): Franchise => {
         const parts = c.parts.map((p) => ({ ...p, mine: byId.get(p.tmdb_id) ?? null, released: !!p.release_date && p.release_date <= today }));
         const released = parts.filter((p) => p.released);
@@ -169,9 +171,9 @@ export function useFranchises(): { franchises: Franchise[]; isLoading: boolean }
         };
       })
       .filter((f) => f.released > 1 && (FEATURED.has(f.id) || f.parts.some((p) => p.mine)));
-  }, [collections, items, today]);
+  }, [loaded, items, today]);
 
-  return { franchises, isLoading: idsKey !== "" && collections === null };
+  return { franchises, isLoading: !isLoaded || (idsKey !== "" && loaded?.key !== idsKey) };
 }
 
 /** Closest to complete first (fewest films left), then the biggest. */

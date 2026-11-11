@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/layout/app-shell";
 import "./globals.css";
@@ -12,6 +12,10 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+// maximumScale stops iOS Safari zooming in when you tap a text field with small text. iOS still lets you
+// pinch-zoom (it ignores this for that), so userScalable stays as it is.
+export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 1 };
 
 export const metadata: Metadata = {
   title: "Olivia — Personal Dashboard",

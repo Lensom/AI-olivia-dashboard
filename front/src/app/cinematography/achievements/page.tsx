@@ -8,9 +8,10 @@ import { useCinema } from "@/state/cinema-store";
 export default function CinemaAchievementsPage() {
   const t = useT();
   const { isLoaded, loadError } = useCinema();
-  const { achievements } = useAchievements();
+  const { achievements, isLoading } = useAchievements();
 
   if (loadError) return <p className="rounded-xl bg-rose-50 px-4 py-2.5 text-sm text-rose-800">{t(loadError)}</p>;
-  if (!isLoaded) return <p className="text-sm text-[#8f8676]">{t("Loading…")}</p>;
+  // Franchise medals need the TMDB collections, which arrive after the titles: wait, so the count doesn't jump.
+  if (!isLoaded || isLoading) return <p className="text-sm text-[#8f8676]">{t("Loading…")}</p>;
   return <AchievementsBoard achievements={achievements} groups={GROUPS} />;
 }
