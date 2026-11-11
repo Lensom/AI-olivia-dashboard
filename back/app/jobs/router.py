@@ -23,7 +23,7 @@ from pypdf import PdfReader
 from app.auth.router import get_conn, get_current_user
 from app.auth.schemas import UserResponse
 from app.investing.analysis import StockAnalysis, _run, get_llm
-from app.jobs.sources import DESCRIPTION_LIMIT, SourceError, fetch_all, load_detail, written_in_local_language
+from app.jobs.sources import DESCRIPTION_LIMIT, SourceError, fetch_all, job_role, load_detail, written_in_local_language
 from app.jobs.sponsors import fetch_registers, sponsor_for
 from app.llm.client import LLMClient
 
@@ -119,6 +119,8 @@ class JobView(BaseModel):
     strengths: list[str] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
     title_only: bool = False  # the source gave no real description, so the assessment rests on little
+    role: Literal["frontend", "fullstack"] = "frontend"
+    by_description: bool = False  # a generic title ("Software Engineer") kept because the ad is front-end work
     assessed: bool = False
 
 
@@ -127,7 +129,8 @@ class JobsState(BaseModel):
     last_refresh_at: str | None = None
     sources: list[SourceStatus] = Field(default_factory=list)
     jobs: list[JobView] = Field(default_factory=list)
-    unassessed: int = 0
+    unassessed: int = 0  # front-end ones
+    unassessed_fullstack: int = 0  # assessed only when you show full-stack
 
 
 class StatusUpdate(BaseModel):
@@ -139,6 +142,11 @@ def _profile(conn: Connection, user_id: int) -> tuple[Any, ...] | None:
         "SELECT cv_text, cv_name, cv_updated_at, last_refresh_at, sources FROM job_search_profiles WHERE user_id = %s",
         (user_id,),
     ).fetchone()
+
+
+def _role(data: dict[str, Any]) -> str:
+    """As saved (the ad may have decided it), or from the title for vacancies saved before roles existed."""
+    return data.get("role") if data.get("role") in ("frontend", "fullstack") else job_role(data.get("title", ""))
 
 
 def _view(job_id: str, data: dict[str, Any], status: str, first_seen: datetime, last_seen: datetime, assessed_at: datetime | None, refreshed: datetime | None) -> JobView:
@@ -171,6 +179,8 @@ def _view(job_id: str, data: dict[str, Any], status: str, first_seen: datetime, 
         gaps=a.get("gaps") or [],
         title_only=bool(data.get("assessed_on_title")),
         assessed=assessed_at is not None,
+        role=_role(data),
+        by_description=bool(data.get("by_description")),
     )
 
 
@@ -190,7 +200,8 @@ def _state(conn: Connection, user_id: int) -> JobsState:
         last_refresh_at=refreshed.isoformat() if refreshed else None,
         sources=[SourceStatus(**s) for s in (profile[4] if profile and isinstance(profile[4], list) else [])],
         jobs=jobs,
-        unassessed=sum(1 for j in jobs if not j.assessed and j.status != "hidden"),
+        unassessed=sum(1 for j in jobs if not j.assessed and j.status != "hidden" and j.role == "frontend"),
+        unassessed_fullstack=sum(1 for j in jobs if not j.assessed and j.status != "hidden" and j.role == "fullstack"),
     )
 
 
@@ -386,7 +397,9 @@ def _prompt(cv: str, jobs: list[dict[str, Any]], lang: str) -> str:
 ## Rules
 - Write summary, strengths and gaps in {language}; keep technology and company names as they are.
 - match: how well the CV fits the required skills and seniority. A senior role for a junior CV, or the reverse, scores low.
-  A role that isn't really front-end work scores below 30.
+  A role that isn't really front-end work scores below 30. For a full-stack role, judge how much of it is front-end:
+  mostly back-end (.NET, Java, Ruby, a Node.js back end) with little front-end scores low; React or another front-end
+  framework as a real half of the work can score well.
 - language: english_ok = the ad is in English and doesn't require a local language (a local language as a "plus" is still
   english_ok). local_required = it requires or strongly expects Dutch, Norwegian or Danish. unclear = too little text to tell.
 - relocation: offered = the ad says it offers relocation help or visa sponsorship. not_offered = it says it doesn't, or that
@@ -412,8 +425,10 @@ async def score_jobs(
     conn: Annotated[Connection, Depends(get_conn)],
     llm: Annotated[LLMClient | None, Depends(get_llm)],
     lang: Annotated[Literal["en", "uk"], Query()] = "en",
+    fullstack: Annotated[bool, Query()] = False,
 ):
-    """Assesses the next few vacancies. Call again while `unassessed` is above zero."""
+    """Assesses the next few vacancies. Call again while `unassessed` (plus `unassessed_fullstack`, when asking for
+    full-stack too) is above zero. Full-stack ones cost AI quota only when you show them."""
     if llm is None:
         raise HTTPException(status_code=503, detail="AI analysis is not configured: set GEMINI_API_KEY in back/.env")
 
@@ -422,11 +437,12 @@ async def score_jobs(
         rows = conn.execute(
             """
             SELECT id, data FROM job_search_jobs WHERE user_id = %s AND assessed_at IS NULL AND status <> 'hidden'
-            ORDER BY first_seen, id LIMIT %s
+            ORDER BY first_seen, id
             """,
-            (user.id, _BATCH),
+            (user.id,),
         ).fetchall()
-        return (profile[0] if profile else None), [(r[0], r[1]) for r in rows]
+        wanted = [(r[0], r[1]) for r in rows if fullstack or _role(r[1]) == "frontend"]
+        return (profile[0] if profile else None), wanted[:_BATCH]
 
     cv, rows = await run_in_threadpool(begin)
     if not cv:

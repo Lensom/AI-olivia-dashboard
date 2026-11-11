@@ -44,6 +44,87 @@ class Titles(unittest.TestCase):
         self.assertEqual(src.country_of("Berlin, Germany"), "")
 
 
+class Roles(unittest.TestCase):
+    def test_full_stack_titles_are_collected_and_marked(self):
+        for title in ("Full Stack Developer", "Fullstack Engineer", "Java Fullstack Engineer", ".NET Full-stack Developer"):
+            self.assertTrue(src.is_wanted_title(title), title)
+            self.assertEqual(src.job_role(title), "fullstack", title)
+
+    def test_front_end_titles_stay_front_end_even_when_full_stack_too(self):
+        for title in ("Senior Frontend Engineer", "React Developer", "Web Developer", "Senior Fullstack Engineer - Java, React", "Frontend/Fullstack-utvikler"):
+            self.assertEqual(src.job_role(title), "frontend", title)
+
+    def test_other_roles_are_still_left_out(self):
+        for title in ("Backend Engineer", "Full Stack Recruiter", "Fullstack Intern", "Data Engineer"):
+            self.assertFalse(src.is_wanted_title(title), title)
+
+    def test_the_role_is_saved_and_shown_even_for_jobs_saved_before_roles(self):
+        job = RawJob(source="eures", external_id="1", title="Java Fullstack Engineer", company="", location="", country="NL", url="https://x.example")
+        self.assertEqual(job.to_data()["role"], "fullstack")
+        now = datetime(2026, 11, 11, tzinfo=timezone.utc)
+        self.assertEqual(_view("a" * 20, {"title": "Full Stack Developer"}, "new", now, now, None, now).role, "fullstack")
+
+    def test_unassessed_full_stack_is_counted_apart(self):
+        from app.jobs import router as jobs_router
+
+        now = datetime(2026, 11, 11, tzinfo=timezone.utc)
+        rows = [
+            ("a" * 20, {"title": "Frontend Engineer"}, "new", now, now, None),
+            ("b" * 20, {"title": "Full Stack Developer"}, "new", now, now, None),
+            ("c" * 20, {"title": "Fullstack Engineer"}, "hidden", now, now, None),
+        ]
+        conn = SimpleNamespace(execute=lambda sql, params=None: SimpleNamespace(fetchone=lambda: None, fetchall=lambda: rows))
+        state = jobs_router._state(conn, 1)
+        self.assertEqual((state.unassessed, state.unassessed_fullstack), (1, 1))
+
+
+class GenericTitles(unittest.TestCase):
+    """"Software Engineer" can be a front-end job: the ad decides."""
+
+    def test_generic_engineering_titles_are_candidates(self):
+        for title in ("Software Engineer", "Senior Product Engineer", "Developer", "Senior Software Developer", "Systemutvikler", "Softwareudvikler"):
+            self.assertTrue(src.is_candidate_title(title), title)
+
+    def test_generic_titles_naming_another_specialty_are_not(self):
+        for title in ("Software Engineer - Backend", "Senior Data Engineer", "Site Reliability Engineer", "C++ Software Engineer",
+                      "Java Software Engineer", "Mobile Developer", "Engineering Manager", "Software Engineering Intern", "QA Engineer",
+                      "Haskell Software Engineer", "Wordpress Developer", "node.js Developer", "Lead AEM Developer", "Actionscript Developer"):
+            self.assertFalse(src.is_candidate_title(title), title)
+
+    def test_the_ad_decides(self):
+        self.assertEqual(src.description_role("You'll build our web app in React and TypeScript."), "frontend")
+        self.assertIsNone(src.description_role("Join our front-end team."))  # a word in passing: a framework has to be named
+        self.assertEqual(src.description_role("Join our front-end team working in Vue."), "frontend")
+        self.assertEqual(src.description_role("Kotlin, Spring and Kafka services, with React and TypeScript screens."), "fullstack")
+        self.assertEqual(src.description_role("Kotlin and Spring services, Kafka, some React on the side."), "fullstack")  # hidden by default
+        self.assertIsNone(src.description_role("Go services, Kubernetes and gRPC."))
+        self.assertIsNone(src.description_role("Write HTML and CSS for our email campaigns."))  # no framework or language
+
+    def board_job(self, title, description="", detail=None):
+        return RawJob(source="greenhouse", external_id=title, title=title, company="Acme", location="Copenhagen", country="DK",
+                      url="https://x.example", description=description, detail=detail or {})
+
+    def test_keep_relevant_reads_the_ad_and_marks_the_role(self):
+        jobs = [
+            self.board_job("Frontend Engineer"),
+            self.board_job("Software Engineer", "React, TypeScript and a design system."),
+            self.board_job("Product Engineer", "Kotlin, Spring and Kafka, with React and TypeScript screens."),
+            self.board_job("Software Engineer II", "Go and Kubernetes."),
+        ]
+        kept = {j.title: j for j in src.keep_relevant(jobs)}
+        self.assertEqual(sorted(kept), ["Frontend Engineer", "Product Engineer", "Software Engineer"])
+        self.assertEqual((kept["Software Engineer"].role, kept["Software Engineer"].by_description), ("frontend", True))
+        self.assertEqual(kept["Product Engineer"].to_data()["role"], "fullstack")
+        self.assertFalse(kept["Frontend Engineer"].by_description)
+
+    def test_a_list_without_text_fetches_the_ad_within_a_budget(self):
+        jobs = [self.board_job(f"Software Engineer {i}", detail={"kind": "greenhouse", "slug": "acme", "id": str(i)}) for i in range(src._DETAIL_BUDGET + 5)]
+        with patch.object(src, "load_detail", return_value={"description": "Vue and TypeScript all day."}) as load:
+            kept = src.keep_relevant(jobs)
+        self.assertEqual(load.call_count, src._DETAIL_BUDGET)
+        self.assertEqual(len(kept), src._DETAIL_BUDGET)  # the rest had no text to judge by
+
+
 class VisaJobs(unittest.TestCase):
     def test_reads_a_card(self):
         job = src.parse_visajobs(card())[0]

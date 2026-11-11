@@ -31,6 +31,9 @@ type Job = {
   gaps: string[];
   title_only: boolean;
   assessed: boolean;
+  role: "frontend" | "fullstack";
+  /** A generic title ("Software Engineer") kept because the ad itself is front-end work. */
+  by_description: boolean;
 };
 type SourceStatus = { source: string; ok: boolean; found: number; error: string };
 type JobsState = {
@@ -39,7 +42,12 @@ type JobsState = {
   sources: SourceStatus[];
   jobs: Job[];
   unassessed: number;
+  /** Full-stack ones: assessed only while you show them, so hidden ones spend no AI quota. */
+  unassessed_fullstack: number;
 };
+
+/** Vacancies still to assess: the front-end ones, plus full-stack while they're shown. */
+const pendingOf = (s: JobsState, withFullstack: boolean) => s.unassessed + (withFullstack ? s.unassessed_fullstack : 0);
 
 const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 const label = "text-[11px] font-semibold uppercase tracking-wide text-[#8f8676]";
@@ -108,6 +116,12 @@ function JobCard({ job, onStatus }: { job: Job; onStatus: (status: JobStatus) =>
         {job.relocation === "not_offered" ? <Pill tone="bad">✕ {t("No relocation")}</Pill> : null}
         {job.visa_stated ? <Pill tone="good">✓ {t("Visa sponsorship")}</Pill> : null}
         {job.sponsor ? <Pill tone="good">✓ {t("Company can sponsor a visa")} · {job.sponsor.name} ({job.sponsor.registry})</Pill> : null}
+        {job.role === "fullstack" ? <Pill tone="plain">{t("Full-stack")}</Pill> : null}
+        {job.by_description && job.role === "frontend" ? (
+          <Pill tone="plain">
+            <span title={t("The title is generic; the ad names a front-end framework.")}>{t("Front-end by the ad")}</span>
+          </Pill>
+        ) : null}
         {job.language === "english_ok" ? <Pill tone="good">✓ {t("English is enough")}</Pill> : null}
         {job.language === "local_required" ? <Pill tone="bad">✕ {t("Local language required")}</Pill> : null}
         {job.language === "unclear" ? <Pill tone="warn">{t("Language unclear")}</Pill> : null}
@@ -186,6 +200,7 @@ function JobsPage() {
   const [englishOnly, setEnglishOnly] = useState(true);
   const [relocationOnly, setRelocationOnly] = useState(false);
   const [sponsorOnly, setSponsorOnly] = useState(false);
+  const [showFullstack, setShowFullstack] = useState(false);
   const [sort, setSort] = useState<"match" | "newest">("match");
   const fileRef = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
@@ -207,18 +222,19 @@ function JobsPage() {
   );
 
   /** Small batches until none are left; stops at the first error, and "Continue" picks up where it ended. */
-  const assess = useCallback(async () => {
+  const assess = useCallback(async (withFullstack: boolean) => {
     if (!token || scoringRef.current) return;
     scoringRef.current = true;
     setScoring(true);
     try {
       let left = Infinity;
       while (alive.current) {
-        const next = await apiFetch<JobsState>(`/life/jobs/score?lang=${lang}`, { method: "POST", token });
+        const next = await apiFetch<JobsState>(`/life/jobs/score?lang=${lang}&fullstack=${withFullstack}`, { method: "POST", token });
         if (!alive.current) return;
         setState(next);
-        if (next.unassessed === 0 || next.unassessed >= left) return; // no progress: don't loop on the same ones
-        left = next.unassessed;
+        const now = pendingOf(next, withFullstack);
+        if (now === 0 || now >= left) return; // no progress: don't loop on the same ones
+        left = now;
       }
     } catch (err) {
       if (alive.current) setError(message(err));
@@ -250,7 +266,7 @@ function JobsPage() {
     try {
       const next = await apiFetch<JobsState>("/life/jobs/refresh", { method: "POST", token });
       setState(next);
-      if (next.cv && next.unassessed) void assess();
+      if (next.cv && pendingOf(next, showFullstack)) void assess(showFullstack);
     } catch (err) {
       setError(message(err));
     } finally {
@@ -267,7 +283,7 @@ function JobsPage() {
       body.append("file", file);
       const next = await apiFetch<JobsState>("/life/jobs/cv", { method: "POST", token, body });
       setState(next);
-      if (next.unassessed) void assess();
+      if (pendingOf(next, showFullstack)) void assess(showFullstack);
     } catch (err) {
       setError(message(err));
     } finally {
@@ -306,6 +322,7 @@ function JobsPage() {
       if (englishOnly && j.language === "local_required") return false;
       if (relocationOnly && j.relocation !== "offered") return false;
       if (sponsorOnly && !j.sponsor) return false;
+      if (!showFullstack && j.role === "fullstack") return false;
       return true;
     });
     const date = (j: Job) => j.posted || j.first_seen.slice(0, 10);
@@ -316,10 +333,18 @@ function JobsPage() {
         ? blocked(a) - blocked(b) || (b.match ?? -1) - (a.match ?? -1) || date(b).localeCompare(date(a))
         : date(b).localeCompare(date(a)),
     );
-  }, [jobs, country, statusFilter, englishOnly, relocationOnly, sponsorOnly, sort]);
+  }, [jobs, country, statusFilter, englishOnly, relocationOnly, sponsorOnly, showFullstack, sort]);
 
   const when = (iso: string) => new Date(iso).toLocaleString(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-  const pending = state?.unassessed ?? 0;
+  const pending = state ? pendingOf(state, showFullstack) : 0;
+  const fullstackCount = jobs.filter((j) => j.role === "fullstack" && j.status !== "hidden").length;
+  const inScope = showFullstack ? jobs.length : jobs.length - jobs.filter((j) => j.role === "fullstack").length;
+
+  function toggleFullstack(on: boolean) {
+    setShowFullstack(on);
+    // Shown for the first time: assess them now, as the front-end ones were.
+    if (on && state?.cv && state.unassessed_fullstack) void assess(true);
+  }
 
   return (
     <div className="space-y-4">
@@ -388,7 +413,7 @@ function JobsPage() {
       ) : state?.cv && pending ? (
         <p className="flex flex-wrap items-center gap-2 text-xs text-[#6f675b]">
           {t("{n} vacancies aren’t assessed yet.", { n: pending })}
-          <button type="button" onClick={() => void assess()} className="font-semibold text-[#2a78d6] hover:underline">{t("Continue assessing")}</button>
+          <button type="button" onClick={() => void assess(showFullstack)} className="font-semibold text-[#2a78d6] hover:underline">{t("Continue assessing")}</button>
         </p>
       ) : !state?.cv && jobs.length ? (
         <p className="text-xs text-[#6f675b]">{t("Upload your CV to get a match score for each vacancy.")}</p>
@@ -410,7 +435,8 @@ function JobsPage() {
           <Toggle checked={englishOnly} onChange={setEnglishOnly}>{t("English only")}</Toggle>
           <Toggle checked={relocationOnly} onChange={setRelocationOnly}>{t("Relocation confirmed")}</Toggle>
           <Toggle checked={sponsorOnly} onChange={setSponsorOnly}>{t("Company can sponsor")}</Toggle>
-          <span className="ml-auto text-xs tabular-nums text-[#8f8676]">{t("{n} of {total} vacancies", { n: visible.length, total: jobs.length })}</span>
+          <Toggle checked={showFullstack} onChange={toggleFullstack}>{t("Show full-stack ({n})", { n: fullstackCount })}</Toggle>
+          <span className="ml-auto text-xs tabular-nums text-[#8f8676]">{t("{n} of {total} vacancies", { n: visible.length, total: inScope })}</span>
           <p className="w-full text-xs leading-relaxed text-[#8f8676]">{t("“Can sponsor” means the company is on an official register: IND for the Netherlands, SIRI for Denmark. Norway has no such list. It doesn’t promise a visa for this role, and a company that isn’t marked may still sponsor under another legal name.")}</p>
         </section>
       ) : null}

@@ -24,6 +24,7 @@ import certifi
 
 _UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 _TIMEOUT = 15
+_DEADLINE = 20  # seconds for a whole answer
 _MAX_AGE_DAYS = 180  # visajobs still lists 2024 postings: long closed, in all likelihood
 DESCRIPTION_LIMIT = 8000
 _TLS = ssl.create_default_context(cafile=certifi.where())  # Windows' own store can't verify europa.eu
@@ -59,6 +60,29 @@ _COUNTRIES = {
 }
 _FRONTEND = re.compile(r"front[\s-]?end|\b(react|vue|angular|next\.?js|javascript|typescript)\b|\b(web|ui)\s+(developer|engineer)\b", re.I)
 _BACKEND = re.compile(r"back[\s-]?end", re.I)
+_FULLSTACK = re.compile(r"full[\s-]?stack", re.I)
+# "Software Engineer" in Europe is often a React job: for generic titles the ad's text decides, not the title.
+_GENERIC = re.compile(r"\b(engineer|developer|programmer|ontwikkelaar|utvikler|udvikler|systemutvikler|softwareudvikler)\b", re.I)
+# Generic titles that still name another specialty are left out without reading the ad.
+_OTHER_SPECIALTY = re.compile(
+    r"back[\s-]?end|(?<!\w)(\.net|c#|c\+\+)(?!\w)|\b(data|machine learning|ml|ai|devops|sre|site reliability|platform|infrastructure|"
+    r"cloud|network|security|embedded|firmware|hardware|mobile|ios|android|qa|test|testing|automation|sales|support|solutions?|"
+    r"analytics|database|game|graphics|java|python|golang|ruby|php|scala|kotlin|rust|electrical|mechanical|civil|process|"
+    r"quality|reliability|manager|director|architect|trading|compliance|gtm|haskell|elixir|clojure|erlang|node(?:\.?js)?|"
+    r"wordpress|drupal|aem|sap|salesforce|actionscript|magento|e-?commerce)\b",
+    re.I,
+)
+_FE_SIGNAL = re.compile(
+    r"front[\s-]?end|\b(react(?:\.?js)?|vue(?:\.?js)?|angular|svelte|next\.?js|nuxt|typescript|javascript|css|html|tailwind|redux|storybook)\b",
+    re.I,
+)
+_BE_SIGNAL = re.compile(
+    r"(?<!\w)(\.net|c#|c\+\+)(?!\w)|\b(java|kotlin|scala|spring|golang|python|django|flask|ruby|rails|php|laravel|rust|elixir|"
+    r"kubernetes|terraform|kafka|spark)\b",
+    re.I,
+)
+_FE_CORE = {"react", "vue", "angular", "svelte", "next.js", "nextjs", "nuxt", "typescript"}
+_DETAIL_BUDGET = 40  # ads fetched per refresh to read generic titles whose list has no text (Greenhouse, SmartRecruiters)
 _NOT_THE_ROLE = re.compile(r"\b(intern|internship|working student|praktikant|recruiter|product manager|engineering manager|designer)\b", re.I)
 _RELOCATE_JOB = re.compile(r"https://relocate\.me/(netherlands|norway|denmark)/([a-z0-9-]+)/([a-z0-9-]+)/([a-z0-9-]+-(\d+))")
 _RELOCATE_COUNTRY = {"netherlands": "NL", "norway": "NO", "denmark": "DK"}
@@ -85,6 +109,8 @@ class RawJob:
     relocation_stated: bool = False  # the source itself says so
     visa_stated: bool = False
     english_stated: bool = False
+    by_description: bool = False  # a generic title kept because its ad is front-end work
+    role: str = ""  # set when the ad decided it; otherwise it comes from the title
     description: str = ""
     detail: dict[str, str] = field(default_factory=dict)  # how to fetch the full text later
 
@@ -97,6 +123,7 @@ class RawJob:
         # With no employer named, "same title" isn't the same job: only the same ad text is.
         who = self.company or sha1((self.description or self.external_id).encode(), usedforsecurity=False).hexdigest()
         data["dedupe_key"] = dedupe_key(who, self.title, self.country)
+        data["role"] = self.role or job_role(self.title)
         return data
 
 
@@ -119,9 +146,17 @@ def _get(url: str, body: dict[str, Any] | None = None) -> str:
     if body is not None:
         headers["Content-Type"] = "application/json"
         data = json.dumps(body).encode()
+    # The socket timeout is per read: a server trickling its answer could take minutes (Lever once took 254 s), so the
+    # whole answer also has a deadline.
+    deadline = time.monotonic() + _DEADLINE
     try:
         with urlopen(Request(url, data=data, headers=headers), timeout=_TIMEOUT, context=_TLS) as response:
-            return response.read().decode("utf-8", "ignore")
+            chunks = []
+            while chunk := response.read(65536):
+                chunks.append(chunk)
+                if time.monotonic() > deadline:
+                    raise SourceError("too slow")
+            return b"".join(chunks).decode("utf-8", "ignore")
     except HTTPError as exc:
         raise SourceError(f"HTTP {exc.code}") from exc
     except (URLError, TimeoutError, OSError) as exc:
@@ -172,8 +207,45 @@ def country_of(location: str) -> str:
     return ""
 
 
+def job_role(title: str) -> str:
+    """"fullstack" for a full-stack title that names no front-end work, else "frontend". "Fullstack React Developer" or
+    "Frontend/Fullstack" stay front-end: they were always shown. The page hides full-stack unless you ask for it, and
+    only then are they assessed."""
+    title = title or ""
+    return "fullstack" if _FULLSTACK.search(title) and not _FRONTEND.search(title) else "frontend"
+
+
 def is_frontend_title(title: str) -> bool:
     return bool(_FRONTEND.search(title)) and not _NOT_THE_ROLE.search(title)
+
+
+def is_candidate_title(title: str) -> bool:
+    """Worth a look: a front-end or full-stack title, or a generic engineering one whose ad may be front-end."""
+    if is_wanted_title(title):
+        return True
+    return bool(_GENERIC.search(title)) and not _OTHER_SPECIALTY.search(title) and not _NOT_THE_ROLE.search(title)
+
+
+def _signal(match: str) -> str:
+    m = match.lower().replace(" ", "").replace("-", "")
+    return "frontend" if m.startswith("frontend") else re.sub(r"\.?js$", "", m) if m not in ("javascript", "nextjs", "next.js") else m
+
+
+def description_role(text: str) -> str | None:
+    """What the ad's text says a generic title is: "frontend", "fullstack" (more back-end stack than front-end), or None
+    when front-end isn't really part of it. It takes "front-end" written out, or two front-end technologies."""
+    fe = {_signal(m.group(0)) for m in _FE_SIGNAL.finditer(text or "")}
+    # "Frontend" in passing, or HTML and CSS, turn up in all sorts of ads (a CMS job, a Node back end): a modern
+    # framework or TypeScript has to be named.
+    if not fe & _FE_CORE:
+        return None
+    be = {m.group(0).lower() for m in _BE_SIGNAL.finditer(text or "")}
+    return "fullstack" if len(be) > len(fe) else "frontend"
+
+
+def is_wanted_title(title: str) -> bool:
+    """Front-end roles, and full-stack ones (kept apart by job_role)."""
+    return (bool(_FRONTEND.search(title)) or bool(_FULLSTACK.search(title))) and not _NOT_THE_ROLE.search(title)
 
 
 def is_recent(posted: str, today: datetime | None = None) -> bool:
@@ -211,7 +283,7 @@ def parse_greenhouse(slug: str, data: dict[str, Any]) -> list[RawJob]:
     for j in data.get("jobs") or []:
         location = str((j.get("location") or {}).get("name") or "")
         title, country = str(j.get("title") or "").strip(), country_of(location)
-        if not country or not is_frontend_title(title):
+        if not country or not is_candidate_title(title):
             continue
         jobs.append(RawJob(
             source="greenhouse",
@@ -235,7 +307,7 @@ def parse_ashby(slug: str, data: dict[str, Any]) -> list[RawJob]:
         places = [str(j.get("location") or "")] + [str(p.get("location") or "") for p in j.get("secondaryLocations") or []]
         match = next((p for p in places if country_of(p)), "")
         title = str(j.get("title") or "").strip()
-        if not match or not is_frontend_title(title):
+        if not match or not is_candidate_title(title):
             continue
         jobs.append(RawJob(
             source="ashby",
@@ -258,7 +330,7 @@ def parse_lever(slug: str, data: list[dict[str, Any]]) -> list[RawJob]:
         places = [str(cats.get("location") or "")] + [str(p) for p in cats.get("allLocations") or []]
         match = next((p for p in places if country_of(p)), "")
         title = str(j.get("text") or "").strip()
-        if not match or not is_frontend_title(title):
+        if not match or not is_candidate_title(title):
             continue
         created = j.get("createdAt")
         posted = datetime.fromtimestamp(created / 1000, timezone.utc).strftime("%Y-%m-%d") if isinstance(created, (int, float)) else ""
@@ -282,7 +354,7 @@ def parse_recruitee(slug: str, data: dict[str, Any]) -> list[RawJob]:
     for o in data.get("offers") or []:
         location = ", ".join(filter(None, [str(o.get("city") or ""), str(o.get("country") or "")])) or str(o.get("location") or "")
         title, country = str(o.get("title") or "").strip(), country_of(location)
-        if not country or not is_frontend_title(title):
+        if not country or not is_candidate_title(title):
             continue
         body = f"{o.get('description') or ''}\n{o.get('requirements') or ''}"
         jobs.append(RawJob(
@@ -307,7 +379,7 @@ def parse_smartrecruiters(slug: str, data: dict[str, Any]) -> list[RawJob]:
         code = str(place.get("country") or "").upper()
         country = {"NL": "NL", "NO": "NO", "DK": "DK"}.get(code) or country_of(location)
         title = str(j.get("name") or "").strip()
-        if not country or not is_frontend_title(title):
+        if not country or not is_candidate_title(title):
             continue
         jobs.append(RawJob(
             source="smartrecruiters",
@@ -328,7 +400,7 @@ def parse_workable(slug: str, data: dict[str, Any]) -> list[RawJob]:
     for j in data.get("jobs") or []:
         location = ", ".join(filter(None, [str(j.get("city") or ""), str(j.get("country") or "")]))
         title, country = str(j.get("title") or "").strip(), country_of(location)
-        if not country or not is_frontend_title(title):
+        if not country or not is_candidate_title(title):
             continue
         jobs.append(RawJob(
             source="workable",
@@ -378,7 +450,7 @@ def fetch_company_boards() -> tuple[list[RawJob], SourceResult]:
     ]
     with ThreadPoolExecutor(max_workers=8) as pool:
         results = list(pool.map(safely, items))
-    jobs = [job for r in results if r for job in r]
+    jobs = keep_relevant([job for r in results if r for job in r])
     failed = [slug for (_, slug), r in zip(items, results) if r is None]
     return jobs, SourceResult(
         "companies",
@@ -386,6 +458,33 @@ def fetch_company_boards() -> tuple[list[RawJob], SourceResult]:
         found=len(jobs),
         error=f"{len(failed)} of {len(items)} didn't answer: {', '.join(failed)}" if failed else "",
     )
+
+
+def keep_relevant(jobs: list[RawJob]) -> list[RawJob]:
+    """Front-end and full-stack titles stay. A generic title stays only if its ad is front-end work, read from the
+    list's text or, when the list has none, from the ad itself (a few dozen per refresh at most)."""
+    generic = [j for j in jobs if not is_wanted_title(j.title)]
+    need = [j for j in generic if len(j.description) < 200 and j.detail][:_DETAIL_BUDGET]
+
+    def fill(job: RawJob) -> None:
+        try:
+            extra = load_detail(job.detail)
+        except (SourceError, KeyError, TypeError, AttributeError, ValueError):
+            return
+        job.description = str(extra.get("description") or job.description)
+        if extra.get("company"):
+            job.company = str(extra["company"])
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        list(pool.map(fill, need))
+    kept = []
+    for job in jobs:
+        if is_wanted_title(job.title):
+            kept.append(job)
+        elif role := description_role(job.description):
+            job.role, job.by_description = role, True
+            kept.append(job)
+    return kept
 
 
 # ---- EURES: Europe's public job portal. Its Dutch ads hide the employer, so the sponsor registers can't help with them ----
@@ -396,7 +495,7 @@ def parse_eures(data: dict[str, Any]) -> list[RawJob]:
     for j in data.get("jvs") or []:
         title = re.sub(r"\s*&\w+;?$", "", plain_text(str(j.get("title") or "")))  # some end in a cut-off "&ndash"
         job_id = str(j.get("id") or "")
-        if not job_id or "NL" not in (j.get("locationMap") or {}) or not is_frontend_title(title) or _DEAD_TECH.search(title):
+        if not job_id or "NL" not in (j.get("locationMap") or {}) or not is_candidate_title(title) or _DEAD_TECH.search(title):
             continue
         created = j.get("creationDate")
         jobs.append(RawJob(
@@ -427,7 +526,7 @@ def fetch_eures() -> list[RawJob]:
             "positionOfferingCodes": [], "locationCodes": ["nl"], "euresFlagCodes": [], "otherBenefitsCodes": [],
             "requiredLanguages": [], "minNumberPost": None, "sessionId": "olivia",
         })
-        jobs += parse_eures(data)
+        jobs += keep_relevant(parse_eures(data))
         if len(data.get("jvs") or []) < _EURES_PAGE_SIZE:
             break
     return jobs
@@ -446,7 +545,7 @@ def parse_visajobs(html: str) -> list[RawJob]:
         if not country or not title_link:
             continue
         title = plain_text(title_link.group(2))
-        if not is_frontend_title(title):
+        if not is_wanted_title(title):
             continue
         company = re.search(r'</h3>\s*<p[^>]*>(.*?)</p>', block, re.S)
         apply = re.search(r'<a href="([^"]+)"[^>]*class="job-card-apply"', block)
@@ -485,7 +584,7 @@ def parse_relocate_sitemap(xml: str) -> list[RawJob]:
             continue
         country, city, company, slug, job_id = m.groups()
         title = re.sub(r"-\d+$", "", slug).replace("-", " ").title()
-        if not is_frontend_title(title):
+        if not is_wanted_title(title):
             continue
         jobs.append(RawJob(
             source="relocate",
