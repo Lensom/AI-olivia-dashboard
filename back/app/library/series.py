@@ -7,11 +7,13 @@ import logging
 import re
 import threading
 import time
+from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app import cache
 from app.auth.router import get_current_user
 from app.auth.schemas import UserResponse
 from app.library import wikidata as wd
@@ -116,6 +118,20 @@ def _series(series_id: str, lang: str) -> LibrarySeries | None:
         return _build_series(series_id, lang)
 
 
+def _db_key(series_id: str, lang: str) -> str:
+    return f"wikidata:series:{series_id}:{lang}"
+
+
+def _from_database(ids: list[str], lang: str) -> None:
+    """Series built before, by this server or another one, go into memory in one query instead of to Wikidata."""
+    missing = [s for s in ids if not ((hit := _series_cache.get((s, lang))) and time.time() - hit[0] < _TTL)]
+    stored = cache.get_many([_db_key(s, lang) for s in missing], timedelta(seconds=_TTL))
+    for s in missing:
+        if _db_key(s, lang) in stored:  # None too: "not a listable series" is worth remembering
+            value = stored[_db_key(s, lang)]
+            _series_cache[(s, lang)] = (time.time(), LibrarySeries(**value) if value else None)
+
+
 def _build_series(series_id: str, lang: str) -> LibrarySeries | None:
     members, total = wd.search_statement(f"P179={series_id}", limit=_MAX_PARTS)
     name = wd.label(wd.entities([series_id], props="labels").get(series_id, {}), lang, "en")
@@ -161,6 +177,7 @@ def _build_series(series_id: str, lang: str) -> LibrarySeries | None:
         if len(parts) >= 2:
             result = LibrarySeries(id=series_id, name=name, parts=parts)
     _series_cache[(series_id, lang)] = (time.time(), result)
+    cache.put_many({_db_key(series_id, lang): result.model_dump() if result else None})
     return result
 
 
@@ -184,8 +201,10 @@ def series_parts(
     lang: Annotated[Literal["en", "uk"], Query()] = "uk",
 ):
     """Every book of up to 40 series, in reading order; series Wikidata can't list are left out."""
+    ids = list(dict.fromkeys(s for s in payload[:40] if re.fullmatch(r"Q\d+", s)))
+    _from_database(ids, lang)
     out = []
-    for sid in dict.fromkeys(s for s in payload[:40] if re.fullmatch(r"Q\d+", s)):
+    for sid in ids:
         try:
             if s := _series(sid, lang):
                 out.append(s)

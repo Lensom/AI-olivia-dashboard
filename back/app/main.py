@@ -24,6 +24,7 @@ from app.collection.router import router as collection_router
 from app.games.router import router as games_router
 from app.jobs.router import router as jobs_router
 from app.pages.router import router as pages_router
+from app import cache
 from app.db import create_pool, init_db
 from app.llm.client import DEFAULT_FALLBACK_MODELS, DEFAULT_MODEL, LLMClient
 import app.broker.router as broker_router_module
@@ -67,6 +68,7 @@ if not settings.database_url:
 
 pool = create_pool(settings.database_url)
 init_db(pool)
+cache.use_pool(pool)
 
 app.add_middleware(
     CORSMiddleware,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from threading import Lock
 import gzip
@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from psycopg import Connection
 from psycopg.types.json import Json
 
+from app import cache
 from app.auth.router import get_current_user, get_conn
 from app.auth.schemas import UserResponse
 from app.cinema.schemas import (
@@ -49,6 +50,7 @@ _TMDB = "https://api.themoviedb.org/3"
 _IMG = "https://image.tmdb.org/t/p"
 _ANIMATION_GENRE = 16
 _TMDB_TTL = 60 * 60
+_COLLECTION_TTL = timedelta(days=1)  # a franchise gains a film rarely; kept in Postgres too (app/cache.py)
 _tmdb_cache: dict[str, tuple[float, dict]] = {}
 
 # Which TMDB catalogue each page searches.
@@ -696,5 +698,13 @@ def collections(
         return CinemaCollection(id=cid, name=name, poster=_img(d.get("poster_path"), "w185"), parts=parts)
 
     # Your library's collections plus the featured big franchises: well over 100 for a large library.
+    ids = list(dict.fromkeys(payload))[:300]
+    key = lambda cid: f"tmdb:collection:{cid}:{language}"  # noqa: E731
+    stored = cache.get_many([key(c) for c in ids], _COLLECTION_TTL)
+    found = {c: CinemaCollection(**stored[key(c)]) for c in ids if stored.get(key(c))}
+    missing = [c for c in ids if c not in found]
     with ThreadPoolExecutor(max_workers=10) as pool:
-        return [c for c in pool.map(one, list(dict.fromkeys(payload))[:300]) if c is not None]
+        fetched = dict(zip(missing, pool.map(one, missing)))
+    cache.put_many({key(c): v.model_dump() for c, v in fetched.items() if v is not None})
+    found.update({c: v for c, v in fetched.items() if v is not None})
+    return [found[c] for c in ids if c in found]

@@ -79,7 +79,7 @@ export function GlobalSearch() {
   const router = useRouter();
   const { token } = useAuth();
   const { categories, subcategoriesByCategoryId } = useCategories();
-  const { holdings, pickingRows } = useInvesting();
+  const { holdings, pickingRows, ensureLoaded } = useInvesting();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -91,8 +91,9 @@ export function GlobalSearch() {
     setQuery("");
     setActive(0);
     setOpen(true);
+    ensureLoaded(); // your tickers, on pages that didn't need the investing data until now
     if (token) void loadData(token).then(setData);
-  }, [token]);
+  }, [token, ensureLoaded]);
 
   // Ctrl+K / ⌘K anywhere, or "/" when not typing in a field.
   useEffect(() => {

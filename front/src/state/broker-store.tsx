@@ -3,7 +3,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { parseCryptoAmount } from "@/features/investing/crypto-format";
 import { parseInvestingDateMs } from "@/features/investing/format";
+import { usePathname } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { usesInvestingData } from "@/state/investing-store";
 import { useAuth } from "./auth-store";
 
 export type BrokerCashBalance = { id: string; currency: string; amount: string };
@@ -64,6 +66,10 @@ export function newBrokerId(): string {
 
 export function BrokerProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
+  const pathname = usePathname();
+  // Only investing pages show broker cash and dividends; once loaded it stays, as the investing data does.
+  const [active, setActive] = useState(false);
+  if (!active && usesInvestingData(pathname)) setActive(true);
   const [data, setData] = useState<BrokerData>({ cash: [], dividends: [], rules: DEFAULT_RULES });
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [fromBroker, setFromBroker] = useState(false);
@@ -79,7 +85,7 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
   const savedRef = useRef<BrokerData>({ cash: [], dividends: [], rules: DEFAULT_RULES });
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !active) return;
     apiFetch<BrokerData & { updated_at: string | null; source?: string }>("/investing/broker", { token })
       .then((res) => {
         const next = { cash: res.cash, dividends: res.dividends, rules: { ...DEFAULT_RULES, ...res.rules } };
@@ -91,7 +97,7 @@ export function BrokerProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {})
       .finally(() => setLoaded(true));
-  }, [token]);
+  }, [token, active]);
 
   const currencyKey = useMemo(
     () => [...new Set(data.cash.map((c) => c.currency.trim().toUpperCase()).filter((c) => c && c !== "USD"))].sort().join(","),

@@ -30,6 +30,16 @@ def init_db(pool: ConnectionPool) -> None:
         );
         """
     )
+        # Slow public answers of other services (app/cache.py), shared by every server instance. Nobody's own data.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS api_cache (
+                key TEXT PRIMARY KEY,
+                value JSONB NOT NULL,
+                stored_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
         # Failed logins per hashed email or address, for the limits in app/auth/limits.py.
         conn.execute(
             """

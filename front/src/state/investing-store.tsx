@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { InvestingHolding } from "@/features/investing/types";
 import { useAuth } from "./auth-store";
 import { apiFetch } from "@/lib/api";
@@ -77,6 +78,8 @@ export type InvestingPickingRow = {
 export type ExternalFeeRow = { id: string; date: string; amount: string; note: string };
 
 type InvestingStore = {
+  /** Loads the data on a page that isn't an investing one (search, for your tickers). Investing pages load it themselves. */
+  ensureLoaded: () => void;
   holdings: InvestingHolding[];
   /** `fromBroker`: positions come from Freedom24 (shares and prices are read-only; targets etc. stay yours). */
   holdingsMeta: { source: "server" | "default"; updatedAt: string | null; fromBroker?: boolean };
@@ -224,6 +227,9 @@ function isPlaceholderIndustry(h: InvestingHolding): boolean {
 
 const InvestingContext = createContext<InvestingStore | null>(null);
 
+/** Pages that show investing data. Elsewhere (Cinema, Library, Life) none of it is fetched until something asks. */
+export const usesInvestingData = (pathname: string | null) => pathname === "/" || !!pathname?.startsWith("/investing");
+
 function createEmptyHolding(): InvestingHolding {
   const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
   return {
@@ -295,6 +301,12 @@ const newActivityId = () => (typeof crypto !== "undefined" && "randomUUID" in cr
 
 export function InvestingProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
+  const pathname = usePathname();
+  const [requested, setRequested] = useState(false);
+  // Once needed it stays loaded, so going back to an investing page from Cinema doesn't load it all again.
+  const [active, setActive] = useState(false);
+  if (!active && (requested || usesInvestingData(pathname))) setActive(true);
+  const ensureLoaded = useCallback(() => setRequested(true), []);
   const [holdings, setHoldings] = useState<InvestingHolding[]>([]);
   const [holdingsMeta, setHoldingsMeta] = useState<{
     source: "server" | "default";
@@ -925,6 +937,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    if (!active) return;
     void refreshHoldings().catch(() => {});
     void refreshActivities().catch(() => {});
     void refreshPicking().catch(() => {});
@@ -932,7 +945,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
     void refreshNotes().catch(() => {});
     void refreshMetrics().catch(() => {});
     void refreshRefills().catch(() => {});
-  }, [token]);
+  }, [token, active]);
 
   const store = useMemo<InvestingStore>(() => {
     return {
@@ -1140,8 +1153,10 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       saveNotes,
       refreshMetrics,
       updateMetrics,
+      ensureLoaded,
     };
   }, [
+    ensureLoaded,
     holdings,
     holdingsMeta,
     capitalEntries,
