@@ -1155,8 +1155,18 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       updateMetrics,
       ensureLoaded,
     };
+    // The functions above are made anew on every render and read the state as it was then, so the store is rebuilt
+    // whenever any state they read changes: everything they read must be listed here. Missing externalFees once meant a
+    // second edit of the external fees showed nothing and wasn't saved, because only the first one changed a listed value.
+    // The functions themselves stay out: they change on every render, so listing them would rebuild the store each time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    token,
     ensureLoaded,
+    quotesSource,
+    externalFees,
+    externalFeesUsd,
+    brokerInterestUsd,
     holdings,
     holdingsMeta,
     capitalEntries,
