@@ -1,11 +1,11 @@
 "use client";
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { newlyWatchedUnrated, type CinemaAiring, type CinemaList, type CinemaTitle } from "@/features/cinema/types";
+import { newlyWatchedUnrated, type CinemaAiring, type CinemaList, type CinemaTitle, type CinemaYear } from "@/features/cinema/types";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "./auth-store";
 
-type CinemaDoc = { items: CinemaTitle[]; language: string; lists: CinemaList[]; updated_at: string | null; tmdb_enabled: boolean };
+type CinemaDoc = { items: CinemaTitle[]; language: string; lists: CinemaList[]; years?: Record<string, CinemaYear>; hidden_years?: number[]; updated_at: string | null; tmdb_enabled: boolean };
 type Saved = { items: CinemaTitle[]; language: string; lists: CinemaList[] };
 
 type CinemaStore = {
@@ -23,6 +23,14 @@ type CinemaStore = {
   /** Titles just marked watched without a score, waiting for "how was it?" (oldest first). */
   toRate: string[];
   dismissRate: (id: string) => void;
+  /** Fixed years: "2026" → its titles as they were when fixed. */
+  years: Record<string, CinemaYear>;
+  /** Fixes (or fixes again) a year with these titles; unfixYear lets it follow your list again. */
+  fixYear: (year: number, items: CinemaTitle[]) => Promise<void>;
+  unfixYear: (year: number) => Promise<void>;
+  /** Years left off "Year in film" (the titles keep them). */
+  hiddenYears: number[];
+  setHiddenYears: (years: number[]) => Promise<void>;
 };
 
 const CinemaContext = createContext<CinemaStore | null>(null);
@@ -36,6 +44,8 @@ export function CinemaProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [toRate, setToRate] = useState<string[]>([]);
+  const [years, setYears] = useState<Record<string, CinemaYear>>({});
+  const [hiddenYears, setHiddenYearsState] = useState<number[]>([]);
   // Saves read from here so quick successive edits (e.g. two checkbox clicks) build on each other.
   const latest = useRef<Saved>({ items: [], language: "uk-UA", lists: [] });
 
@@ -48,6 +58,8 @@ export function CinemaProvider({ children }: { children: ReactNode }) {
         setLists(d.lists ?? []);
         setLanguageState(d.language);
         setTmdbEnabled(d.tmdb_enabled);
+        setYears(d.years ?? {});
+        setHiddenYearsState(d.hidden_years ?? []);
         setLoadError(null);
         // One after the other, so the two background saves don't race.
         void syncImdbRatings(token, d.items).then(() => syncAiring(token, d.tmdb_enabled));
@@ -175,6 +187,33 @@ export function CinemaProvider({ children }: { children: ReactNode }) {
 
   const dismissRate = useCallback((id: string) => setToRate((q) => q.filter((x) => x !== id)), []);
 
+  const fixYear = useCallback(
+    async (year: number, list: CinemaTitle[]) => {
+      const fixed = await apiFetch<CinemaYear>(`/cinema/years/${year}`, { token: token ?? undefined, method: "PUT", body: JSON.stringify(list) });
+      setYears((y) => ({ ...y, [String(year)]: fixed }));
+    },
+    [token],
+  );
+
+  const setHiddenYears = useCallback(
+    async (next: number[]) => {
+      setHiddenYearsState(await apiFetch<number[]>("/cinema/hidden-years", { token: token ?? undefined, method: "PUT", body: JSON.stringify(next) }));
+    },
+    [token],
+  );
+
+  const unfixYear = useCallback(
+    async (year: number) => {
+      await apiFetch(`/cinema/years/${year}`, { token: token ?? undefined, method: "DELETE" });
+      setYears((y) => {
+        const next = { ...y };
+        delete next[String(year)];
+        return next;
+      });
+    },
+    [token],
+  );
+
   const updateLists = useCallback(
     (change: (lists: CinemaList[]) => CinemaList[]) => persist({ ...latest.current, lists: change(latest.current.lists) }),
     [persist],
@@ -183,7 +222,7 @@ export function CinemaProvider({ children }: { children: ReactNode }) {
   const setLanguage = useCallback((lang: string) => persist({ ...latest.current, language: lang }), [persist]);
 
   return (
-    <CinemaContext.Provider value={{ items, lists, language, tmdbEnabled, isLoaded, loadError, update, updateLists, setLanguage, toRate, dismissRate }}>
+    <CinemaContext.Provider value={{ items, lists, language, tmdbEnabled, isLoaded, loadError, update, updateLists, setLanguage, toRate, dismissRate, years, fixYear, unfixYear, hiddenYears, setHiddenYears }}>
       {children}
     </CinemaContext.Provider>
   );

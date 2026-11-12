@@ -67,6 +67,9 @@ export type CinemaCollection = {
   parts: { tmdb_id: number; title: string; original_title: string; year: number | null; release_date: string; poster: string; animation: boolean }[];
 };
 
+/** A year fixed at its end (PUT /cinema/years/{year}): its titles as they were, whatever you change later. */
+export type CinemaYear = { taken_at: string; items: CinemaTitle[] };
+
 /** POST /cinema/people: a director's or actor's released films, to see what of theirs you haven't watched. */
 export type CinemaPerson = {
   name: string;

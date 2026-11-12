@@ -1,5 +1,17 @@
 /** Ukrainian interface text: Cinematography, Library, Tops, shared charts and their backend messages. */
 export const MEDIA: Record<string, string | string[]> = {
+  // Cinematography: fixed years
+  "Hide {year} here": "Сховати {year} тут",
+  "Hidden years:": "Приховані роки:",
+  "Show again": "Показати знову",
+  "fixed": "зафіксовано",
+  "{year} is fixed as of {date}": "{year} зафіксовано {date}",
+  "Rewatching a title and changing its year won't change this page.": "Повторний перегляд зі зміною року цю сторінку вже не змінить.",
+  "Fix {year} again from your list as it is now? Titles you've since moved to another year will leave it.": "Зафіксувати {year} заново з поточного списку? Назви, яким ви відтоді змінили рік, з нього зникнуть.",
+  "Fix again": "Оновити знімок",
+  "Unfix": "Скасувати фіксацію",
+  "Fix {year}": "Зафіксувати {year}",
+  "Keeps this year as it is now, so a rewatch you log under a later year won't take titles out of it. Best done at the end of the year.": "Зберігає рік таким, як зараз: повторний перегляд, записаний пізнішим роком, не забере з нього назви. Найкраще робити наприкінці року.",
   // Cinematography: coming up, year in film, people, "how was it?"
   "Add to watchlist": "Додати в план",
   "All {n} →": "Усі {n} →",

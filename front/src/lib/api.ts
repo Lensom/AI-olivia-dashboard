@@ -78,6 +78,7 @@ export async function apiFetch<T>(
       }
       throw await readError(res);
     }
+    if (res.status === 204) return undefined as T; // "done", with no body to read
     try {
       return (await res.json()) as T; // the timeout covers the body too: it can stall after the headers arrived
     } catch (err) {

@@ -3,13 +3,21 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CINEMA_KINDS, cinemaKindMeta } from "@/features/cinema/nav";
-import { isSeries, watchedMinutes, type CinemaTitle } from "@/features/cinema/types";
+import { errorText } from "@/features/cinema/title-dialog";
+import { isSeries, watchedMinutes, type CinemaTitle, type CinemaYear } from "@/features/cinema/types";
+import { investingToolbarBtn } from "@/features/investing/ui/investing-classes";
 import { Poster, ScoreBadge } from "@/features/cinema/ui";
 import { useLocale, useT } from "@/lib/i18n";
 import { useCinema } from "@/state/cinema-store";
 
 const card = "rounded-2xl border border-black/5 bg-white/90 p-4 shadow-[0_8px_30px_rgba(18,16,13,0.05)] sm:p-5";
 const label = "text-[11px] font-semibold uppercase tracking-wide text-[#8f8676]";
+
+const watchedIn = (items: CinemaTitle[], year: number) => items.filter((t) => t.view_year === year && (t.status === "watched" || t.status === "watching"));
+
+/** A fixed year's own titles (they count for it even if a rewatch moved them on); otherwise your list as it is now. */
+const titlesOf = (items: CinemaTitle[], fixed: Record<string, CinemaYear>, year: number) =>
+  fixed[String(year)] ? fixed[String(year)].items.map((t) => ({ ...t, view_year: year })) : items;
 
 const byScore = (a: CinemaTitle, b: CinemaTitle) => (b.score ?? -1) - (a.score ?? -1) || (b.imdb_rating ?? -1) - (a.imdb_rating ?? -1) || a.title.localeCompare(b.title);
 
@@ -31,7 +39,7 @@ function favourite(list: CinemaTitle[], pick: (t: CinemaTitle) => string[], min:
 
 /** Your year in film: what you watched in a year (by the year you watched it), its best, its surprises and its hours. */
 function summarize(items: CinemaTitle[], year: number) {
-  const list = items.filter((t) => t.view_year === year && (t.status === "watched" || t.status === "watching"));
+  const list = watchedIn(items, year);
   const scored = list.filter((t) => t.score != null);
   const vsImdb = list.filter((t) => t.score != null && t.imdb_rating != null);
   const diff = (t: CinemaTitle) => (t.score ?? 0) - (t.imdb_rating ?? 0);
@@ -71,21 +79,45 @@ function Pick({ t, caption, note }: { t: CinemaTitle; caption: string; note: str
 export default function CinemaYearPage() {
   const t = useT();
   const locale = useLocale();
-  const { items, isLoaded, loadError } = useCinema();
-  const years = useMemo(
-    () => [...new Set(items.filter((x) => x.view_year && (x.status === "watched" || x.status === "watching")).map((x) => x.view_year!))].sort((a, b) => b - a),
-    [items],
+  const { items, isLoaded, loadError, years: fixed, fixYear, unfixYear, hiddenYears, setHiddenYears } = useCinema();
+  const allYears = useMemo(
+    () =>
+      [
+        ...new Set([
+          ...items.filter((x) => x.view_year && (x.status === "watched" || x.status === "watching")).map((x) => x.view_year!),
+          ...Object.keys(fixed).map(Number),
+        ]),
+      ].sort((a, b) => b - a),
+    [items, fixed],
   );
+  const years = useMemo(() => allYears.filter((y) => !hiddenYears.includes(y)), [allYears, hiddenYears]);
+  const hiddenShown = useMemo(() => allYears.filter((y) => hiddenYears.includes(y)), [allYears, hiddenYears]);
   const [chosen, setChosen] = useState<number | null>(null);
-  const year = chosen ?? years[0] ?? new Date().getFullYear();
-  const s = useMemo(() => summarize(items, year), [items, year]);
-  const before = useMemo(() => summarize(items, year - 1).count, [items, year]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const year = chosen != null && years.includes(chosen) ? chosen : (years[0] ?? new Date().getFullYear());
+  const s = useMemo(() => summarize(titlesOf(items, fixed, year), year), [items, fixed, year]);
+  const before = useMemo(() => summarize(titlesOf(items, fixed, year - 1), year - 1).count, [items, fixed, year]);
+  const fixedYear = fixed[String(year)];
+
+  async function act(run: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await run();
+    } catch (e) {
+      setError(t(errorText(e, "Could not save.")));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (loadError) return <p className="rounded-xl bg-rose-50 px-4 py-2.5 text-sm text-rose-800">{t(loadError)}</p>;
   if (!isLoaded) return <p className="text-sm text-[#8f8676]">{t("Loading…")}</p>;
   if (!years.length) return <p className={`${card} text-center text-sm text-[#8f8676]`}>{t("Set the year you watched a title, and your years in film show up here.")}</p>;
 
   const hours = Math.round(s.minutes / 60);
+  const fixedOn = fixedYear ? new Date(`${fixedYear.taken_at}T00:00:00Z`).toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : "";
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("Year")}>
@@ -98,8 +130,48 @@ export default function CinemaYearPage() {
             className={`rounded-full px-3 py-1 text-xs font-medium tabular-nums ${y === year ? "bg-[#1f1c17] text-[#f8f4eb]" : "border border-black/10 bg-white text-[#3b352d] hover:bg-[#faf8f2]"}`}
           >
             {y}
+            {fixed[String(y)] ? <span aria-label={t("fixed")}> 📌</span> : null}
           </button>
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-xs text-[#6f675b]">
+        {fixedYear ? (
+          <>
+            <span className="font-medium text-[#1f1c17]">📌 {t("{year} is fixed as of {date}", { year, date: fixedOn })}</span>
+            <span>{t("Rewatching a title and changing its year won't change this page.")}</span>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (window.confirm(t("Fix {year} again from your list as it is now? Titles you've since moved to another year will leave it.", { year })))
+                  void act(() => fixYear(year, watchedIn(items, year)));
+              }}
+              className="underline decoration-black/20 underline-offset-2 hover:text-[#1f1c17]"
+            >
+              {t("Fix again")}
+            </button>
+            <button type="button" disabled={busy} onClick={() => void act(() => unfixYear(year))} className="underline decoration-black/20 underline-offset-2 hover:text-[#1f1c17]">
+              {t("Unfix")}
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" disabled={busy || !s.count} onClick={() => void act(() => fixYear(year, watchedIn(items, year)))} className={investingToolbarBtn}>
+              {busy ? t("Saving…") : t("Fix {year}", { year })}
+            </button>
+            <span>{t("Keeps this year as it is now, so a rewatch you log under a later year won't take titles out of it. Best done at the end of the year.")}</span>
+          </>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void act(() => setHiddenYears([...hiddenYears, year]))}
+          className="ml-auto underline decoration-black/20 underline-offset-2 hover:text-[#1f1c17]"
+        >
+          {t("Hide {year} here", { year })}
+        </button>
+        {error ? <span className="text-rose-700">{error}</span> : null}
       </div>
 
       <section className="rounded-2xl bg-[#1f1c17] p-5 text-[#f8f4eb] sm:p-7">
@@ -198,6 +270,20 @@ export default function CinemaYearPage() {
             ))}
           </ul>
         </section>
+      ) : null}
+
+      {hiddenShown.length ? (
+        <p className="text-xs text-[#8f8676]">
+          {t("Hidden years:")}{" "}
+          {hiddenShown.map((y, i) => (
+            <span key={y}>
+              {i ? ", " : ""}
+              <button type="button" onClick={() => void act(() => setHiddenYears(hiddenYears.filter((x) => x !== y)))} className="underline decoration-black/20 underline-offset-2 hover:text-[#1f1c17]" title={t("Show again")}>
+                {y}
+              </button>
+            </span>
+          ))}
+        </p>
       ) : null}
     </div>
   );

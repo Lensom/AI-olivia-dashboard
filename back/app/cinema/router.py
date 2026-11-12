@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import Path as PathParam
 from psycopg import Connection
 from psycopg.types.json import Json
 
@@ -31,6 +32,7 @@ from app.cinema.schemas import (
     CinemaImdbRating,
     CinemaImportResponse,
     CinemaKind,
+    CinemaYear,
     CinemaPeopleRequest,
     CinemaPerson,
     CinemaPersonFilm,
@@ -339,6 +341,13 @@ def update_cinema(
         # A client that doesn't know about lists (e.g. a tab opened before they existed) must not wipe them.
         saved = conn.execute("SELECT data->'lists' FROM cinema_titles WHERE user_id = %s", (user.id,)).fetchone()
         data["lists"] = saved[0] if saved and isinstance(saved[0], list) else []
+    if "years" not in payload.model_fields_set:
+        # Fixed years are saved on their own (PUT /cinema/years/{year}); saving the list leaves them as they are.
+        saved = conn.execute("SELECT data->'years' FROM cinema_titles WHERE user_id = %s", (user.id,)).fetchone()
+        data["years"] = saved[0] if saved and isinstance(saved[0], dict) else {}
+    if "hidden_years" not in payload.model_fields_set:
+        saved = conn.execute("SELECT data->'hidden_years' FROM cinema_titles WHERE user_id = %s", (user.id,)).fetchone()
+        data["hidden_years"] = saved[0] if saved and isinstance(saved[0], list) else []
     row = conn.execute(
         """
         INSERT INTO cinema_titles(user_id, data, updated_at)
@@ -784,3 +793,67 @@ def people(
     cache.put_many({key(n): p.model_dump() for n, p in fetched.items() if p is not None})
     found.update({n: p for n, p in fetched.items() if p is not None})
     return [_notable(found[n]) for n in names if n in found]
+
+
+_YEAR = PathParam(ge=1900, le=2100)
+# What a fixed year needs of a title; the long text fields would only make the saved copy heavy.
+_YEAR_BLANKS = {"overview": "", "actors": [], "studios": [], "backdrop": ""}
+
+
+@router.put("/years/{year}", response_model=CinemaYear)
+def fix_year(
+    year: Annotated[int, _YEAR],
+    payload: list[CinemaTitle],
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+):
+    """Fixes a year: the titles you watched in it, as they are now. Fixing it again replaces the copy."""
+    if len(payload) > 3000:
+        raise HTTPException(status_code=422, detail="Too many titles for one year")
+    fixed = CinemaYear(taken_at=date.today().isoformat(), items=[t.model_copy(update=_YEAR_BLANKS) for t in payload])
+    row = conn.execute(
+        """
+        UPDATE cinema_titles
+        SET data = jsonb_set(data, '{years}', COALESCE(data->'years', '{}'::jsonb) || jsonb_build_object(%s::text, %s::jsonb)),
+            updated_at = NOW()
+        WHERE user_id = %s
+        RETURNING 1
+        """,
+        (str(year), Json(fixed.model_dump()), user.id),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Add some titles first")
+    conn.commit()
+    return fixed
+
+
+@router.delete("/years/{year}", status_code=204)
+def unfix_year(
+    year: Annotated[int, _YEAR],
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+):
+    """Lets a fixed year follow your list again."""
+    conn.execute(
+        "UPDATE cinema_titles SET data = jsonb_set(data, '{years}', COALESCE(data->'years', '{}'::jsonb) - %s::text) WHERE user_id = %s",
+        (str(year), user.id),
+    )
+    conn.commit()
+
+
+@router.put("/hidden-years", response_model=list[int])
+def set_hidden_years(
+    payload: list[int],
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+):
+    """Years left off "Year in film". Only the page changes: the titles and their years stay as they are."""
+    hidden = sorted({y for y in payload if 1900 <= y <= 2100})[:200]
+    row = conn.execute(
+        "UPDATE cinema_titles SET data = jsonb_set(data, '{hidden_years}', %s::jsonb) WHERE user_id = %s RETURNING 1",
+        (Json(hidden), user.id),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Add some titles first")
+    conn.commit()
+    return hidden

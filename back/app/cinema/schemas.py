@@ -64,10 +64,19 @@ class CinemaList(BaseModel):
     entries: list[CinemaListEntry] = Field(default_factory=list)
 
 
+class CinemaYear(BaseModel):
+    """A year's titles as they were when you fixed it: rewatching one later and setting a new year doesn't change it."""
+
+    taken_at: str  # ISO date
+    items: list[CinemaTitle] = Field(default_factory=list, max_length=3000)
+
+
 class CinemaData(BaseModel):
     items: list[CinemaTitle] = Field(default_factory=list)
     language: str = "uk-UA"  # TMDB language for titles, genres and descriptions
     lists: list[CinemaList] = Field(default_factory=list)
+    years: dict[str, CinemaYear] = Field(default_factory=dict)  # "2026" → fixed year (PUT /cinema/years/{year})
+    hidden_years: list[int] = Field(default_factory=list, max_length=200)  # left off "Year in film"; the titles stay
 
 
 class CinemaResponse(CinemaData):
