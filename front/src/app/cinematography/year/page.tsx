@@ -19,6 +19,16 @@ const watchedIn = (items: CinemaTitle[], year: number) => items.filter((t) => t.
 const titlesOf = (items: CinemaTitle[], fixed: Record<string, CinemaYear>, year: number) =>
   fixed[String(year)] ? fixed[String(year)].items.map((t) => ({ ...t, view_year: year })) : items;
 
+/**
+ * Films you saw in the cinema in a year: a cinema shows a film when it comes out, so this goes by its release year, not
+ * the year you last watched it (a 2016 film seen in the cinema then and again at home in 2026 counts for 2016).
+ */
+function cinemaIn(items: CinemaTitle[], fixed: Record<string, CinemaYear>, year: number): CinemaTitle[] {
+  const all = new Map<string, CinemaTitle>();
+  for (const t of [...Object.values(fixed).flatMap((y) => y.items), ...items]) all.set(t.id, t);
+  return [...all.values()].filter((t) => t.in_cinema && t.year === year && (t.status === "watched" || t.status === "watching"));
+}
+
 const byScore = (a: CinemaTitle, b: CinemaTitle) => (b.score ?? -1) - (a.score ?? -1) || (b.imdb_rating ?? -1) - (a.imdb_rating ?? -1) || a.title.localeCompare(b.title);
 
 type Group = { name: string; n: number; avg: number | null };
@@ -53,7 +63,6 @@ function summarize(items: CinemaTitle[], year: number) {
     minutes: list.reduce((s, t) => s + watchedMinutes(t), 0),
     hasSeries: list.some((t) => isSeries(t.kind)),
     avg: scored.length ? scored.reduce((s, t) => s + (t.score ?? 0), 0) / scored.length : null,
-    inCinema: list.filter((t) => t.in_cinema).length,
     top: [...scored].sort(byScore).slice(0, 5),
     discovery,
     letdown,
@@ -99,6 +108,7 @@ export default function CinemaYearPage() {
   const s = useMemo(() => summarize(titlesOf(items, fixed, year), year), [items, fixed, year]);
   const before = useMemo(() => summarize(titlesOf(items, fixed, year - 1), year - 1).count, [items, fixed, year]);
   const fixedYear = fixed[String(year)];
+  const cinema = useMemo(() => cinemaIn(items, fixed, year), [items, fixed, year]);
 
   async function act(run: () => Promise<void>) {
     setBusy(true);
@@ -193,11 +203,14 @@ export default function CinemaYearPage() {
             <p className="text-xs text-[#bfb6a5]">{t("your average score")}</p>
           </div>
           <div>
-            <p className="text-3xl font-semibold tabular-nums sm:text-4xl">{s.inCinema}</p>
+            <p className="text-3xl font-semibold tabular-nums sm:text-4xl" title={cinema.map((x) => x.title).join(", ")}>
+              {cinema.length}
+            </p>
             <p className="text-xs text-[#bfb6a5]">{t("in the cinema")}</p>
           </div>
         </div>
         <p className="mt-4 text-xs text-[#bfb6a5]">{s.byKind.map((x) => `${t(x.kind.count, { n: x.n })}`).join(" · ")}</p>
+        {cinema.length ? <p className="mt-1 text-xs text-[#bfb6a5]">{t("In the cinema: {titles}", { titles: cinema.map((x) => x.title).join(", ") })}</p> : null}
       </section>
 
       {s.top.length ? (

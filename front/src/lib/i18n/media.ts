@@ -1,6 +1,7 @@
 /** Ukrainian interface text: Cinematography, Library, Tops, shared charts and their backend messages. */
 export const MEDIA: Record<string, string | string[]> = {
   // Cinematography: fixed years
+  "In the cinema: {titles}": "У кінотеатрі: {titles}",
   "Hide {year} here": "Сховати {year} тут",
   "Hidden years:": "Приховані роки:",
   "Show again": "Показати знову",
