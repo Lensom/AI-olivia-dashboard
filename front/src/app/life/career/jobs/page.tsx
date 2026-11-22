@@ -6,6 +6,7 @@ import { investingPrimarySaveActive, investingPrimarySaveDisabled, investingTool
 import { apiFetch, type ApiError } from "@/lib/api";
 import { useLang, useLocale, useT } from "@/lib/i18n";
 import { newId } from "@/features/life/career/store";
+import { JOBS_SEEN_EVENT } from "@/features/life/career/jobs-news";
 import { useAuth } from "@/state/auth-store";
 
 /** Mirrors back/app/jobs/router.py. */
@@ -35,6 +36,8 @@ type Job = {
   role: "frontend" | "fullstack";
   /** A generic title ("Software Engineer") kept because the ad itself is front-end work. */
   by_description: boolean;
+  /** Found after your previous visit. */
+  new: boolean;
 };
 type SourceStatus = { source: string; ok: boolean; found: number; error: string };
 type JobsState = {
@@ -45,7 +48,13 @@ type JobsState = {
   unassessed: number;
   /** Full-stack ones: assessed only while you show them, so hidden ones spend no AI quota. */
   unassessed_fullstack: number;
+  seen_at: string | null;
+  new_interesting: number;
 };
+
+/** Mirrors INTERESTING_MATCH in back/app/jobs/router.py. */
+const INTERESTING_MATCH = 75;
+const AUTO_REFRESH_MS = 20 * 60 * 60 * 1000;
 
 /** Vacancies still to assess: the front-end ones, plus full-stack while they're shown. */
 const pendingOf = (s: JobsState, withFullstack: boolean) => s.unassessed + (withFullstack ? s.unassessed_fullstack : 0);
@@ -86,7 +95,7 @@ function matchTone(match: number): string {
   return "bg-[#f4efe4] text-[#6f675b]";
 }
 
-function JobCard({ job, onStatus }: { job: Job; onStatus: (status: JobStatus) => void }) {
+function JobCard({ job, isNew, onStatus }: { job: Job; isNew: boolean; onStatus: (status: JobStatus) => void }) {
   const t = useT();
   const locale = useLocale();
   const day = (iso: string) => new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -117,6 +126,7 @@ function JobCard({ job, onStatus }: { job: Job; onStatus: (status: JobStatus) =>
         {job.relocation === "not_offered" ? <Pill tone="bad">✕ {t("No relocation")}</Pill> : null}
         {job.visa_stated ? <Pill tone="good">✓ {t("Visa sponsorship")}</Pill> : null}
         {job.sponsor ? <Pill tone="good">✓ {t("Company can sponsor a visa")} · {job.sponsor.name} ({job.sponsor.registry})</Pill> : null}
+        {isNew ? <Pill tone="good">★ {t("New")}</Pill> : null}
         {job.role === "fullstack" ? <Pill tone="plain">{t("Full-stack")}</Pill> : null}
         {job.by_description && job.role === "frontend" ? (
           <Pill tone="plain">
@@ -202,6 +212,10 @@ function JobsPage() {
   const [relocationOnly, setRelocationOnly] = useState(false);
   const [sponsorOnly, setSponsorOnly] = useState(false);
   const [showFullstack, setShowFullstack] = useState(false);
+  const [newOnly, setNewOnly] = useState(false);
+  // What was new when you opened the page stays marked for this visit, even after it's saved as seen and refreshed.
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
+  const autoTried = useRef(false);
   const [sort, setSort] = useState<"match" | "newest">("match");
   const fileRef = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
@@ -250,7 +264,13 @@ function JobsPage() {
     let active = true;
     apiFetch<JobsState>("/life/jobs", { token })
       .then((data) => {
-        if (active) setState(data);
+        if (!active) return;
+        setState(data);
+        setNewIds(new Set(data.jobs.filter((j) => j.new).map((j) => j.id)));
+        // You've seen them now: from here on, only what's found later is new (and the menu badge clears).
+        void apiFetch("/life/jobs/seen", { method: "POST", token })
+          .then(() => window.dispatchEvent(new Event(JOBS_SEEN_EVENT)))
+          .catch(() => {});
       })
       .catch((err) => {
         if (active) setError(message(err));
@@ -260,20 +280,29 @@ function JobsPage() {
     };
   }, [token, message]);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!token) return;
     setBusy("refresh");
     setError(null);
     try {
       const next = await apiFetch<JobsState>("/life/jobs/refresh", { method: "POST", token });
       setState(next);
+      setNewIds((ids) => new Set([...ids, ...next.jobs.filter((j) => j.new).map((j) => j.id)]));
       if (next.cv && pendingOf(next, showFullstack)) void assess(showFullstack);
     } catch (err) {
       setError(message(err));
     } finally {
       setBusy(null);
     }
-  }
+  }, [token, showFullstack, assess, message]);
+
+  // Opened after more than a day: refresh by itself (the daily run on the server does this too, where it's set up).
+  useEffect(() => {
+    if (!state || autoTried.current) return;
+    autoTried.current = true;
+    const age = state.last_refresh_at ? Date.now() - Date.parse(state.last_refresh_at) : Infinity;
+    if (age > AUTO_REFRESH_MS && (state.cv || state.last_refresh_at)) void refresh();
+  }, [state, refresh]);
 
   async function uploadCv(file: File) {
     if (!token) return;
@@ -332,6 +361,7 @@ function JobsPage() {
       if (relocationOnly && j.relocation !== "offered") return false;
       if (sponsorOnly && !j.sponsor) return false;
       if (!showFullstack && j.role === "fullstack") return false;
+      if (newOnly && !newIds.has(j.id)) return false;
       return true;
     });
     const date = (j: Job) => j.posted || j.first_seen.slice(0, 10);
@@ -342,10 +372,14 @@ function JobsPage() {
         ? blocked(a) - blocked(b) || (b.match ?? -1) - (a.match ?? -1) || date(b).localeCompare(date(a))
         : date(b).localeCompare(date(a)),
     );
-  }, [jobs, country, statusFilter, englishOnly, relocationOnly, sponsorOnly, showFullstack, sort]);
+  }, [jobs, country, statusFilter, englishOnly, relocationOnly, sponsorOnly, showFullstack, newOnly, newIds, sort]);
 
   const when = (iso: string) => new Date(iso).toLocaleString(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const pending = state ? pendingOf(state, showFullstack) : 0;
+  // Same rule as the backend's interesting(): counted over what was new on this visit.
+  const interestingNew = jobs.filter(
+    (j) => newIds.has(j.id) && j.match != null && j.match >= INTERESTING_MATCH && j.language !== "local_required" && j.relocation !== "not_offered" && j.role === "frontend" && j.status !== "hidden" && j.status !== "rejected",
+  ).length;
   const fullstackCount = jobs.filter((j) => j.role === "fullstack" && j.status !== "hidden").length;
   const inScope = showFullstack ? jobs.length : jobs.length - jobs.filter((j) => j.role === "fullstack").length;
 
@@ -414,6 +448,17 @@ function JobsPage() {
         <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800" role="alert">{error}</p>
       ) : null}
 
+      {interestingNew ? (
+        <p className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900" role="status">
+          ★ {t("{n} new vacancies worth a look since your last visit: a match of {m}% or more, English is enough, relocation not refused.", { n: interestingNew, m: INTERESTING_MATCH })}
+          {!newOnly ? (
+            <button type="button" onClick={() => setNewOnly(true)} className="font-semibold underline underline-offset-2">
+              {t("Show only new")}
+            </button>
+          ) : null}
+        </p>
+      ) : null}
+
       {scoring ? (
         <p className="flex items-center gap-2 text-xs text-[#6f675b]" role="status">
           <span className="h-3 w-3 animate-spin rounded-full border-2 border-violet-200 border-t-violet-600" aria-hidden />
@@ -445,6 +490,7 @@ function JobsPage() {
           <Toggle checked={relocationOnly} onChange={setRelocationOnly}>{t("Relocation confirmed")}</Toggle>
           <Toggle checked={sponsorOnly} onChange={setSponsorOnly}>{t("Company can sponsor")}</Toggle>
           <Toggle checked={showFullstack} onChange={toggleFullstack}>{t("Show full-stack ({n})", { n: fullstackCount })}</Toggle>
+          {newIds.size ? <Toggle checked={newOnly} onChange={setNewOnly}>{t("Only new ({n})", { n: newIds.size })}</Toggle> : null}
           <span className="ml-auto text-xs tabular-nums text-[#8f8676]">{t("{n} of {total} vacancies", { n: visible.length, total: inScope })}</span>
           <p className="w-full text-xs leading-relaxed text-[#8f8676]">{t("“Can sponsor” means the company is on an official register: IND for the Netherlands, SIRI for Denmark. Norway has no such list. It doesn’t promise a visa for this role, and a company that isn’t marked may still sponsor under another legal name.")}</p>
         </section>
@@ -458,7 +504,7 @@ function JobsPage() {
         <p className={`${card} text-center text-sm text-[#8f8676]`}>{t("No vacancies match these filters.")}</p>
       ) : (
         <ul className="space-y-3">
-          {visible.map((job) => <JobCard key={job.id} job={job} onStatus={(status) => void setStatus(job, status)} />)}
+          {visible.map((job) => <JobCard key={job.id} job={job} isNew={newIds.has(job.id)} onStatus={(status) => void setStatus(job, status)} />)}
         </ul>
       )}
     </div>

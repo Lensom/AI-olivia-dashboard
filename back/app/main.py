@@ -24,6 +24,7 @@ from app.career.router import router as career_router
 from app.collection.router import router as collection_router
 from app.games.router import router as games_router
 from app.jobs.router import router as jobs_router
+from app.jobs import router as jobs_router_module
 from app.pages.router import router as pages_router
 from app import cache
 from app.db import create_pool, init_db
@@ -37,6 +38,7 @@ class Settings(BaseSettings):
     database_url: str = ""
     auth_token_secret: str = "dev-secret-change-me"
     auth_token_ttl_seconds: int = 60 * 60 * 24 * 7  # 7 days
+    cron_secret: str = ""  # Vercel Cron sends it as a bearer token to the daily vacancies refresh; empty: off
     allow_registration: bool = False  # new accounts: closed unless turned on, e.g. to create the first one
     tmdb_api_key: str = ""  # Cinematography autofill; v3 API key or v4 read access token
     # Library series (Wikidata): a URL or email for the User-Agent, which raises Wikimedia's rate limit 20×
@@ -132,6 +134,7 @@ _llm = (
     else None
 )
 app.dependency_overrides[analysis_router_module.get_llm] = lambda: _llm
+app.dependency_overrides[jobs_router_module.get_cron_secret] = lambda: settings.cron_secret.strip()
 app.include_router(analysis_router_module.router, prefix=API_PREFIX)
 app.include_router(investing_chat_router, prefix=API_PREFIX)
 app.include_router(cinema_ai_router, prefix=API_PREFIX)

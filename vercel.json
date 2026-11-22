@@ -24,5 +24,11 @@
         "service": "front"
       }
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/life/jobs/cron",
+      "schedule": "0 5 * * *"
+    }
   ]
 }

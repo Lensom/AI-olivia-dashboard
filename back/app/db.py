@@ -249,6 +249,10 @@ def init_db(pool: ConnectionPool) -> None:
             );
             """
         )
+        # When you last looked at the vacancies (what's "new"), and the language your assessments are written in,
+        # so the daily run (GET /life/jobs/cron) writes them the same way.
+        conn.execute("ALTER TABLE job_search_profiles ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ")
+        conn.execute("ALTER TABLE job_search_profiles ADD COLUMN IF NOT EXISTS lang TEXT")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS job_search_jobs (

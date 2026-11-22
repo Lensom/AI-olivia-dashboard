@@ -987,6 +987,10 @@ export const INVESTING: Record<string, string | string[]> = {
     "Freedom24 не відповів, тому готівка й позиції тут зі збереженої копії та можуть бути застарілими.",
 
   // Life → Career
+  "Only new ({n})": "Лише нові ({n})",
+  "Show only new": "Показати лише нові",
+  "{n} new vacancies worth a look since your last visit: a match of {m}% or more, English is enough, relocation not refused.": "Нових вакансій, вартих уваги, з вашого останнього візиту: {n}. Збіг від {m}%, вистачить англійської, релокейт не відкинуто.",
+  "{n} new worth a look": "Нових вартих уваги: {n}",
   "Weekly plan": "План",
   "A Senior Frontend / Product Engineer offer from a sponsor in the Netherlands: the weekly plan, your applications and what to learn.": "Офер Senior Frontend / Product Engineer від компанії-спонсора в Нідерландах: тижневий план, ваші подачі й що вчити.",
   "A weekday (~1.5 hours)": "Будній день (~1,5 години)",

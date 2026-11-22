@@ -5,15 +5,17 @@ page keeps asking until none are left, which keeps each request short and lets i
 
 from __future__ import annotations
 
+import hmac
 import io
 import json
 import logging
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Path, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from psycopg import Connection
 from psycopg.types.json import Json
@@ -40,6 +42,13 @@ _CV_MAX_CHARS = 20000
 _CV_MIN_CHARS = 200  # less than this: a scan, not text
 _BATCH = 5
 _MIN_REFRESH_SECONDS = 60  # these are other people's sites: a double click shouldn't hit them twice
+INTERESTING_MATCH = 75  # a new vacancy this good, with English enough and relocation not refused, is worth a flag
+_CRON_BUDGET_SECONDS = 200  # the daily run assesses until then; the page finishes the rest when you open it
+
+
+def get_cron_secret() -> str:
+    """CRON_SECRET from the settings (main.py). Vercel sends it as a bearer token to the daily run."""
+    return ""
 _JOB_ID = Path(pattern=r"^[0-9a-f]{20}$")
 
 
@@ -119,6 +128,7 @@ class JobView(BaseModel):
     strengths: list[str] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
     title_only: bool = False  # the source gave no real description, so the assessment rests on little
+    new: bool = False  # found after you last looked at the page
     role: Literal["frontend", "fullstack"] = "frontend"
     by_description: bool = False  # a generic title ("Software Engineer") kept because the ad is front-end work
     assessed: bool = False
@@ -131,6 +141,8 @@ class JobsState(BaseModel):
     jobs: list[JobView] = Field(default_factory=list)
     unassessed: int = 0  # front-end ones
     unassessed_fullstack: int = 0  # assessed only when you show full-stack
+    seen_at: str | None = None  # when you last looked, before this visit
+    new_interesting: int = 0  # new since then and worth a look (see interesting())
 
 
 class StatusUpdate(BaseModel):
@@ -139,7 +151,7 @@ class StatusUpdate(BaseModel):
 
 def _profile(conn: Connection, user_id: int) -> tuple[Any, ...] | None:
     return conn.execute(
-        "SELECT cv_text, cv_name, cv_updated_at, last_refresh_at, sources FROM job_search_profiles WHERE user_id = %s",
+        "SELECT cv_text, cv_name, cv_updated_at, last_refresh_at, sources, seen_at, lang FROM job_search_profiles WHERE user_id = %s",
         (user_id,),
     ).fetchone()
 
@@ -191,7 +203,8 @@ def _state(conn: Connection, user_id: int) -> JobsState:
         "SELECT id, data, status, first_seen, last_seen, assessed_at FROM job_search_jobs WHERE user_id = %s ORDER BY first_seen DESC",
         (user_id,),
     ).fetchall()
-    jobs = [_view(r[0], r[1], r[2], r[3], r[4], r[5], refreshed) for r in rows]
+    seen = profile[5] if profile else None
+    jobs = [_view(r[0], r[1], r[2], r[3], r[4], r[5], refreshed).model_copy(update={"new": seen is not None and r[3] > seen}) for r in rows]
     cv = None
     if profile and profile[0]:
         cv = CvInfo(name=profile[1] or "CV", characters=len(profile[0]), updated_at=profile[2].isoformat())
@@ -202,6 +215,20 @@ def _state(conn: Connection, user_id: int) -> JobsState:
         jobs=jobs,
         unassessed=sum(1 for j in jobs if not j.assessed and j.status != "hidden" and j.role == "frontend"),
         unassessed_fullstack=sum(1 for j in jobs if not j.assessed and j.status != "hidden" and j.role == "fullstack"),
+        seen_at=seen.isoformat() if seen else None,
+        new_interesting=sum(1 for j in jobs if j.new and interesting(j)),
+    )
+
+
+def interesting(job: JobView) -> bool:
+    """Worth a flag: a good match you could actually take — English enough, relocation not refused, front-end."""
+    return (
+        job.match is not None
+        and job.match >= INTERESTING_MATCH
+        and job.language != "local_required"
+        and job.relocation != "not_offered"
+        and job.role == "frontend"
+        and job.status not in ("hidden", "rejected")
     )
 
 
@@ -419,27 +446,17 @@ def _with_details(row: tuple[str, dict[str, Any]]) -> tuple[str, dict[str, Any]]
     return job_id, data
 
 
-@router.post("/score", response_model=JobsState)
-async def score_jobs(
-    user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
-    llm: Annotated[LLMClient | None, Depends(get_llm)],
-    lang: Annotated[Literal["en", "uk"], Query()] = "en",
-    fullstack: Annotated[bool, Query()] = False,
-):
-    """Assesses the next few vacancies. Call again while `unassessed` (plus `unassessed_fullstack`, when asking for
-    full-stack too) is above zero. Full-stack ones cost AI quota only when you show them."""
-    if llm is None:
-        raise HTTPException(status_code=503, detail="AI analysis is not configured: set GEMINI_API_KEY in back/.env")
+async def _assess_next(conn: Connection, user_id: int, llm: LLMClient, lang: str, fullstack: bool) -> int:
+    """Assesses the next few vacancies of one person; how many it did (0: none left). 409 without a CV."""
 
     def begin() -> tuple[str | None, list[tuple[str, dict[str, Any]]]]:
-        profile = _profile(conn, user.id)
+        profile = _profile(conn, user_id)
         rows = conn.execute(
             """
             SELECT id, data FROM job_search_jobs WHERE user_id = %s AND assessed_at IS NULL AND status <> 'hidden'
             ORDER BY first_seen, id
             """,
-            (user.id,),
+            (user_id,),
         ).fetchall()
         wanted = [(r[0], r[1]) for r in rows if fullstack or _role(r[1]) == "frontend"]
         return (profile[0] if profile else None), wanted[:_BATCH]
@@ -448,7 +465,7 @@ async def score_jobs(
     if not cv:
         raise HTTPException(status_code=409, detail="Upload your CV first")
     if not rows:
-        return await run_in_threadpool(_state, conn, user.id)
+        return 0
 
     def details() -> list[tuple[str, dict[str, Any]]]:
         with ThreadPoolExecutor(max_workers=3) as pool:
@@ -485,16 +502,102 @@ async def score_jobs(
         for a in result.value.items:
             assessments[a.job_id] = a.model_dump(exclude={"job_id"})
 
-    def finish() -> JobsState:
+    def finish() -> None:
         for job_id, data in loaded:
             update = {k: data[k] for k in ("description", "company", "location", "posted", "english_stated") if data.get(k)}
             update["assessment"] = assessments[job_id]
             update["assessed_on_title"] = len(data.get("description") or "") < 200
             conn.execute(
                 "UPDATE job_search_jobs SET data = data || %s::jsonb, assessed_at = NOW() WHERE user_id = %s AND id = %s",
-                (Json(update), user.id, job_id),
+                (Json(update), user_id, job_id),
             )
         conn.commit()
-        return _state(conn, user.id)
 
-    return await run_in_threadpool(finish)
+    await run_in_threadpool(finish)
+    return len(loaded)
+
+
+def _remember_lang(conn: Connection, user_id: int, lang: str) -> None:
+    conn.execute("UPDATE job_search_profiles SET lang = %s WHERE user_id = %s", (lang, user_id))
+    conn.commit()
+
+
+@router.post("/score", response_model=JobsState)
+async def score_jobs(
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+    llm: Annotated[LLMClient | None, Depends(get_llm)],
+    lang: Annotated[Literal["en", "uk"], Query()] = "en",
+    fullstack: Annotated[bool, Query()] = False,
+):
+    """Assesses the next few vacancies. Call again while `unassessed` (plus `unassessed_fullstack`, when asking for
+    full-stack too) is above zero. Full-stack ones cost AI quota only when you show them."""
+    if llm is None:
+        raise HTTPException(status_code=503, detail="AI analysis is not configured: set GEMINI_API_KEY in back/.env")
+    # Remembered, so the daily run writes its assessments in the language you read them in.
+    await run_in_threadpool(_remember_lang, conn, user.id, lang)
+    await _assess_next(conn, user.id, llm, lang, fullstack)
+    return await run_in_threadpool(_state, conn, user.id)
+
+
+@router.post("/seen", status_code=204)
+def mark_seen(
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+):
+    """You've looked at the vacancies: anything found from now on is "new"."""
+    conn.execute("UPDATE job_search_profiles SET seen_at = NOW() WHERE user_id = %s", (user.id,))
+    conn.commit()
+
+
+class JobsNews(BaseModel):
+    new_interesting: int = 0
+
+
+@router.get("/news", response_model=JobsNews)
+def jobs_news(
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+):
+    """Just the count of new interesting vacancies, for a badge in the menu."""
+    return JobsNews(new_interesting=_state(conn, user.id).new_interesting)
+
+
+@router.get("/cron", include_in_schema=False)
+async def daily_run(
+    conn: Annotated[Connection, Depends(get_conn)],
+    llm: Annotated[LLMClient | None, Depends(get_llm)],
+    secret: Annotated[str, Depends(get_cron_secret)],
+    authorization: Annotated[str | None, Header()] = None,
+):
+    """The daily refresh (Vercel Cron, vercel.json): collects vacancies once for everyone with a CV, then assesses
+    the new front-end ones within a time budget. Anyone without the secret gets nothing."""
+    if not secret:
+        raise HTTPException(status_code=503, detail="Set CRON_SECRET to turn the daily refresh on")
+    if not hmac.compare_digest((authorization or "").encode(), f"Bearer {secret}".encode()):
+        raise HTTPException(status_code=401, detail="Not allowed")
+    started = time.monotonic()
+
+    def people_with_cv() -> list[tuple[int, str]]:
+        return conn.execute("SELECT user_id, COALESCE(lang, 'en') FROM job_search_profiles WHERE cv_text IS NOT NULL").fetchall()
+
+    people = await run_in_threadpool(people_with_cv)
+    if not people:
+        return {"people": 0}
+    found, statuses = await run_in_threadpool(fetch_all)
+    if not any(s.ok for s in statuses):
+        return {"people": len(people), "error": "no job site answered"}
+    registers, register_statuses = await run_in_threadpool(fetch_registers)
+    assessed = 0
+    for user_id, lang in people:
+        await run_in_threadpool(save_found, conn, user_id, found, statuses + [s for s in register_statuses if not s.ok])
+        await run_in_threadpool(apply_sponsors, conn, user_id, registers)
+        while llm is not None and time.monotonic() - started < _CRON_BUDGET_SECONDS:
+            try:
+                done = await _assess_next(conn, user_id, llm, lang if lang in ("en", "uk") else "en", False)
+            except HTTPException:  # quota spent or the AI unreachable: the page carries on later
+                break
+            if not done:
+                break
+            assessed += done
+    return {"people": len(people), "found": len(found), "assessed": assessed, "seconds": round(time.monotonic() - started)}

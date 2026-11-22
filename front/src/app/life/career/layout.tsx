@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RequireAuth } from "@/components/auth/require-auth";
+import { useJobsNews } from "@/features/life/career/jobs-news";
 import { CareerProvider, useCareer } from "@/features/life/career/store";
 import { useT } from "@/lib/i18n";
 
@@ -19,6 +20,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   const t = useT();
   const pathname = usePathname();
   const { loaded, error } = useCareer();
+  const news = useJobsNews();
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <div>
@@ -37,6 +39,11 @@ function Shell({ children }: { children: React.ReactNode }) {
               className={`rounded-full px-3.5 py-1.5 text-xs font-medium ${active ? "bg-[#1f1c17] text-[#f8f4eb]" : "border border-black/10 bg-white text-[#3b352d] hover:bg-[#faf8f2]"}`}
             >
               {t(tab.label)}
+              {tab.href === "/life/career/jobs" && news ? (
+                <span className="ml-1.5 rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold text-white" aria-label={t("{n} new worth a look", { n: news })}>
+                  {news}
+                </span>
+              ) : null}
             </Link>
           );
         })}
