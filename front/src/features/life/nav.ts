@@ -2,8 +2,11 @@
 export const LIFE_PAGES = [
   { slug: "tasks", label: "Tasks" },
   { slug: "games", label: "Games" },
-  { slug: "jobs", label: "Jobs" },
+  { slug: "career", label: "Career" },
   { slug: "collection", label: "Collecting" },
 ];
 
-export const lifePageHref = (slug: string) => (LIFE_PAGES.some((p) => p.slug === slug) ? `/life/${slug}` : `/c/life/${slug}`);
+/** Pages that became part of another: a menu entry left over from before still goes to the right place. */
+const MOVED: Record<string, string> = { jobs: "/life/career/jobs" };
+
+export const lifePageHref = (slug: string) => MOVED[slug] ?? (LIFE_PAGES.some((p) => p.slug === slug) ? `/life/${slug}` : `/c/life/${slug}`);

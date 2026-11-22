@@ -12,7 +12,7 @@ export default function LifeLayout({ children }: { children: React.ReactNode }) 
     <div className="space-y-5">
       <TabNav
         title={t("Life")}
-        tabs={LIFE_PAGES.map((p) => ({ href: `/life/${p.slug}`, label: t(p.label), active: pathname === `/life/${p.slug}` }))}
+        tabs={LIFE_PAGES.map((p) => ({ href: `/life/${p.slug}`, label: t(p.label), active: pathname === `/life/${p.slug}` || pathname.startsWith(`/life/${p.slug}/`) }))}
       />
       {children}
     </div>

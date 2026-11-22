@@ -18,6 +18,11 @@ export const UK: Record<string, string | string[]> = {
 export const EN_PLURALS: Record<string, [string, string]> = {
   "{n} titles": ["{n} title", "{n} titles"],
   "{n} films": ["{n} film", "{n} films"],
+  "Starts in {n} days": ["Starts in {n} day", "Starts in {n} days"],
+  "You: {n} applications": ["You: {n} application", "You: {n} applications"],
+  "{n} calls": ["{n} call", "{n} calls"],
+  "{n} recruiter calls": ["{n} recruiter call", "{n} recruiter calls"],
+  "{n} left": ["{n} left", "{n} left"],
   "{n} films you haven't seen": ["{n} film you haven't seen", "{n} films you haven't seen"],
   "{n} more to rate": ["{n} more to rate", "{n} more to rate"],
   "{n} lines": ["{n} line", "{n} lines"],

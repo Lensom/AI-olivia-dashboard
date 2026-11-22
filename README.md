@@ -196,7 +196,7 @@ A simple task board at `/life/tasks`: **To do, Hold, In progress, Completed**. T
 
 ### Jobs
 
-Front-end vacancies with relocation to the Netherlands, Norway and Denmark at `/life/jobs`. Upload your CV as a PDF (only its text is kept, and it goes to Gemini for matching), press **Refresh vacancies**, and each one gets a match score, whether English is enough, and what the ad says about relocation. Give vacancies a status (Interesting, Applied, Interview, Rejected, Hidden); they survive refreshes.
+Front-end vacancies with relocation to the Netherlands, Norway and Denmark, a tab of Career at `/life/career/jobs` (the old `/life/jobs` redirects there). Upload your CV as a PDF (only its text is kept, and it goes to Gemini for matching), press **Refresh vacancies**, and each one gets a match score, whether English is enough, and what the ad says about relocation. Give vacancies a status (Interesting, Applied, Interview, Rejected, Hidden); they survive refreshes.
 
 Generic titles ("Software Engineer", "Product Engineer", "Developer") on company pages and EURES are kept when the ad names a modern front-end framework or TypeScript, marked *Front-end by the ad*; when the ad leans on a back-end stack they count as full-stack. Full-stack roles are collected too and shown with **Show full-stack** (off by default). A title that also names front-end work ("Fullstack Engineer - Java, React") counts as front-end. Full-stack ones are assessed by AI only while shown, judged by how much of the role is front-end.
 
@@ -207,6 +207,19 @@ Each refresh also checks companies against the official sponsor registers (`back
 ### Games
 
 A list of the games you've finished at `/life/games`: a title and the year you finished it (optional). Add one with the form at the top (the year defaults to this one). Sort **A–Z** or **By year** (grouped, newest first, games without a year last), search by title, and hover a row for ✎ (edit, or double-click) and ✕ (delete). Every change saves immediately.
+
+### Career
+
+The job search for a move to the Netherlands at `/life/career`, in five tabs:
+
+- **This week**: the plan's week by today's date (goal and items to tick), the week's rhythm (applications counted from the Applications tab, messages, mock interviews, posts, the Friday funnel), the roadmap topics of that week, and the checkpoints (planned vs your numbers).
+- **Weekly plan**: every week by phase, the weekly rhythm, from offer to moving, and what to do without an offer by 14.02 (`front/src/features/life/career/plan.ts`).
+- **Jobs**: the vacancy search described below.
+- **Applications**: where you applied (company, wave, channel, stage, salary, sponsorship, notes), an IND register check per company, and the funnel against the guide's healthy rates. Marking a vacancy *Applied* on the Jobs page adds it here.
+- **Learning**: the Node + AI roadmap (`roadmap.ts`), with progress from the old HTML version brought over by its backup code.
+- **Cheat sheets**: the guide's scripts with a copy button, referral templates, your five STAR stories, the offer checklist and the rules (`guide.ts`).
+
+Everything is one document per account (`GET/PUT /life/career`, each tab saving only its part; `POST /life/career/applications`, `POST /life/career/sponsors`).
 
 ### Collecting
 
@@ -265,6 +278,7 @@ All endpoints are under the `/api` prefix (e.g. `/api/investing/holdings`); the 
 | Library | `GET/PUT /library`, `GET /library/search?q=&kind=`, `GET /library/details?source=&source_id=`, `POST /library/match-many`, `POST /library/import`, `POST /library/wikidata`, `POST /library/series?lang=`, `GET/POST /library/ai?lang=` |
 | Tasks | `GET/PUT /tasks` |
 | Games | `GET/PUT /games` |
+| Career | `GET/PUT /life/career`, `POST /life/career/applications`, `POST /life/career/sponsors` |
 | Collecting | `GET/PUT /life/collection` |
 | Jobs | `GET /life/jobs`, `POST /life/jobs/refresh`, `POST /life/jobs/score`, `POST/DELETE /life/jobs/cv`, `PATCH /life/jobs/{id}` |
 | Life | `GET/POST /pages`, `GET/PATCH/DELETE /pages/{id}` (PATCH moves too: `parent_id`, `sort_order`) |

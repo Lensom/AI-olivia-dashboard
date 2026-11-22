@@ -216,6 +216,16 @@ def init_db(pool: ConnectionPool) -> None:
             );
             """
         )
+        # Life → Career (app/career/router.py): progress through the roadmap, item id → in progress / done.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS career_progress (
+                user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
         # Life → Collecting (app/collection/router.py): categories, lines with a status, and what to buy, as one document.
         conn.execute(
             """
