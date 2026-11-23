@@ -247,6 +247,16 @@ def init_db(pool: ConnectionPool) -> None:
             );
             """
         )
+        # Life → Must visit (app/places/router.py): places and events, been there or planned, as one document.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS places_lists (
+                user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
         # Life → Jobs (app/jobs/router.py): your CV's text and last refresh; the vacancies found, with your status.
         conn.execute(
             """

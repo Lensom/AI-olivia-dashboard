@@ -40,7 +40,7 @@ async function readError(res: Response): Promise<ApiError> {
 const TIMEOUT_MS = 60_000;
 /** AI, imports, vacancies and Wikidata can legitimately take minutes. */
 const SLOW_TIMEOUT_MS = 180_000;
-const SLOW_PATHS = /^\/(investing\/(chat|analysis)|life\/jobs\/(refresh|score|cv)|library\/(ai|series|wikidata|import|match-many)|cinema\/(ai|import|match-many))/;
+const SLOW_PATHS = /^\/(investing\/(chat|analysis)|life\/jobs\/(refresh|score|cv)|life\/places\/(ideas|images)|library\/(ai|series|wikidata|import|match-many)|cinema\/(ai|import|match-many))/;
 
 export async function apiFetch<T>(
   path: string,

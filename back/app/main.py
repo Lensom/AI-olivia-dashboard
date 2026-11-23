@@ -25,6 +25,7 @@ from app.investing.events import router as events_router
 from app.tasks.router import router as tasks_router
 from app.career.router import router as career_router
 from app.collection.router import router as collection_router
+from app.places.router import router as places_router
 from app.games.router import router as games_router
 from app.jobs.router import router as jobs_router
 from app.jobs import router as jobs_router_module
@@ -143,6 +144,7 @@ app.include_router(tasks_router, prefix=API_PREFIX)
 app.include_router(games_router, prefix=API_PREFIX)
 app.include_router(jobs_router, prefix=API_PREFIX)
 app.include_router(collection_router, prefix=API_PREFIX)
+app.include_router(places_router, prefix=API_PREFIX)
 app.include_router(career_router, prefix=API_PREFIX)
 _llm = (
     LLMClient(

@@ -4,6 +4,7 @@ export const LIFE_PAGES = [
   { slug: "games", label: "Games" },
   { slug: "career", label: "Career" },
   { slug: "collection", label: "Collecting" },
+  { slug: "places", label: "Must visit" },
 ];
 
 /** Pages that became part of another: a menu entry left over from before still goes to the right place. */

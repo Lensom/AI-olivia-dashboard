@@ -116,7 +116,7 @@ _DEFAULTS: dict[str, list[tuple[str, str]]] = {
         ("Book series", "series"),
         ("Tops", "tops"),
     ],
-    "life": [("Tasks", "tasks"), ("Games", "games"), ("Career", "career"), ("Collecting", "collection")],
+    "life": [("Tasks", "tasks"), ("Games", "games"), ("Career", "career"), ("Collecting", "collection"), ("Must visit", "places")],
 }
 # Investing rows created with the old default names are renamed; names the user changed are left alone.
 _LEGACY_NAMES = {"dashboard": ("Dashboard",), "table": ("Holdings",), "picking": ("Picking", "Allocation rules")}
