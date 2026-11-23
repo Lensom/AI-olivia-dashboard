@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+import logging
+import time
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -84,6 +87,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+_slow_log = logging.getLogger("olivia.slow")
+SLOW_REQUEST_SECONDS = 3.0
+
+
+@app.middleware("http")
+async def log_slow_requests(request: Request, call_next):
+    """Names any request slower than a few seconds in the log, so a long load can be traced to what caused it."""
+    started = time.perf_counter()
+    try:
+        return await call_next(request)
+    finally:
+        took = time.perf_counter() - started
+        if took > SLOW_REQUEST_SECONDS:
+            _slow_log.warning("Slow request: %s %s took %.1f s", request.method, request.url.path, took)
 
 
 def get_conn():

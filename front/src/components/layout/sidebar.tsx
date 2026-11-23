@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { categoryLook, ChevronIcon, HomeIcon } from "@/components/layout/icons";
 import { categoryHref } from "@/lib/category-href";
 import { isCategoryVisible } from "@/lib/features";
@@ -71,16 +71,12 @@ function readOpen(): Record<string, boolean> {
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const t = useT();
-  const { user, token } = useAuth();
-  const { categories, isLoading, subcategoriesByCategoryId, refreshSubcategories } = useCategories();
+  const { token } = useAuth();
+  // The subcategories load with the categories, in the store (this nav renders twice: desktop and mobile).
+  const { categories, isLoading, subcategoriesByCategoryId } = useCategories();
   // Categories you opened or closed yourself; the rest are open only while you're inside them.
   // Read lazily: the categories (and so this state's effect on the markup) only render after login loads.
   const [openState, setOpenState] = useState<Record<string, boolean>>(() => (typeof window === "undefined" ? {} : readOpen()));
-
-  useEffect(() => {
-    if (!user) return;
-    for (const cat of categories) refreshSubcategories(cat.id).catch(() => {});
-  }, [user, categories, refreshSubcategories]);
 
   function toggle(slug: string, open: boolean) {
     setOpenState((prev) => {

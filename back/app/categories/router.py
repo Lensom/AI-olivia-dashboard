@@ -79,59 +79,9 @@ def _require_category_owner(conn: Connection, *, user_id: int, category_id: int)
         raise HTTPException(status_code=404, detail="Category not found")
 
 
-def _next_subcategory_sort_order(conn: Connection, *, user_id: int, category_id: int) -> int:
-    row = conn.execute(
-        """
-        SELECT COALESCE(MAX(sort_order), 0)
-        FROM subcategories
-        WHERE user_id = %s AND category_id = %s
-        """,
-        (user_id, category_id),
-    ).fetchone()
-    return int(row[0]) + 10 if row and row[0] is not None else 10
-
-
-def _backfill_subcategory_sort_orders_if_all_zero(
-    conn: Connection, *, user_id: int, category_id: int
-) -> None:
-    agg = conn.execute(
-        """
-        SELECT COUNT(*) FILTER (WHERE COALESCE(sort_order, 0) = 0), COUNT(*)
-        FROM subcategories
-        WHERE user_id = %s AND category_id = %s
-        """,
-        (user_id, category_id),
-    ).fetchone()
-    if not agg or int(agg[1]) == 0:
-        return
-    if int(agg[0]) != int(agg[1]):
-        return
-    rows = conn.execute(
-        """
-        SELECT id FROM subcategories
-        WHERE user_id = %s AND category_id = %s
-        ORDER BY created_at ASC, id ASC
-        """,
-        (user_id, category_id),
-    ).fetchall()
-    for i, (sid,) in enumerate(rows):
-        conn.execute(
-            "UPDATE subcategories SET sort_order = %s WHERE id = %s AND user_id = %s",
-            ((i + 1) * 10, int(sid), user_id),
-        )
-    conn.commit()
-
-
-def _ensure_investing_defaults(conn: Connection, *, user_id: int, category_id: int) -> None:
-    category = conn.execute(
-        "SELECT slug FROM categories WHERE id = %s AND user_id = %s",
-        (category_id, user_id),
-    ).fetchone()
-    if not category or category[0] != "investing":
-        return
-
-    # Same names and order as the frontend's Investing nav (front/src/features/investing/nav.ts).
-    defaults = [
+# Each section's menu, in the same names and order as its frontend nav (front/src/features/*/nav.ts).
+_DEFAULTS: dict[str, list[tuple[str, str]]] = {
+    "investing": [
         ("Overview", "dashboard"),
         ("Portfolio", "table"),
         ("Watchlist", "picking"),
@@ -142,45 +92,8 @@ def _ensure_investing_defaults(conn: Connection, *, user_id: int, category_id: i
         ("Notes", "notes"),
         ("Crypto", "crypto"),
         ("Total", "total"),
-    ]
-    # Rows created with the old default names are renamed; names the user changed are left alone.
-    legacy_names = {"dashboard": ("Dashboard",), "table": ("Holdings",), "picking": ("Picking", "Allocation rules")}
-    for name, slug in defaults:
-        for old in legacy_names.get(slug, ()):
-            conn.execute(
-                "UPDATE subcategories SET name = %s WHERE category_id = %s AND slug = %s AND name = %s",
-                (name, category_id, slug, old),
-            )
-    for name, slug in defaults:
-        exists = conn.execute(
-            """
-            SELECT 1 FROM subcategories
-            WHERE category_id = %s AND slug = %s
-            """,
-            (category_id, slug),
-        ).fetchone()
-        if exists:
-            continue
-        ord_val = _next_subcategory_sort_order(conn, user_id=user_id, category_id=category_id)
-        conn.execute(
-            """
-            INSERT INTO subcategories(user_id, category_id, name, slug, sort_order)
-            VALUES (%s, %s, %s, %s, %s)
-            """,
-            (user_id, category_id, name, slug, ord_val),
-        )
-    conn.commit()
-
-
-def _ensure_cinema_defaults(conn: Connection, *, user_id: int, category_id: int) -> None:
-    category = conn.execute(
-        "SELECT slug FROM categories WHERE id = %s AND user_id = %s",
-        (category_id, user_id),
-    ).fetchone()
-    if not category or category[0] != "cinematography":
-        return
-    # Same names and order as the frontend's Cinematography nav (front/src/features/cinema/nav.ts).
-    defaults = [
+    ],
+    "cinematography": [
         ("Films", "films"),
         ("Series", "series"),
         ("Cartoons", "cartoons"),
@@ -193,42 +106,8 @@ def _ensure_cinema_defaults(conn: Connection, *, user_id: int, category_id: int)
         ("Achievements", "achievements"),
         ("Franchises", "franchises"),
         ("Tops", "tops"),
-    ]
-    # "TV shows" used to be the series page: it becomes "Series", and tv-shows is now for TV shows proper.
-    has_series = conn.execute(
-        "SELECT 1 FROM subcategories WHERE category_id = %s AND slug = 'series'", (category_id,)
-    ).fetchone()
-    if not has_series:
-        conn.execute(
-            "UPDATE subcategories SET name = 'Series', slug = 'series' WHERE category_id = %s AND slug = 'tv-shows'",
-            (category_id,),
-        )
-    for name, slug in defaults:
-        exists = conn.execute(
-            "SELECT 1 FROM subcategories WHERE category_id = %s AND slug = %s",
-            (category_id, slug),
-        ).fetchone()
-        if exists:
-            continue
-        conn.execute(
-            """
-            INSERT INTO subcategories(user_id, category_id, name, slug, sort_order)
-            VALUES (%s, %s, %s, %s, %s)
-            """,
-            (user_id, category_id, name, slug, _next_subcategory_sort_order(conn, user_id=user_id, category_id=category_id)),
-        )
-    conn.commit()
-
-
-def _ensure_library_defaults(conn: Connection, *, user_id: int, category_id: int) -> None:
-    category = conn.execute(
-        "SELECT slug FROM categories WHERE id = %s AND user_id = %s",
-        (category_id, user_id),
-    ).fetchone()
-    if not category or category[0] != "library":
-        return
-    # Same names and order as the frontend's Library nav (front/src/features/library/nav.ts).
-    defaults = [
+    ],
+    "library": [
         ("Books", "books"),
         ("Comics", "comics"),
         ("Manga", "manga"),
@@ -236,50 +115,87 @@ def _ensure_library_defaults(conn: Connection, *, user_id: int, category_id: int
         ("Achievements", "achievements"),
         ("Book series", "series"),
         ("Tops", "tops"),
-    ]
-    for name, slug in defaults:
-        exists = conn.execute(
-            "SELECT 1 FROM subcategories WHERE category_id = %s AND slug = %s",
-            (category_id, slug),
-        ).fetchone()
-        if exists:
-            continue
-        conn.execute(
-            """
-            INSERT INTO subcategories(user_id, category_id, name, slug, sort_order)
-            VALUES (%s, %s, %s, %s, %s)
-            """,
-            (user_id, category_id, name, slug, _next_subcategory_sort_order(conn, user_id=user_id, category_id=category_id)),
-        )
-    conn.commit()
+    ],
+    "life": [("Tasks", "tasks"), ("Games", "games"), ("Career", "career"), ("Collecting", "collection")],
+}
+# Investing rows created with the old default names are renamed; names the user changed are left alone.
+_LEGACY_NAMES = {"dashboard": ("Dashboard",), "table": ("Holdings",), "picking": ("Picking", "Allocation rules")}
+
+# (id, category_id, name, slug, sort_order)
+SubRow = tuple[int, int, str, str, int]
 
 
-def _ensure_life_defaults(conn: Connection, *, user_id: int, category_id: int) -> None:
-    category = conn.execute(
-        "SELECT slug FROM categories WHERE id = %s AND user_id = %s",
-        (category_id, user_id),
-    ).fetchone()
-    if not category or category[0] != "life":
-        return
-    # Same names and order as the frontend's Life nav (front/src/features/life/nav.ts).
-    defaults = [("Tasks", "tasks"), ("Games", "games"), ("Career", "career"), ("Collecting", "collection")]
-    # Jobs became a tab of Career: its own menu entry goes. Only the entry; the vacancies stay.
-    conn.execute("DELETE FROM subcategories WHERE category_id = %s AND user_id = %s AND slug = 'jobs'", (category_id, user_id))
-    for name, slug in defaults:
-        exists = conn.execute(
-            "SELECT 1 FROM subcategories WHERE category_id = %s AND slug = %s",
-            (category_id, slug),
-        ).fetchone()
-        if exists:
-            continue
+def _category_slug(conn: Connection, *, user_id: int, category_id: int) -> str:
+    """The category's slug; 404 when it isn't yours."""
+    row = conn.execute("SELECT slug FROM categories WHERE id = %s AND user_id = %s", (category_id, user_id)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return row[0]
+
+
+def _subcategory_rows(conn: Connection, *, user_id: int, category_id: int) -> list[SubRow]:
+    return conn.execute(
+        """
+        SELECT id, category_id, name, slug, COALESCE(sort_order, 0)
+        FROM subcategories
+        WHERE user_id = %s AND category_id = %s
+        ORDER BY sort_order ASC, id ASC
+        """,
+        (user_id, category_id),
+    ).fetchall()
+
+
+def _ensure_defaults(conn: Connection, *, user_id: int, category_id: int, slug: str, rows: list[SubRow]) -> bool:
+    """Brings the menu up to date: renames, the moved Jobs entry, missing defaults, an order for old rows.
+
+    Decided from the rows already read, so the usual case (nothing to do) costs no queries: this runs on every page
+    load, and each query is a round trip to the database. Returns whether anything was written (not yet committed)."""
+    by_slug = {r[3]: r for r in rows}
+    changed = False
+    if slug == "investing":
+        for s, old_names in _LEGACY_NAMES.items():
+            row = by_slug.get(s)
+            new_name = next(n for n, d in _DEFAULTS["investing"] if d == s)
+            if row and row[2] in old_names:
+                conn.execute("UPDATE subcategories SET name = %s WHERE id = %s", (new_name, row[0]))
+                changed = True
+    if slug == "cinematography" and "series" not in by_slug and "tv-shows" in by_slug:
+        # "TV shows" used to be the series page: it becomes "Series", and tv-shows is now for TV shows proper.
+        conn.execute("UPDATE subcategories SET name = 'Series', slug = 'series' WHERE id = %s", (by_slug["tv-shows"][0],))
+        by_slug["series"] = by_slug.pop("tv-shows")
+        changed = True
+    if slug == "life" and "jobs" in by_slug:
+        # Jobs became a tab of Career: its own menu entry goes. Only the entry; the vacancies stay.
+        conn.execute("DELETE FROM subcategories WHERE id = %s", (by_slug.pop("jobs")[0],))
+        changed = True
+
+    missing = [(name, s) for name, s in _DEFAULTS.get(slug, []) if s not in by_slug]
+    if missing:
+        top = max((r[4] for r in by_slug.values()), default=0)
+        with conn.cursor() as cur:
+            # One round trip for all of them; a page loading in two tabs at once must not trip over the other's rows.
+            cur.executemany(
+                """
+                INSERT INTO subcategories(user_id, category_id, name, slug, sort_order)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (category_id, slug) DO NOTHING
+                """,
+                [(user_id, category_id, name, s, top + 10 * (i + 1)) for i, (name, s) in enumerate(missing)],
+            )
+        changed = True
+    elif by_slug and all(r[4] == 0 for r in by_slug.values()):
+        # Rows from before sort_order existed: give them an order, oldest first.
         conn.execute(
             """
-            INSERT INTO subcategories(user_id, category_id, name, slug, sort_order)
-            VALUES (%s, %s, %s, %s, %s)
+            UPDATE subcategories AS s SET sort_order = o.n * 10
+            FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY created_at, id) AS n FROM subcategories
+                  WHERE user_id = %s AND category_id = %s) AS o
+            WHERE s.id = o.id
             """,
-            (user_id, category_id, name, slug, _next_subcategory_sort_order(conn, user_id=user_id, category_id=category_id)),
+            (user_id, category_id),
         )
-    conn.commit()
+        changed = True
+    return changed
 
 
 @router.get("/{category_id}/subcategories", response_model=list[SubcategoryResponse])
@@ -288,31 +204,47 @@ def list_subcategories(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
 ):
-    _require_category_owner(conn, user_id=user.id, category_id=category_id)
-    _ensure_investing_defaults(conn, user_id=user.id, category_id=category_id)
-    _ensure_cinema_defaults(conn, user_id=user.id, category_id=category_id)
-    _ensure_library_defaults(conn, user_id=user.id, category_id=category_id)
-    _ensure_life_defaults(conn, user_id=user.id, category_id=category_id)
-    _backfill_subcategory_sort_orders_if_all_zero(conn, user_id=user.id, category_id=category_id)
-    rows = conn.execute(
-        """
-        SELECT id, category_id, name, slug, sort_order
-        FROM subcategories
-        WHERE user_id = %s AND category_id = %s
-        ORDER BY sort_order ASC, id ASC
-        """,
-        (user.id, category_id),
-    ).fetchall()
-    return [
-        SubcategoryResponse(
-            id=int(r[0]),
-            category_id=int(r[1]),
-            name=r[2],
-            slug=r[3],
-            sort_order=int(r[4] if r[4] is not None else 0),
-        )
-        for r in rows
-    ]
+    slug = _category_slug(conn, user_id=user.id, category_id=category_id)
+    rows = _subcategory_rows(conn, user_id=user.id, category_id=category_id)
+    if _ensure_defaults(conn, user_id=user.id, category_id=category_id, slug=slug, rows=rows):
+        conn.commit()
+        rows = _subcategory_rows(conn, user_id=user.id, category_id=category_id)
+    return [_sub_response(r) for r in rows]
+
+
+@router.get("/subcategories", response_model=dict[int, list[SubcategoryResponse]])
+def list_all_subcategories(
+    user: Annotated[UserResponse, Depends(get_current_user)],
+    conn: Annotated[Connection, Depends(get_conn)],
+):
+    """The whole menu at once, by category id: one request (and two queries) on every page load instead of one each."""
+
+    def read() -> tuple[list[tuple[int, str]], dict[int, list[SubRow]]]:
+        cats = conn.execute("SELECT id, slug FROM categories WHERE user_id = %s", (user.id,)).fetchall()
+        rows = conn.execute(
+            """
+            SELECT id, category_id, name, slug, COALESCE(sort_order, 0) FROM subcategories
+            WHERE user_id = %s ORDER BY sort_order ASC, id ASC
+            """,
+            (user.id,),
+        ).fetchall()
+        by_cat: dict[int, list[SubRow]] = {int(c[0]): [] for c in cats}
+        for r in rows:
+            by_cat.setdefault(int(r[1]), []).append(r)
+        return cats, by_cat
+
+    cats, by_cat = read()
+    changed = False
+    for cat_id, slug in cats:
+        changed |= _ensure_defaults(conn, user_id=user.id, category_id=int(cat_id), slug=slug, rows=by_cat[int(cat_id)])
+    if changed:
+        conn.commit()
+        cats, by_cat = read()
+    return {cat_id: [_sub_response(r) for r in rows] for cat_id, rows in by_cat.items()}
+
+
+def _sub_response(r: SubRow) -> SubcategoryResponse:
+    return SubcategoryResponse(id=int(r[0]), category_id=int(r[1]), name=r[2], slug=r[3], sort_order=int(r[4]))
 
 
 @router.post("/{category_id}/subcategories", response_model=SubcategoryResponse, status_code=status.HTTP_201_CREATED)

@@ -15,6 +15,8 @@ type CategoriesStore = {
   refresh: () => Promise<void>;
   create: (name: string) => Promise<void>;
   refreshSubcategories: (categoryId: number) => Promise<void>;
+  /** Every category's subcategories in one request (the menus on every page). */
+  refreshAllSubcategories: () => Promise<void>;
   createSubcategory: (categoryId: number, name: string) => Promise<void>;
   reorderSubcategories: (categoryId: number, orderedIds: number[]) => Promise<void>;
 };
@@ -72,6 +74,12 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     [token],
   );
 
+  const refreshAllSubcategories = useCallback(async () => {
+    if (!token) return;
+    const res = await apiFetch<Record<string, Subcategory[]>>("/categories/subcategories", { token });
+    setSubcategoriesByCategoryId(Object.fromEntries(Object.entries(res).map(([id, subs]) => [Number(id), subs])));
+  }, [token]);
+
   const createSubcategory = useCallback(
     async (categoryId: number, name: string) => {
       if (!token) return;
@@ -105,8 +113,10 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
       setIsSubcategoriesLoadingByCategoryId({});
       return;
     }
+    // In parallel: the menus don't need the category list to load first.
     refresh().catch(() => {});
-  }, [token, refresh]);
+    refreshAllSubcategories().catch(() => {});
+  }, [token, refresh, refreshAllSubcategories]);
 
   return (
     <CategoriesContext.Provider
@@ -118,6 +128,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
         refresh,
         create,
         refreshSubcategories,
+        refreshAllSubcategories,
         createSubcategory,
         reorderSubcategories,
       }}

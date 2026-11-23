@@ -15,6 +15,17 @@ def create_pool(database_url: str) -> ConnectionPool:
         timeout=5,
         check=ConnectionPool.check_connection,
         max_idle=240,
+        # A connection whose network quietly died (the laptop slept, Wi-Fi changed, Neon suspended) would otherwise
+        # hang a request until the page gives up after a minute: fail it in seconds so the next try gets a fresh one.
+        # tcp_user_timeout works on Linux (Vercel); Windows ignores it and relies on keepalives.
+        kwargs={
+            "connect_timeout": 10,
+            "keepalives": 1,
+            "keepalives_idle": 10,
+            "keepalives_interval": 3,
+            "keepalives_count": 3,
+            "tcp_user_timeout": 15000,
+        },
     )
 
 

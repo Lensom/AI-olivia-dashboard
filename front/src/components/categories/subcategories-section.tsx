@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { cinemaPageHref } from "@/features/cinema/nav";
 import { libraryPageHref } from "@/features/library/nav";
 import { lifePageHref } from "@/features/life/nav";
@@ -22,7 +22,7 @@ function hrefForSubcategory(categorySlug: string, subSlug: string) {
 }
 
 export function SubcategoriesSection({ categorySlug }: SubcategoriesSectionProps) {
-  const { categories, subcategoriesByCategoryId, refreshSubcategories, createSubcategory } =
+  const { categories, subcategoriesByCategoryId, createSubcategory } =
     useCategories();
 
   const category = useMemo(
@@ -34,11 +34,6 @@ export function SubcategoriesSection({ categorySlug }: SubcategoriesSectionProps
   const [isAdding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!category) return;
-    refreshSubcategories(category.id).catch(() => {});
-  }, [category?.id, refreshSubcategories]);
 
   const subs = category ? (subcategoriesByCategoryId[category.id] ?? []) : [];
 

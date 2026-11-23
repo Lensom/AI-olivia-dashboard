@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { RequireAuth } from "@/components/auth/require-auth";
 import { AttentionStrip } from "@/features/investing/attention-strip";
 import { formatUsd, parseUsd } from "@/features/investing/format";
@@ -43,10 +43,6 @@ export default function InvestingPage() {
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
-
-  useEffect(() => {
-    if (investing?.id) void refreshSubcategories(investing.id);
-  }, [investing?.id, refreshSubcategories]);
 
   const tiles = draft ?? saved;
 
