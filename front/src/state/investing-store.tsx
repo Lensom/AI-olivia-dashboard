@@ -76,6 +76,8 @@ export type InvestingPickingRow = {
 
 /** A fee paid outside the broker for one deposit, in USD (mirrors ExternalFeeRow in back/app/investing/schemas.py). */
 export type ExternalFeeRow = { id: string; date: string; amount: string; note: string };
+/** Margin interest the broker charged on one day, in USD. */
+export type BrokerInterestRow = { date: string; amount: string };
 
 type InvestingStore = {
   /** Loads the data on a page that isn't an investing one (search, for your tickers). Investing pages load it themselves. */
@@ -103,6 +105,8 @@ type InvestingStore = {
   externalFees: ExternalFeeRow[];
   /** Margin interest charged by the broker (Freedom24 only; read-only). */
   brokerInterestUsd: string;
+  /** The same interest by day (for the dated list of fees). */
+  brokerInterest: BrokerInterestRow[];
   /** `fromBroker`: deposits come from Freedom24; only the operating-expenses override is yours. */
   refillsMeta: { updatedAt: string | null; fromBroker?: boolean };
   isRefillsLoading: boolean;
@@ -347,6 +351,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
     [externalFees],
   );
   const [brokerInterestUsd, setBrokerInterestUsd] = useState("");
+  const [brokerInterest, setBrokerInterest] = useState<BrokerInterestRow[]>([]);
   const [refillsMeta, setRefillsMeta] = useState<{ updatedAt: string | null; fromBroker?: boolean }>({ updatedAt: null });
   const [isRefillsLoading, setRefillsLoading] = useState(false);
   const [isRefillsSaving, setRefillsSaving] = useState(false);
@@ -524,6 +529,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       setOperatingExpensesUsdState("");
       setExternalFeesState([]);
       setBrokerInterestUsd("");
+      setBrokerInterest([]);
       setRefillsMeta({ updatedAt: null });
       setRefillsDirty(false);
       return;
@@ -536,6 +542,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
         external_fees_usd?: string;
         external_fees?: ExternalFeeRow[];
         broker_interest_usd?: string;
+        broker_interest?: BrokerInterestRow[];
         updated_at: string | null;
         source?: string;
       }>("/investing/refills", { token });
@@ -543,6 +550,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       setOperatingExpensesUsdState(res.operating_expenses_usd ?? "");
       setExternalFeesState(res.external_fees ?? []);
       setBrokerInterestUsd(res.broker_interest_usd ?? "");
+      setBrokerInterest(res.broker_interest ?? []);
       setRefillsMeta({ updatedAt: res.updated_at ?? null, fromBroker: res.source === "freedom24" });
       setRefillsDirty(false);
     } finally {
@@ -560,6 +568,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
         external_fees_usd?: string;
         external_fees?: ExternalFeeRow[];
         broker_interest_usd?: string;
+        broker_interest?: BrokerInterestRow[];
         updated_at: string | null;
         source?: string;
       }>("/investing/refills", {
@@ -575,6 +584,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       setOperatingExpensesUsdState(res.operating_expenses_usd ?? "");
       setExternalFeesState(res.external_fees ?? []);
       setBrokerInterestUsd(res.broker_interest_usd ?? "");
+      setBrokerInterest(res.broker_interest ?? []);
       setRefillsMeta({ updatedAt: res.updated_at ?? null, fromBroker: res.source === "freedom24" });
       setRefillsDirty(false);
     } finally {
@@ -967,6 +977,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
       externalFeesUsd,
       externalFees,
       brokerInterestUsd,
+      brokerInterest,
       refillsMeta,
       isRefillsLoading,
       isRefillsSaving,
@@ -1167,6 +1178,7 @@ export function InvestingProvider({ children }: { children: ReactNode }) {
     externalFees,
     externalFeesUsd,
     brokerInterestUsd,
+    brokerInterest,
     holdings,
     holdingsMeta,
     capitalEntries,

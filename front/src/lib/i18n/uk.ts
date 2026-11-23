@@ -59,6 +59,8 @@ export const EN_PLURALS: Record<string, [string, string]> = {
   "{n} rules": ["{n} rule", "{n} rules"],
   "{n} opportunities": ["{n} opportunity", "{n} opportunities"],
   "{n} refills": ["{n} refill", "{n} refills"],
+  "{n} fees": ["{n} fee", "{n} fees"],
+  "{month}: charged on {n} days": ["{month}: charged on {n} day", "{month}: charged on {n} days"],
   "{n} days ago": ["{n} day ago", "{n} days ago"],
   "{n} buys": ["{n} buy", "{n} buys"],
   "{n} purchase days": ["{n} purchase day", "{n} purchase days"],

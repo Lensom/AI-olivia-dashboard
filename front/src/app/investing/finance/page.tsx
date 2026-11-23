@@ -8,8 +8,11 @@ import {
   currentYearPace,
   depositsVsBuys,
   feeBreakdown,
+  feeRows,
   refillsByYear,
   xirrFromRefills,
+  type FeeKind,
+  type FeeRow,
 } from "@/features/investing/funding-stats";
 import {
   investingMetaBadge,
@@ -99,6 +102,126 @@ function StatCard({
   );
 }
 
+const FEE_KINDS: { kind: FeeKind; label: string; pill: string }[] = [
+  { kind: "refill", label: "Deposit fee", pill: "bg-sky-50 text-sky-800" },
+  { kind: "buy", label: "Buy", pill: "bg-emerald-50 text-emerald-800" },
+  { kind: "sell", label: "Sell", pill: "bg-amber-50 text-amber-800" },
+  { kind: "external", label: "Outside the broker", pill: "bg-violet-50 text-violet-800" },
+  { kind: "interest", label: "Margin interest", pill: "bg-rose-50 text-rose-800" },
+];
+
+/** Every fee by date, like the refills table: filter by year and by kind, with a running total and the sum. */
+function FeesByDate({ rows, isOverride }: { rows: FeeRow[]; isOverride: boolean }) {
+  const tr = useT();
+  const locale = useLocale();
+  const [open, setOpen] = useState(true);
+  const [year, setYear] = useState<number | "all">("all");
+  const [kind, setKind] = useState<FeeKind | "all">("all");
+
+  const yearOf = (r: FeeRow) => (r.ms == null ? null : new Date(r.ms).getUTCFullYear());
+  const years = useMemo(() => [...new Set(rows.map(yearOf).filter((y): y is number => y != null))].sort((a, b) => b - a), [rows]);
+  const inYear = useMemo(() => rows.filter((r) => year === "all" || yearOf(r) === year || r.ms == null), [rows, year]);
+  const shown = useMemo(() => inYear.filter((r) => kind === "all" || r.kind === kind), [inYear, kind]);
+  // Running total oldest first, over what is shown.
+  const cumulative = useMemo(() => {
+    const out = new Map<string, number>();
+    let run = 0;
+    for (const r of [...shown].reverse()) {
+      run += r.usd;
+      out.set(r.id, run);
+    }
+    return out;
+  }, [shown]);
+  const sum = (list: FeeRow[]) => list.reduce((a, r) => a + r.usd, 0);
+  const pill = (on: boolean) =>
+    ["rounded-full px-2.5 py-1 text-xs font-medium transition", on ? "bg-[#1f1c17] text-[#f8f4eb]" : "border border-black/10 bg-white text-[#3b352d] hover:bg-[#faf8f2]"].join(" ");
+  const meta = (k: FeeKind) => FEE_KINDS.find((x) => x.kind === k)!;
+
+  const detail = (r: FeeRow) => {
+    if (r.kind === "refill") return r.depositUsd ? tr("Deposit of {v}", { v: formatUsd(r.depositUsd) }) : "";
+    if (r.kind === "buy" || r.kind === "sell") return [r.ticker, r.count ? `× ${r.count}` : "", r.detail && r.detail !== r.ticker ? `· ${r.detail}` : ""].filter(Boolean).join(" ");
+    if (r.kind === "interest" && r.ms != null)
+      return tr("{month}: charged on {n} days", { month: new Date(r.ms).toLocaleDateString(locale, { month: "long", year: "numeric", timeZone: "UTC" }), n: r.days ?? 1 });
+    return r.detail;
+  };
+
+  return (
+    <section className={investingSubsectionStack}>
+      <InvestingSubsectionHeader title="Fees by date" isOpen={open} onToggle={() => setOpen((v) => !v)} />
+      {open ? (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-[#655d51]">
+              {tr("Every fee with its date: deposit fees, buy and sell commissions from Activities, fees outside the broker, margin interest. In USD.")}
+            </p>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter fees by year")}>
+              {(["all", ...years] as const).map((y) => (
+                <button key={y} type="button" onClick={() => setYear(y)} aria-pressed={year === y} className={pill(year === y)}>
+                  {y === "all" ? tr("All") : y}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter fees by kind")}>
+            <button type="button" onClick={() => setKind("all")} aria-pressed={kind === "all"} className={pill(kind === "all")}>
+              {tr("All")} <span className="tabular-nums opacity-70">{formatUsd(sum(inYear))}</span>
+            </button>
+            {FEE_KINDS.filter((k) => inYear.some((r) => r.kind === k.kind)).map((k) => (
+              <button key={k.kind} type="button" onClick={() => setKind(k.kind)} aria-pressed={kind === k.kind} className={pill(kind === k.kind)}>
+                {tr(k.label)} <span className="tabular-nums opacity-70">{formatUsd(sum(inYear.filter((r) => r.kind === k.kind)))}</span>
+              </button>
+            ))}
+          </div>
+          {isOverride ? (
+            <p className="text-[11px] text-[#8f8676]">⚠ {tr("Operating expenses use your manual total; this list shows the fees as recorded.")}</p>
+          ) : null}
+          <div className={investingTableScrollWrap}>
+            <table className="stack-table w-full min-w-[640px] border-collapse text-left text-sm">
+              <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
+                <tr>
+                  <th className="px-3 py-2 font-medium">{tr("Date")}</th>
+                  <th className="px-3 py-2 font-medium">{tr("Type")}</th>
+                  <th className="px-3 py-2 font-medium">{tr("What for")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Fee, $")}</th>
+                  <th className="px-3 py-2 text-right font-medium">{tr("Cumulative")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-4 text-center text-xs text-[#8f8676]">
+                      {tr("No fees here.")}
+                    </td>
+                  </tr>
+                ) : (
+                  shown.map((r) => (
+                    <tr key={r.id} className="border-t border-black/5">
+                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-[#3b352d]">{r.ms == null ? r.date || "—" : new Date(r.ms).toLocaleDateString(locale)}</td>
+                      <td className="px-3 py-2">
+                        <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${meta(r.kind).pill}`}>{tr(meta(r.kind).label)}</span>
+                      </td>
+                      <td className="px-3 py-2 text-[#6f675b]">{detail(r) || "—"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-[#1f1c17]">{fmt2(r.usd)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-[#8f8676]">{fmt2(cumulative.get(r.id) ?? 0)}</td>
+                    </tr>
+                  ))
+                )}
+                <tr className="border-t-2 border-black/15 bg-[#f6f3ea] font-medium">
+                  <td className="px-3 py-2 text-[#1f1c17]" colSpan={3}>
+                    {year === "all" ? tr("Total") : tr("Total {year}", { year })} · {tr("{n} fees", { n: shown.length })}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums text-[#1f1c17]">{fmt2(sum(shown))}</td>
+                  <td className="px-3 py-2" />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 export default function InvestingFinancePage() {
   // Deposits come from Freedom24: the table is read-only; the operating-expenses override stays yours.
   const {
@@ -106,6 +229,8 @@ export default function InvestingFinancePage() {
     operatingExpensesUsd,
     externalFeesUsd,
     brokerInterestUsd,
+    brokerInterest,
+    activities,
     refillsMeta,
     isRefillsLoading,
     isRefillsSaving,
@@ -138,6 +263,7 @@ export default function InvestingFinancePage() {
     [refills, activitiesSummary, operatingExpensesUsd, externalFeesUsd, brokerInterestUsd],
   );
   const operatingExpenses = fees.total;
+  const datedFees = useMemo(() => feeRows(refills, activities, externalFees, brokerInterest), [refills, activities, externalFees, brokerInterest]);
 
   const netAfterFees = totalInvested - operatingExpenses;
   const gainOnGrossPct = totalInvested > 0 ? ((currentValue - totalInvested) / totalInvested) * 100 : 0;
@@ -635,6 +761,8 @@ export default function InvestingFinancePage() {
           </>
         ) : null}
       </section>
+
+      <FeesByDate rows={datedFees} isOverride={fees.isOverride} />
     </div>
   );
 }

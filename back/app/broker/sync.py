@@ -233,11 +233,16 @@ class Freedom24Source:
     def margin_interest_usd(self) -> float:
         """Interest the broker charged for using its money (a negative cash balance), in USD. Not a trade or
         deposit fee, so it shows nowhere else."""
-        return sum(
-            _f(c.get("sum")) * (self._usd_rate(str(c.get("currency")), str(c.get("datetime"))[:10]) or 0.0)
-            for c in self._commissions()
-            if str(c.get("type", "")).startswith("Interest")
-        )
+        return sum(float(r["amount"]) for r in self.margin_interest_rows())
+
+    def margin_interest_rows(self) -> list[dict]:
+        """That interest by day ({"date": DD.MM.YYYY, "amount": USD}), oldest first, for the fees list."""
+        by_day: dict[str, float] = defaultdict(float)
+        for c in self._commissions():
+            if str(c.get("type", "")).startswith("Interest"):
+                iso = str(c.get("datetime"))[:10]
+                by_day[iso] += _f(c.get("sum")) * (self._usd_rate(str(c.get("currency")), iso) or 0.0)
+        return [{"date": _ddmmyyyy(iso), "amount": f"{v:.2f}"} for iso, v in sorted(by_day.items()) if round(v, 2)]
 
     def upcoming_dividends(self) -> dict[str, list[dict]]:
         """Dividends the broker has announced from today on, per ticker: ex-date, pay date and amount per share.

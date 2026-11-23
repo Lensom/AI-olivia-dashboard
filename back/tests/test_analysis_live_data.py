@@ -70,6 +70,9 @@ class Broker:
     def margin_interest_usd(self):
         return 0.0
 
+    def margin_interest_rows(self):
+        return []
+
 
 class BrokerDown(Broker):
     def holdings(self, saved):

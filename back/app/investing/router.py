@@ -46,6 +46,7 @@ from app.investing.schemas import (
     InvestingPickingRow,
     InvestingPickingUpdateRequest,
     ExternalFeeRow,
+    BrokerInterestRow,
     InvestingRefillRow,
     InvestingRefillsResponse,
     InvestingRefillsUpdateRequest,
@@ -1468,15 +1469,17 @@ def get_refills(
     ).fetchone()
     fee_rows = [ExternalFeeRow(**r) for r in (row[4] if row and isinstance(row[4], list) else []) if isinstance(r, dict)]
     external = _external_total(fee_rows, str(row[3] if row and row[3] is not None else ""))
-    live = _live(source_for, user, lambda src: (src.refills(), src.margin_interest_usd()))
+    live = _live(source_for, user, lambda src: (src.refills(), src.margin_interest_rows()))
     if live is not None:
-        deposits, interest = live
+        deposits, interest_rows = live
+        interest = sum(float(r["amount"]) for r in interest_rows)
         return InvestingRefillsResponse(
             rows=[InvestingRefillRow(**r) for r in _sort_refill_rows(deposits)],
             operating_expenses_usd=str(row[1] if row and row[1] is not None else ""),  # still yours to set
             external_fees_usd=external,
             external_fees=fee_rows,
             broker_interest_usd=f"{interest:.2f}",
+            broker_interest=[BrokerInterestRow(**r) for r in interest_rows],
             updated_at=datetime.now().isoformat(),
             source="freedom24",
         )

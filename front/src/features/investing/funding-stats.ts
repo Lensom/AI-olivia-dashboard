@@ -1,5 +1,11 @@
 import { parseInvestingDateMs, parseUsd } from "@/features/investing/format";
-import type { InvestingActivityYearSummary, InvestingRefillRow } from "@/state/investing-store";
+import type {
+  BrokerInterestRow,
+  ExternalFeeRow,
+  InvestingActivity,
+  InvestingActivityYearSummary,
+  InvestingRefillRow,
+} from "@/state/investing-store";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -183,4 +189,79 @@ export function depositsVsBuys(
       unspent += netCash;
       return { year, deposited, bought, sold, fees, netCash, unspent };
     });
+}
+
+export type FeeKind = "refill" | "buy" | "sell" | "external" | "interest";
+
+export type FeeRow = {
+  id: string;
+  kind: FeeKind;
+  /** As the source wrote it (DD.MM.YYYY or YYYY-MM-DD); `ms` is null when it can't be read. */
+  date: string;
+  ms: number | null;
+  usd: number;
+  /** What it was for: the deposit, the trade, your note. */
+  detail: string;
+  /** For a deposit's fee: the deposit, so the detail can show it. */
+  depositUsd?: number;
+  ticker?: string;
+  count?: number;
+  /** Margin interest: one row per month, the days it was charged (dated by the last of them). */
+  days?: number;
+};
+
+/**
+ * Every fee with its date, from the same sources and in the same amounts as `feeBreakdown`: refill commissions,
+ * buy and sell commissions from Activities (in USD, as the yearly summary counts them), fees outside the broker,
+ * and margin interest. Newest first; undated ones last.
+ */
+export function feeRows(
+  refills: InvestingRefillRow[],
+  activities: InvestingActivity[],
+  external: ExternalFeeRow[],
+  interest: BrokerInterestRow[],
+): FeeRow[] {
+  const rows: FeeRow[] = [];
+  for (const r of refills) {
+    const usd = parseUsd(r.commission);
+    if (usd) rows.push({ id: `refill-${r.id}`, kind: "refill", date: r.date, ms: parseInvestingDateMs(r.date), usd, detail: "", depositUsd: parseUsd(r.amount) });
+  }
+  for (const a of activities) {
+    const usd = parseUsd(a.commission_usd ?? a.commission);
+    if (!usd) continue;
+    rows.push({
+      id: `trade-${a.id}`,
+      kind: a.type === "sell" ? "sell" : "buy",
+      date: a.date,
+      ms: parseInvestingDateMs(a.date),
+      usd,
+      detail: a.name,
+      ticker: a.ticker,
+      count: a.count,
+    });
+  }
+  for (const f of external) {
+    const usd = parseUsd(f.amount);
+    if (usd) rows.push({ id: `external-${f.id}`, kind: "external", date: f.date, ms: parseInvestingDateMs(f.date), usd, detail: f.note });
+  }
+  // The broker charges interest daily, a few cents at a time: one row per month reads better than hundreds.
+  const months = new Map<string, { date: string; ms: number; usd: number; days: number }>();
+  for (const r of interest) {
+    const usd = parseUsd(r.amount);
+    const ms = parseInvestingDateMs(r.date);
+    if (!usd || ms == null) continue;
+    const d = new Date(ms);
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const m = months.get(key);
+    if (!m) months.set(key, { date: r.date, ms, usd, days: 1 });
+    else {
+      m.usd += usd;
+      m.days += 1;
+      if (ms > m.ms) Object.assign(m, { date: r.date, ms });
+    }
+  }
+  for (const [key, m] of months) {
+    rows.push({ id: `interest-${key}`, kind: "interest", date: m.date, ms: m.ms, usd: m.usd, detail: "", days: m.days });
+  }
+  return rows.sort((a, b) => (b.ms ?? -Infinity) - (a.ms ?? -Infinity));
 }

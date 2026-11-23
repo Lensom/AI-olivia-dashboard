@@ -252,14 +252,20 @@ class ExternalFeeRow(BaseModel):
     note: str = ""
 
 
+class BrokerInterestRow(BaseModel):
+    date: str  # DD.MM.YYYY
+    amount: str  # USD
+
+
 class InvestingRefillsResponse(BaseModel):
     rows: list[InvestingRefillRow]
     operating_expenses_usd: str = ""
     # Fees paid outside the broker (e.g. deposit services), added to the broker's fees: the sum of external_fees.
     external_fees_usd: str = ""
     external_fees: list[ExternalFeeRow] = Field(default_factory=list)
-    # Interest the broker charged on a negative cash balance (from Freedom24; empty otherwise).
+    # Interest the broker charged on a negative cash balance (from Freedom24; empty otherwise), and by day.
     broker_interest_usd: str = ""
+    broker_interest: list[BrokerInterestRow] = Field(default_factory=list)
     updated_at: str | None = None
     # "freedom24" when the data came from the broker's API (read-only in the app), else "app".
     source: str = "app"
