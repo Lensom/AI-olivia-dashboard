@@ -60,7 +60,7 @@ class Defaults(unittest.TestCase):
 
     def test_a_new_section_gets_its_whole_menu(self):
         conn, _ = run("life", [])
-        self.assertEqual([r[3] for r in conn.inserted], ["tasks", "games", "career", "collection", "places"])
+        self.assertEqual([r[3] for r in conn.inserted], ["tasks", "games", "career", "collection", "places", "improvements"])
 
     def test_the_old_jobs_entry_goes(self):
         conn, changed = run("life", [*rows_for("life"), (99, 7, "Jobs", "jobs", 50)])
@@ -103,7 +103,7 @@ class WholeMenu(unittest.TestCase):
 
         menu = list_all_subcategories(SimpleNamespace(id=1), SimpleNamespace(execute=execute))
         self.assertEqual(len(queries), 2)
-        self.assertEqual([s.slug for s in menu[3]], ["tasks", "games", "career", "collection", "places"])
+        self.assertEqual([s.slug for s in menu[3]], ["tasks", "games", "career", "collection", "places", "improvements"])
         self.assertEqual(menu[5], [])
 
 

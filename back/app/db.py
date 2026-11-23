@@ -247,6 +247,16 @@ def init_db(pool: ConnectionPool) -> None:
             );
             """
         )
+        # Life → Improvements (app/improvements/router.py): habits and goals by area of life, as one document.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS improvement_lists (
+                user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                data JSONB NOT NULL DEFAULT '{}'::jsonb,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
         # Life → Must visit (app/places/router.py): places and events, been there or planned, as one document.
         conn.execute(
             """
