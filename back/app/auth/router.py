@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -18,6 +20,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")  # routes are m
 
 
 def get_conn() -> Connection:
+    raise RuntimeError("DB dependency not wired")
+
+
+def get_db() -> Callable[[], AbstractContextManager[Connection]]:
+    """`with db() as conn:` borrows a pool connection only for the queries inside the block. Use it instead of
+    `get_conn` in handlers that also call slow outside services (quotes, the broker, AI), so the connection
+    isn't held idle while they answer and other requests don't queue for the pool."""
     raise RuntimeError("DB dependency not wired")
 
 
@@ -111,14 +120,17 @@ def login(
 
 def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Annotated[Callable[[], AbstractContextManager[Connection]], Depends(get_db)],
     settings=Depends(get_settings),
 ) -> UserResponse:
     payload = verify_token(secret=settings.auth_token_secret, token=token)
     if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-    row = conn.execute("SELECT id, email FROM users WHERE id = %s", (int(payload.sub),)).fetchone()
+    # Its own short connection, returned at once: a handler that needs no database (quotes) then holds none,
+    # and one that does takes it through `get_conn` or `get_db`.
+    with db() as conn:
+        row = conn.execute("SELECT id, email FROM users WHERE id = %s", (int(payload.sub),)).fetchone()
     if not row:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 

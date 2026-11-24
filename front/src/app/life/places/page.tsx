@@ -22,6 +22,7 @@ import {
   type WikiInfo,
 } from "@/features/life/places/types";
 import { apiFetch, type ApiError } from "@/lib/api";
+import { filterSearch, filterSelect } from "@/lib/filter-classes";
 import { useLang, useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 
@@ -483,13 +484,14 @@ function PlacesPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0 flex-1">
+        {/* basis-64: on a phone the buttons move below instead of squeezing the title into a narrow column. */}
+        <div className="min-w-0 flex-1 basis-64">
           <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">{t("Life")}</p>
           <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">{t("Must visit")}</h1>
           <p className="mt-1 text-sm text-[#6f675b]">{t("Places and events: where you've been, and where you're going next.")}</p>
         </div>
         {loaded && data.categories.length ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button type="button" onClick={surprise} className="rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-sm font-medium text-[#3b352d] hover:bg-[#faf8f2]">
               🎲 {t("Where next?")}
             </button>
@@ -557,7 +559,7 @@ function PlacesPage() {
 
           <section className="space-y-2.5" aria-label={t("Filters")}>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex rounded-full border border-black/10 bg-white p-0.5" role="group" aria-label={t("Status")}>
+              <span className="inline-flex h-8 items-center rounded-full border border-black/10 bg-white p-0.5" role="group" aria-label={t("Status")}>
                 {(
                   [
                     ["all", t("All"), rows.length],
@@ -576,7 +578,7 @@ function PlacesPage() {
                   </button>
                 ))}
               </span>
-              <span className="inline-flex rounded-full border border-black/10 bg-white p-0.5" role="group" aria-label={t("View")}>
+              <span className="inline-flex h-8 shrink-0 items-center rounded-full border border-black/10 bg-white p-0.5" role="group" aria-label={t("View")}>
                 {(
                   [
                     ["cards", `▦ ${t("Cards")}`],
@@ -594,7 +596,7 @@ function PlacesPage() {
                   </button>
                 ))}
               </span>
-              <select value={country} onChange={(e) => setCountry(e.target.value)} aria-label={t("Country")} className={`${field} rounded-full text-xs`}>
+              <select value={country} onChange={(e) => setCountry(e.target.value)} aria-label={t("Country")} className={`${filterSelect} flex-1 basis-36 sm:flex-none sm:basis-auto`}>
                 <option value="all">{t("All countries")}</option>
                 {countries.map((c) => (
                   <option key={c} value={c}>
@@ -602,7 +604,7 @@ function PlacesPage() {
                   </option>
                 ))}
               </select>
-              <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label={t("Sort")} className={`${field} rounded-full text-xs`}>
+              <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label={t("Sort")} className={filterSelect}>
                 {SORTS.map((s) => (
                   <option key={s.value} value={s.value}>
                     {t(s.label)}
@@ -614,7 +616,7 @@ function PlacesPage() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("Search places…")}
                 aria-label={t("Search places…")}
-                className="w-full rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-xs outline-none focus:border-black/25 sm:ml-auto sm:w-56"
+                className={filterSearch}
               />
             </div>
             <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label={t("Category")}>

@@ -118,6 +118,7 @@ def get_settings():
 
 
 app.dependency_overrides[auth_router_module.get_conn] = get_conn
+app.dependency_overrides[auth_router_module.get_db] = lambda: pool.connection
 app.dependency_overrides[auth_router_module.get_settings] = get_settings
 app.include_router(auth_router_module.router, prefix=API_PREFIX)
 app.include_router(categories_router, prefix=API_PREFIX)

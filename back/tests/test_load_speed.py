@@ -96,5 +96,53 @@ class SeriesBuiltOnce(unittest.TestCase):
         self.assertEqual(builds, ["Q1", "Q2", "Q1"])
 
 
+class ConnectionNotHeldDuringOutsideCalls(unittest.TestCase):
+    """A request waiting on quotes or the broker used to keep its pool connection, so a few slow answers left
+    every other request queueing for one (the pool has 10)."""
+
+    def setUp(self):
+        self.open = 0
+
+        class Conn:
+            def execute(conn, *a):
+                cur = mock.MagicMock()
+                cur.fetchone.return_value = ([{"ticker": "AAPL", "shares": "1"}], "2026-11-24")
+                return cur
+
+        class Borrow:
+            def __enter__(b):
+                self.open += 1
+                return Conn()
+
+            def __exit__(b, *exc):
+                self.open -= 1
+
+        self.db = lambda: Borrow()
+        self.user = mock.MagicMock(id=1)
+
+    def outside(self, result):
+        def call(*a, **kw):
+            self.assertEqual(self.open, 0, "a pool connection is still held while an outside service is asked")
+            return result
+
+        return call
+
+    def test_metrics_fetch_quotes_without_a_connection(self):
+        with mock.patch.object(investing, "_fetch_market_prices", self.outside({"AAPL": 100.0})):
+            investing.get_metrics(self.user, self.db)
+
+    def test_holdings_ask_the_broker_without_a_connection(self):
+        src = mock.MagicMock()
+        src.holdings.side_effect = self.outside([])
+        investing.get_holdings(self.user, self.db, lambda user: src)
+        src.holdings.assert_called_once()
+
+    def test_a_handler_called_with_an_open_connection_uses_it(self):
+        conn = mock.MagicMock()
+        conn.execute.return_value.fetchone.return_value = None
+        investing.get_holdings(self.user, investing.borrowed(conn), lambda user: None)
+        conn.execute.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

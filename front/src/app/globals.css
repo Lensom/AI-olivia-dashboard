@@ -123,6 +123,17 @@ body {
   table.stack-table td[data-label=""]::before {
     content: none;
   }
+  /* A labelled cell: the label takes the left, everything else in the cell stays together on the right.
+     space-between would spread a cell holding "406.21" and "USD" across the whole card. :where keeps this
+     below the title rules that follow. */
+  table.stack-table td:where([data-label]:not([data-label=""])),
+  table.stack-table th:where([data-label]:not([data-label=""])) {
+    justify-content: flex-end;
+  }
+  table.stack-table td:where([data-label]:not([data-label=""]))::before,
+  table.stack-table th:where([data-label]:not([data-label=""]))::before {
+    margin-right: auto;
+  }
   /* The card's title: the cell marked .stack-title, else the row's first cell. */
   table.stack-table tr:not(:has(> .stack-title)) > td:first-child,
   table.stack-table td.stack-title {

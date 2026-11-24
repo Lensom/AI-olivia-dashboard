@@ -30,6 +30,7 @@ from app.investing.router import (
     _normalize_stored_picking_row,
     _parse_date,
     _parse_num,
+    borrowed,
     get_activities,
     get_broker,
     get_broker_source,
@@ -65,7 +66,7 @@ def _from_saved_copy(user: UserResponse, source_for: BrokerSource, *responses: A
 
 
 def _account_holdings(conn: Connection, user: UserResponse, source_for: BrokerSource) -> list[dict[str, Any]]:
-    return [h.model_dump() for h in get_holdings(user, conn, source_for).holdings]
+    return [h.model_dump() for h in get_holdings(user, borrowed(conn), source_for).holdings]
 
 
 class StockAnalysis(BaseModel):
@@ -155,12 +156,12 @@ def _gather(
     rows = [_normalize_stored_picking_row(r) for r in (picking[0] if picking and isinstance(picking[0], list) else []) if isinstance(r, dict)]
     row = next((r for r in rows if r["ticker"].strip().upper() == ticker), None)
 
-    held = get_holdings(user, conn, source_for)
+    held = get_holdings(user, borrowed(conn), source_for)
     holding = next((h.model_dump() for h in held.holdings if h.ticker.strip().upper() == ticker), None)
     if row is None and holding is None:
         raise HTTPException(status_code=404, detail="Ticker is not in your watchlist or portfolio")
 
-    activities = get_activities(user, conn, source_for)
+    activities = get_activities(user, borrowed(conn), source_for)
     trades = [
         a.model_dump() for a in activities.activities
         if a.ticker.strip().upper() == ticker and a.type in ("buy", "sell")
@@ -470,7 +471,7 @@ def _signed_usd(v: float) -> str:
 
 def _gather_portfolio(conn: Connection, user: UserResponse, source_for: BrokerSource) -> tuple[dict[str, Any], float, set[str]]:
     """The whole account at live prices, with every ratio worked out here. Returns (facts, account value, known tickers)."""
-    held = get_holdings(user, conn, source_for)
+    held = get_holdings(user, borrowed(conn), source_for)
     holdings = [h for h in (x.model_dump() for x in held.holdings) if str(h.get("ticker", "")).strip() and float(h.get("shares") or 0) > 0]
     if not holdings:
         raise HTTPException(status_code=404, detail="No holdings yet — add them on the Portfolio tab")
@@ -506,16 +507,16 @@ def _gather_portfolio(conn: Connection, user: UserResponse, source_for: BrokerSo
     invested = sum(p["value"] for p in positions)
     cost = sum(p["cost"] for p in positions)
 
-    broker = get_broker(user, conn, source_for)
+    broker = get_broker(user, borrowed(conn), source_for)
     to_usd = get_rates(user=user).to_usd
     cash = sum(_parse_num(c.amount) * to_usd.get((c.currency or "USD").strip().upper(), 0.0) for c in broker.cash)
     year_ago = datetime.now().timestamp() - 365 * 86400
     dividends_12m = sum(d.amount_usd for d in broker.dividends if (ts := _dmy_ts(d.date)) and ts >= year_ago)
 
-    refills = get_refills(user, conn, source_for)
+    refills = get_refills(user, borrowed(conn), source_for)
     deposited = sum(_parse_num(r.amount) for r in refills.rows)
 
-    activities = get_activities(user, conn, source_for)
+    activities = get_activities(user, borrowed(conn), source_for)
     summary = activities.yearly_summary
     realized = sum(_parse_num(y.sales_pnl) for y in summary)
     fees = sum(_parse_num(y.purchases_commission) + _parse_num(y.sales_commission) for y in summary)

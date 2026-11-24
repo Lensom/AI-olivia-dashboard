@@ -19,6 +19,7 @@ import {
 } from "@/features/life/improvements/types";
 import { isWebLink, newId, norm } from "@/features/life/places/types";
 import { apiFetch } from "@/lib/api";
+import { filterSearch, filterSelect } from "@/lib/filter-classes";
 import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 
@@ -517,7 +518,8 @@ function ImprovementsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-5">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="min-w-0 flex-1">
+        {/* basis-64: on a phone the buttons move below instead of squeezing the title into a narrow column. */}
+        <div className="min-w-0 flex-1 basis-64">
           <p className="text-xs font-medium uppercase tracking-[0.15em] text-[#8f8676]">{t("Life")}</p>
           <h1 className="mt-1.5 text-3xl font-semibold text-[#1f1c17]">{t("Improvements")}</h1>
           <p className="mt-1 text-sm text-[#6f675b]">{t("Habits and goals across every area of life: what's done, what's in progress, what's next.")}</p>
@@ -626,7 +628,9 @@ function ImprovementsPage() {
 
           <section className="space-y-2.5" aria-label={t("Filters")}>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex flex-wrap rounded-full border border-black/10 bg-white p-0.5" role="group" aria-label={t("Status")}>
+              {/* Phones: the status pills scroll sideways on a row of their own; wider screens keep one row. */}
+              <div className="scroll-row flex grow basis-full sm:contents">
+              <span className="inline-flex h-8 items-center rounded-full border border-black/10 bg-white p-0.5" role="group" aria-label={t("Status")}>
                 {([["all", t("All"), all.total, ""] as const, ...STATUSES.map((s) => [s.value, t(s.label), rows.filter((r) => r.item.status === s.value).length, s.dot] as const)]).map(([value, label, n, dot]) => (
                   <button
                     key={value}
@@ -640,7 +644,8 @@ function ImprovementsPage() {
                   </button>
                 ))}
               </span>
-              <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label={t("Sort")} className={`${field} rounded-full text-xs`}>
+              </div>
+              <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label={t("Sort")} className={filterSelect}>
                 {SORTS.map((s) => (
                   <option key={s.value} value={s.value}>
                     {t(s.label)}
@@ -652,7 +657,7 @@ function ImprovementsPage() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("Search habits and goals…")}
                 aria-label={t("Search habits and goals…")}
-                className="w-full rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-xs outline-none focus:border-black/25 sm:ml-auto sm:w-56"
+                className={filterSearch}
               />
             </div>
             <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label={t("Area")}>

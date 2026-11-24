@@ -345,7 +345,7 @@ export default function InvestingActivitiesPage() {
           onChange={(e) => setSearch(e.target.value)}
           placeholder={tr("Search ticker, name, category…")}
           aria-label={tr("Search activities")}
-          className="w-full max-w-xs rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20"
+          className="w-full rounded-full border border-black/10 bg-white px-3.5 py-1.5 text-sm text-[#2f2922] outline-none placeholder:text-[#b0a79a] focus:border-black/20 sm:max-w-xs"
         />
         <div className={`${scrollRow} sm:contents`}>
         <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter by type")}>
@@ -361,6 +361,8 @@ export default function InvestingActivitiesPage() {
             </button>
           ))}
         </div>
+        {/* Two groups each with its own selected pill: a divider keeps them from reading as one. */}
+        <span aria-hidden className="mx-0.5 h-5 w-px self-center bg-black/15" />
         <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr("Filter by year")}>
           {(["all", ...years] as const).map((y) => (
             <button key={y} type="button" onClick={() => setYearFilter(y)} className={chip(yearFilter === y)}>

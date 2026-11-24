@@ -5,6 +5,7 @@ from datetime import datetime
 from html import unescape
 from typing import Annotated, Any
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 import json
 import re
 import time
@@ -17,7 +18,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from psycopg import Connection
 from psycopg.types.json import Json
 
-from app.auth.router import get_current_user, get_conn
+from app.auth.router import get_current_user, get_conn, get_db
 from app.auth.schemas import UserResponse
 from app.investing.schemas import (
     InvestingActivitiesResponse,
@@ -731,6 +732,15 @@ def _fetch_finviz_profile(ticker: str) -> InvestingTickerProfile | None:
     return profile
 
 
+# A pool connection borrowed for one block (`with db() as conn:`); see `get_db`.
+Db = Annotated[Callable[[], AbstractContextManager[Connection]], Depends(get_db)]
+
+
+def borrowed(conn: Connection) -> Callable[[], AbstractContextManager[Connection]]:
+    """For calling a `Db` handler from code that already holds a connection: it uses that one."""
+    return lambda: nullcontext(conn)
+
+
 def get_broker_source() -> Callable[[UserResponse], Any]:
     """Overridden in main.py. Returns a function giving the broker source (Freedom24) for an account whose
     data comes from the broker's API, or None (data from this database, as before)."""
@@ -884,12 +894,13 @@ def get_quotes(
 @router.get("/metrics", response_model=InvestingMetricsResponse)
 def get_metrics(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
 ):
-    row = conn.execute(
-        "SELECT holdings FROM investing_holdings WHERE user_id = %s",
-        (user.id,),
-    ).fetchone()
+    with db() as conn:  # returned before the quotes are fetched
+        row = conn.execute(
+            "SELECT holdings FROM investing_holdings WHERE user_id = %s",
+            (user.id,),
+        ).fetchone()
     holdings = row[0] if row and isinstance(row[0], list) else []
     try:
         div_yield_percent, beta, allocation_percent = _calc_metrics_from_holdings(holdings)
@@ -936,13 +947,14 @@ def update_metrics(
 @router.get("/holdings", response_model=InvestingHoldingsResponse)
 def get_holdings(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
-    row = conn.execute(
-        "SELECT holdings, updated_at FROM investing_holdings WHERE user_id = %s",
-        (user.id,),
-    ).fetchone()
+    with db() as conn:  # returned before the broker is asked
+        row = conn.execute(
+            "SELECT holdings, updated_at FROM investing_holdings WHERE user_id = %s",
+            (user.id,),
+        ).fetchone()
     # Broker numbers, with your targets / industries / names from the saved rows.
     live = _live(source_for, user, lambda src: src.holdings(row[0] if row and isinstance(row[0], list) else []))
     if live is not None:
@@ -1320,13 +1332,14 @@ def update_notes(
 @router.get("/activities", response_model=InvestingActivitiesResponse)
 def get_activities(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
-    row = conn.execute(
-        "SELECT activities, updated_at FROM investing_activities WHERE user_id = %s",
-        (user.id,),
-    ).fetchone()
+    with db() as conn:  # returned before the broker and the exchange rates are asked
+        row = conn.execute(
+            "SELECT activities, updated_at FROM investing_activities WHERE user_id = %s",
+            (user.id,),
+        ).fetchone()
     saved = row[0] if row and isinstance(row[0], list) else []
     # Names and categories you gave tickers before carry over to the broker's trades.
     known = {str(a.get("ticker", "")).upper(): (str(a.get("name", "")), str(a.get("category", ""))) for a in saved if isinstance(a, dict)}
@@ -1460,13 +1473,14 @@ def _sort_refill_rows(rows: list[dict]) -> list[dict]:
 @router.get("/refills", response_model=InvestingRefillsResponse)
 def get_refills(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
-    row = conn.execute(
-        "SELECT rows, operating_expenses_usd, updated_at, external_fees_usd, external_fees FROM investing_refills WHERE user_id = %s",
-        (user.id,),
-    ).fetchone()
+    with db() as conn:  # returned before the broker is asked
+        row = conn.execute(
+            "SELECT rows, operating_expenses_usd, updated_at, external_fees_usd, external_fees FROM investing_refills WHERE user_id = %s",
+            (user.id,),
+        ).fetchone()
     fee_rows = [ExternalFeeRow(**r) for r in (row[4] if row and isinstance(row[4], list) else []) if isinstance(r, dict)]
     external = _external_total(fee_rows, str(row[3] if row and row[3] is not None else ""))
     live = _live(source_for, user, lambda src: (src.refills(), src.margin_interest_rows()))
@@ -1521,7 +1535,7 @@ def update_refills(
             (user.id, opx, external, Json(fee_rows)),
         )
         conn.commit()
-        return get_refills(user, conn, source_for)
+        return get_refills(user, borrowed(conn), source_for)
     rows_json = [_normalize_refill_row(r.model_dump()) for r in payload.rows]
     rows_json = _sort_refill_rows(rows_json)
     row = conn.execute(
@@ -1766,10 +1780,11 @@ def _broker_response(data: InvestingBrokerData, updated_at: str | None) -> Inves
 @router.get("/broker", response_model=InvestingBrokerResponse)
 def get_broker(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
 ):
-    row = conn.execute("SELECT data, updated_at FROM investing_broker WHERE user_id = %s", (user.id,)).fetchone()
+    with db() as conn:  # returned before the broker and the exchange rates are asked
+        row = conn.execute("SELECT data, updated_at FROM investing_broker WHERE user_id = %s", (user.id,)).fetchone()
     saved = InvestingBrokerData(**(row[0] if row and isinstance(row[0], dict) else {}))
     # Cash and dividends from the broker; your attention rules stay in the database.
     live = _live(source_for, user, lambda src: (src.cash(), src.dividends()))
@@ -1802,7 +1817,7 @@ def update_broker(
             (user.id, Json(payload.rules.model_dump()), Json(payload.rules.model_dump())),
         )
         conn.commit()
-        return get_broker(user, conn, source_for)
+        return get_broker(user, borrowed(conn), source_for)
     data = payload.model_dump()
     for d in data["dividends"]:  # USD columns are derived, never stored
         d.pop("amount_usd", None)
