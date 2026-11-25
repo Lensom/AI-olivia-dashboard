@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.auth.router import get_current_user, get_conn
 from app.auth.schemas import UserResponse
+from app.versioning import BaseVersion, check_base_version
 
 
 router = APIRouter(prefix="/games", tags=["games"])
@@ -45,7 +46,9 @@ def update_games(
     payload: GameList,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "game_lists", user.id, base_version)
     row = conn.execute(
         """
         INSERT INTO game_lists(user_id, data, updated_at)

@@ -2,6 +2,7 @@
 Run: python -m unittest discover -s tests"""
 
 import asyncio
+from contextlib import nullcontext
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -12,6 +13,9 @@ from app.investing import chat as chat_module
 from app.investing.chat import ChatRequest, chat
 from app.investing.chat_check import check, repair_message
 from app.llm.client import LLMClient, TextResult, Tool
+
+# Stands in for the pool: the facts that need a connection are mocked, so they get None.
+NO_DB = lambda: nullcontext(None)  # noqa: E731
 
 DATA = '{"cash": "$844.98", "cash_share": "12.4%", "net_debt": "$1.2B", "positions": [{"ticker": "TSLA", "weight": "+10.6%"}], "day": "-2.35%"}'
 
@@ -175,7 +179,7 @@ class ChatUsesThem(unittest.TestCase):
             self.addCleanup(patcher.stop)
 
     def run_chat(self, llm, question="How much cash?"):
-        return asyncio.run(chat(ChatRequest(messages=[{"role": "user", "content": question}]), USER, None, llm, lambda user: None))
+        return asyncio.run(chat(ChatRequest(messages=[{"role": "user", "content": question}]), USER, NO_DB, llm, lambda user: None))
 
     def test_a_correct_answer_costs_one_call(self):
         llm = ScriptedLLM("You have $844.98 in cash.")

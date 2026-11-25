@@ -18,8 +18,9 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from psycopg import Connection
 from psycopg.types.json import Json
 
-from app.auth.router import get_current_user, get_conn, get_db
+from app.auth.router import Db, get_current_user, get_conn
 from app.auth.schemas import UserResponse
+from app.versioning import BaseVersion, check_base_version
 from app.investing.schemas import (
     InvestingActivitiesResponse,
     InvestingActivitiesUpdateRequest,
@@ -732,10 +733,6 @@ def _fetch_finviz_profile(ticker: str) -> InvestingTickerProfile | None:
     return profile
 
 
-# A pool connection borrowed for one block (`with db() as conn:`); see `get_db`.
-Db = Annotated[Callable[[], AbstractContextManager[Connection]], Depends(get_db)]
-
-
 def borrowed(conn: Connection) -> Callable[[], AbstractContextManager[Connection]]:
     """For calling a `Db` handler from code that already holds a connection: it uses that one."""
     return lambda: nullcontext(conn)
@@ -969,7 +966,9 @@ def update_holdings(
     payload: InvestingHoldingsUpdateRequest,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "investing_holdings", user.id, base_version)
     holdings_json = [h.model_dump() for h in payload.holdings]
     row = conn.execute(
         """
@@ -1260,7 +1259,9 @@ def update_capital_entries(
     payload: InvestingCapitalEntriesUpdateRequest,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "investing_capital_entries", user.id, base_version)
     entries_json = [e.model_dump() for e in payload.entries]
     row = conn.execute(
         """
@@ -1311,7 +1312,9 @@ def update_notes(
     payload: InvestingNotesUpdateRequest,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "investing_notes", user.id, base_version)
     row = conn.execute(
         """
         INSERT INTO investing_notes(user_id, notes, updated_at)
@@ -1371,7 +1374,9 @@ def update_activities(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
     source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "investing_activities", user.id, base_version)
     if source_for(user) is not None:
         # Trades come from the broker now; the hand-kept table is archived, not edited.
         raise HTTPException(status_code=409, detail="Trades come from Freedom24 and can't be edited here.")
@@ -1428,7 +1433,9 @@ def update_picking(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
     source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "investing_picking", user.id, base_version)
     rows_json = [_pick_row_to_storage(r) for r in payload.rows]
     row = conn.execute(
         """
@@ -1518,7 +1525,9 @@ def update_refills(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
     source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "investing_refills", user.id, base_version)
     opx = str(payload.operating_expenses_usd or "").strip()[:64]
     fee_rows = [r.model_dump() for r in payload.external_fees]
     external = _external_total(payload.external_fees, str(payload.external_fees_usd or "").strip()[:64])
@@ -1662,7 +1671,9 @@ def update_crypto(
     payload: InvestingCryptoUpdateRequest,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "investing_crypto", user.id, base_version)
     holdings = [_normalize_crypto_holding(h.model_dump()) for h in payload.holdings]
     purchases = _sort_crypto_purchases([_normalize_crypto_purchase(p.model_dump()) for p in payload.purchase_rows])
     refills = _sort_crypto_refills([_normalize_crypto_refill(r.model_dump()) for r in payload.refill_rows])
@@ -1716,7 +1727,9 @@ def update_total(
     payload: InvestingTotalData,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "investing_total", user.id, base_version)
     # One row per month (last one wins), oldest first.
     months = {m.month: m for m in payload.months if re.fullmatch(r"\d{4}-\d{2}", m.month)}
     payload.months = [months[k] for k in sorted(months)]
@@ -1805,7 +1818,9 @@ def update_broker(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
     source_for: Annotated[Callable[[UserResponse], Any], Depends(get_broker_source)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "investing_broker", user.id, base_version)
     if source_for(user) is not None:
         # Cash and dividends come from the broker: save only your attention rules, keep the old rows untouched.
         conn.execute(

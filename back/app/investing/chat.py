@@ -15,10 +15,9 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
-from psycopg import Connection
 from pydantic import BaseModel, Field, field_validator
 
-from app.auth.router import get_conn, get_current_user
+from app.auth.router import Db, DbFactory, get_current_user, using
 from app.auth.schemas import UserResponse
 from app.investing.analysis import (
     _PORTFOLIO_KEY,
@@ -104,20 +103,20 @@ class ChatResponse(BaseModel):
     looked_up: list[str] = Field(default_factory=list)  # tickers fetched with get_stock for this answer
 
 
-def _account_facts(conn: Connection, user: UserResponse, source_for: BrokerSource) -> dict[str, Any]:
+def _account_facts(db: DbFactory, user: UserResponse, source_for: BrokerSource) -> dict[str, Any]:
     """The whole account, with the evidence behind holdings and funds, and the last written review."""
     cached = _account_cache.get(user.id)
     if cached and time.time() - cached[1] < _ACCOUNT_TTL:
         return cached[0]
     try:
-        facts, _, _ = _gather_portfolio(conn, user, source_for)
+        facts, _, _ = _gather_portfolio(db, user, source_for)
     except HTTPException as exc:
         if exc.status_code != 404:
             raise
         facts = {"portfolio": "The investor has no holdings yet."}
     else:
         facts.update(_portfolio_insights(facts["positions"]))
-    saved = _load(conn, user.id, _PORTFOLIO_KEY)
+    saved = using(db, _load, user.id, _PORTFOLIO_KEY)
     if saved and isinstance(saved[0].get("analysis"), dict):
         facts["latest_saved_review"] = {"made_at": saved[1], **saved[0]["analysis"]}
     if not facts.get("broker_data_unavailable"):  # a broker outage shouldn't outlive the outage
@@ -125,12 +124,12 @@ def _account_facts(conn: Connection, user: UserResponse, source_for: BrokerSourc
     return facts
 
 
-def _focus_facts(conn: Connection, user: UserResponse, ticker: str, source_for: BrokerSource) -> dict[str, Any] | None:
+def _focus_facts(db: DbFactory, user: UserResponse, ticker: str, source_for: BrokerSource) -> dict[str, Any] | None:
     """The stock the investor has open. Nothing here is essential: without it the chat still works."""
     detail = fetch_detail(ticker)
     if detail is None:
         return None
-    fit = _stock_fit(conn, user, ticker, detail, source_for)
+    fit = _stock_fit(db, user, ticker, detail, source_for)
     news = get_news(ticker=ticker, user=user)
     return {
         "ticker": ticker,
@@ -143,13 +142,13 @@ def _focus_facts(conn: Connection, user: UserResponse, ticker: str, source_for: 
     }
 
 
-def build_context(conn: Connection, user: UserResponse, ticker: str | None, source_for: BrokerSource) -> dict[str, Any]:
+def build_context(db: DbFactory, user: UserResponse, ticker: str | None, source_for: BrokerSource) -> dict[str, Any]:
     context: dict[str, Any] = {
         "today": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "account": _account_facts(conn, user, source_for),
+        "account": _account_facts(db, user, source_for),
     }
     if ticker:
-        context["stock_open_on_screen"] = _focus_facts(conn, user, ticker.upper(), source_for)
+        context["stock_open_on_screen"] = _focus_facts(db, user, ticker.upper(), source_for)
     return context
 
 
@@ -157,7 +156,7 @@ def system_instruction(context: dict[str, Any]) -> str:
     return f"{_SYSTEM}\n\n## Data (JSON)\n{json.dumps(context, ensure_ascii=False, default=str)}"
 
 
-def stock_tool(conn: Connection, user: UserResponse, source_for: BrokerSource, found: dict[str, Any]) -> Tool:
+def stock_tool(db: DbFactory, user: UserResponse, source_for: BrokerSource, found: dict[str, Any]) -> Tool:
     """get_stock: the same facts as for the stock open on screen. What it returns is kept in `found` for the check."""
 
     async def run(args: dict[str, Any]) -> dict[str, Any]:
@@ -168,7 +167,7 @@ def stock_tool(conn: Connection, user: UserResponse, source_for: BrokerSource, f
             return found[ticker]
         if len(found) >= _MAX_LOOKUPS:
             return {"error": f"At most {_MAX_LOOKUPS} lookups per message. Answer with what you have."}
-        facts = await run_in_threadpool(_focus_facts, conn, user, ticker, source_for)
+        facts = await run_in_threadpool(_focus_facts, db, user, ticker, source_for)
         found[ticker] = facts or {"error": f"No market data found for {ticker}. Check the ticker."}
         return found[ticker]
 
@@ -191,13 +190,14 @@ def stock_tool(conn: Connection, user: UserResponse, source_for: BrokerSource, f
 async def chat(
     payload: ChatRequest,
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     llm: Annotated[LLMClient | None, Depends(get_llm)],
     source_for: Annotated[BrokerSource, Depends(get_broker_source)],
 ):
     if llm is None:
         raise HTTPException(status_code=503, detail="AI analysis is not configured: set GEMINI_API_KEY in back/.env")
-    context = await run_in_threadpool(build_context, conn, user, payload.ticker, source_for)
+    # No connection is held while the model answers: the facts borrow one per query (see `using`).
+    context = await run_in_threadpool(build_context, db, user, payload.ticker, source_for)
     # Gemini wants a conversation to open with the user, so a cut mustn't leave an assistant turn first.
     history = payload.messages[-_MAX_HISTORY:]
     while history[0].role != "user":
@@ -205,7 +205,7 @@ async def chat(
     messages = [ChatMessage(role=m.role, content=m.content) for m in history]
     system = system_instruction(context)
     found: dict[str, Any] = {}
-    tools = [stock_tool(conn, user, source_for, found)]
+    tools = [stock_tool(db, user, source_for, found)]
     result = await _guarded(llm, "chat", lambda: llm.chat(messages, system, tools=tools))
 
     reply, model, corrected = result.value, result.model, False

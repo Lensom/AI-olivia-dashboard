@@ -14,7 +14,7 @@ from fastapi.concurrency import run_in_threadpool
 from psycopg import Connection
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
-from app.auth.router import get_conn, get_current_user
+from app.auth.router import Db, get_conn, get_current_user, using
 from app.auth.schemas import UserResponse
 from app.investing.analysis import StockAnalysis, _load, _run, _save, get_llm
 from app.library.router import _best_match, _norm, get_google_books_key
@@ -192,14 +192,15 @@ def get_picks(
 @router.post("", response_model=ReadingTasteResponse)
 async def make_picks(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     llm: Annotated[LLMClient | None, Depends(get_llm)],
     gkey: Annotated[str, Depends(get_google_books_key)],
     lang: Annotated[Literal["en", "uk"], Query()] = "en",
 ):
     if llm is None:
         raise HTTPException(status_code=503, detail="AI analysis is not configured: set GEMINI_API_KEY in back/.env")
-    row = await run_in_threadpool(lambda: conn.execute("SELECT data FROM library_items WHERE user_id = %s", (user.id,)).fetchone())
+    # Reads and the save borrow a connection each (`using`): none is held while the model and the catalogues answer.
+    row = await run_in_threadpool(using, db, lambda conn: conn.execute("SELECT data FROM library_items WHERE user_id = %s", (user.id,)).fetchone())
     items = LibraryData(**(row[0] if row and isinstance(row[0], dict) else {})).items
     if sum(1 for t in items if t.score is not None) < 5:
         raise HTTPException(status_code=400, detail="Score at least 5 books first, so there's a taste to read.")
@@ -225,5 +226,5 @@ async def make_picks(
         "lang": lang,
         "titles": len(items),
     }
-    created_at = await run_in_threadpool(_save, conn, user.id, _KEY, data)
+    created_at = await run_in_threadpool(using, db, _save, user.id, _KEY, data)
     return ReadingTasteResponse(**data, created_at=created_at)

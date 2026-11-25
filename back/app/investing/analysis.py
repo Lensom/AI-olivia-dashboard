@@ -23,7 +23,7 @@ from psycopg import Connection
 from psycopg.types.json import Json
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
-from app.auth.router import get_conn, get_current_user
+from app.auth.router import Db, DbFactory, get_conn, get_current_user, using
 from app.auth.schemas import UserResponse
 from app.investing.router import (
     _enrich_picking_rows,
@@ -65,8 +65,8 @@ def _from_saved_copy(user: UserResponse, source_for: BrokerSource, *responses: A
     return source_for(user) is not None and any(r.source != "freedom24" for r in responses)
 
 
-def _account_holdings(conn: Connection, user: UserResponse, source_for: BrokerSource) -> list[dict[str, Any]]:
-    return [h.model_dump() for h in get_holdings(user, borrowed(conn), source_for).holdings]
+def _account_holdings(db: DbFactory, user: UserResponse, source_for: BrokerSource) -> list[dict[str, Any]]:
+    return [h.model_dump() for h in get_holdings(user, db, source_for).holdings]
 
 
 class StockAnalysis(BaseModel):
@@ -145,29 +145,29 @@ def _plain(text: str) -> str:
 
 
 def _gather(
-    conn: Connection,
+    db: DbFactory,
     user: UserResponse,
     ticker: str,
     source_for: BrokerSource,
     weight: float | None = None,
 ) -> tuple[dict[str, Any], float | None]:
     """Everything known about the ticker (with the arithmetic done here rather than by the model), and today's price."""
-    picking = conn.execute("SELECT rows FROM investing_picking WHERE user_id = %s", (user.id,)).fetchone()
+    picking = using(db, _one, "SELECT rows FROM investing_picking WHERE user_id = %s", (user.id,))
     rows = [_normalize_stored_picking_row(r) for r in (picking[0] if picking and isinstance(picking[0], list) else []) if isinstance(r, dict)]
     row = next((r for r in rows if r["ticker"].strip().upper() == ticker), None)
 
-    held = get_holdings(user, borrowed(conn), source_for)
+    held = get_holdings(user, db, source_for)
     holding = next((h.model_dump() for h in held.holdings if h.ticker.strip().upper() == ticker), None)
     if row is None and holding is None:
         raise HTTPException(status_code=404, detail="Ticker is not in your watchlist or portfolio")
 
-    activities = get_activities(user, borrowed(conn), source_for)
+    activities = get_activities(user, db, source_for)
     trades = [
         a.model_dump() for a in activities.activities
         if a.ticker.strip().upper() == ticker and a.type in ("buy", "sell")
     ]
     trades.sort(key=lambda a: _parse_date(a.get("date", "")))  # DD.MM.YYYY: as text, the order would be wrong
-    notes = conn.execute("SELECT notes FROM investing_notes WHERE user_id = %s", (user.id,)).fetchone()
+    notes = using(db, _one, "SELECT notes FROM investing_notes WHERE user_id = %s", (user.id,))
 
     snap = _fetch_snapshot(ticker)
     price = _num(_enrich_picking_rows([row])[0]["current_price"]) if row else None
@@ -285,6 +285,11 @@ async def _guarded(llm: LLMClient, label: str, call: Callable[[], Awaitable[R]])
         ) from exc
     finally:
         logger.info("AI analysis %s: %s", label, llm.usage.summary())
+
+
+def _one(conn: Connection, query: str, params: tuple[Any, ...]) -> Any:
+    """One row; with `using(db, _one, ...)` the connection is returned right after it."""
+    return conn.execute(query, params).fetchone()
 
 
 def _save(conn: Connection, user_id: int, key: str, data: dict[str, Any]) -> str:
@@ -469,14 +474,14 @@ def _signed_usd(v: float) -> str:
     return f"{'+' if v >= 0 else '−'}${abs(v):,.2f}"
 
 
-def _gather_portfolio(conn: Connection, user: UserResponse, source_for: BrokerSource) -> tuple[dict[str, Any], float, set[str]]:
+def _gather_portfolio(db: DbFactory, user: UserResponse, source_for: BrokerSource) -> tuple[dict[str, Any], float, set[str]]:
     """The whole account at live prices, with every ratio worked out here. Returns (facts, account value, known tickers)."""
-    held = get_holdings(user, borrowed(conn), source_for)
+    held = get_holdings(user, db, source_for)
     holdings = [h for h in (x.model_dump() for x in held.holdings) if str(h.get("ticker", "")).strip() and float(h.get("shares") or 0) > 0]
     if not holdings:
         raise HTTPException(status_code=404, detail="No holdings yet — add them on the Portfolio tab")
 
-    picking = conn.execute("SELECT rows FROM investing_picking WHERE user_id = %s", (user.id,)).fetchone()
+    picking = using(db, _one, "SELECT rows FROM investing_picking WHERE user_id = %s", (user.id,))
     watch = [_normalize_stored_picking_row(r) for r in (picking[0] if picking and isinstance(picking[0], list) else []) if isinstance(r, dict)]
     owned = list(dict.fromkeys(str(h["ticker"]).strip().upper() for h in holdings))
     tickers = list(dict.fromkeys([*owned, *(r["ticker"].strip().upper() for r in watch if r["ticker"].strip())]))
@@ -507,21 +512,21 @@ def _gather_portfolio(conn: Connection, user: UserResponse, source_for: BrokerSo
     invested = sum(p["value"] for p in positions)
     cost = sum(p["cost"] for p in positions)
 
-    broker = get_broker(user, borrowed(conn), source_for)
+    broker = get_broker(user, db, source_for)
     to_usd = get_rates(user=user).to_usd
     cash = sum(_parse_num(c.amount) * to_usd.get((c.currency or "USD").strip().upper(), 0.0) for c in broker.cash)
     year_ago = datetime.now().timestamp() - 365 * 86400
     dividends_12m = sum(d.amount_usd for d in broker.dividends if (ts := _dmy_ts(d.date)) and ts >= year_ago)
 
-    refills = get_refills(user, borrowed(conn), source_for)
+    refills = get_refills(user, db, source_for)
     deposited = sum(_parse_num(r.amount) for r in refills.rows)
 
-    activities = get_activities(user, borrowed(conn), source_for)
+    activities = get_activities(user, db, source_for)
     summary = activities.yearly_summary
     realized = sum(_parse_num(y.sales_pnl) for y in summary)
     fees = sum(_parse_num(y.purchases_commission) + _parse_num(y.sales_commission) for y in summary)
 
-    notes = conn.execute("SELECT notes FROM investing_notes WHERE user_id = %s", (user.id,)).fetchone()
+    notes = using(db, _one, "SELECT notes FROM investing_notes WHERE user_id = %s", (user.id,))
     account = invested + cash
 
     def weight(v: float) -> float:
@@ -745,14 +750,14 @@ def get_portfolio_analysis(
 @router.post("/portfolio", response_model=PortfolioAnalysisResponse)
 async def analyze_portfolio(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     llm: Annotated[LLMClient | None, Depends(get_llm)],
     source_for: Annotated[BrokerSource, Depends(get_broker_source)],
     lang: Annotated[Literal["en", "uk"], Query()] = "en",
 ):
     if llm is None:
         raise HTTPException(status_code=503, detail="AI analysis is not configured: set GEMINI_API_KEY in back/.env")
-    facts, account, tickers = await run_in_threadpool(_gather_portfolio, conn, user, source_for)
+    facts, account, tickers = await run_in_threadpool(_gather_portfolio, db, user, source_for)
     facts.update(await run_in_threadpool(_portfolio_insights, facts["positions"]))
     result = await _run(
         llm,
@@ -769,7 +774,7 @@ async def analyze_portfolio(
         "account_value": round(account, 2),
         "stale_data": bool(facts["broker_data_unavailable"]),
     }
-    created_at = await run_in_threadpool(_save, conn, user.id, _PORTFOLIO_KEY, data)
+    created_at = await run_in_threadpool(using, db, _save, user.id, _PORTFOLIO_KEY, data)
     return PortfolioAnalysisResponse(**data, created_at=created_at)
 
 
@@ -908,16 +913,16 @@ def compute_fit(
     )
 
 
-def _stock_fit(conn: Connection, user: UserResponse, ticker: str, detail: StockDetail | None, source_for: BrokerSource) -> StockFit:
+def _stock_fit(db: DbFactory, user: UserResponse, ticker: str, detail: StockDetail | None, source_for: BrokerSource) -> StockFit:
     """The fit at live prices. Without any holdings there's simply nothing to compare with."""
-    picking = conn.execute("SELECT rows FROM investing_picking WHERE user_id = %s", (user.id,)).fetchone()
+    picking = using(db, _one, "SELECT rows FROM investing_picking WHERE user_id = %s", (user.id,))
     rows = [_normalize_stored_picking_row(r) for r in (picking[0] if picking and isinstance(picking[0], list) else []) if isinstance(r, dict)]
     row = next((r for r in rows if r["ticker"].strip().upper() == ticker), None)
     bucket_of = {r["ticker"].strip().upper(): r["bucket"] for r in rows}
 
-    by_ticker = {str(h.get("ticker", "")).strip().upper(): h for h in _account_holdings(conn, user, source_for)}
+    by_ticker = {str(h.get("ticker", "")).strip().upper(): h for h in _account_holdings(db, user, source_for)}
     # A target can be set on a saved row before you own the stock, and the broker lists only what you own.
-    stored = conn.execute("SELECT holdings FROM investing_holdings WHERE user_id = %s", (user.id,)).fetchone()
+    stored = using(db, _one, "SELECT holdings FROM investing_holdings WHERE user_id = %s", (user.id,))
     saved = {str(h.get("ticker", "")).strip().upper(): h for h in (stored[0] if stored and isinstance(stored[0], list) else []) if isinstance(h, dict)}
     target = _num(by_ticker.get(ticker, {}).get("targetWeight")) or _num(saved.get(ticker, {}).get("targetWeight"))
 
@@ -925,7 +930,7 @@ def _stock_fit(conn: Connection, user: UserResponse, ticker: str, detail: StockD
     cash: float | None = None
     stale = False
     try:
-        facts, _, _ = _gather_portfolio(conn, user, source_for)
+        facts, _, _ = _gather_portfolio(db, user, source_for)
     except HTTPException as exc:
         if exc.status_code != 404:
             raise
@@ -1192,15 +1197,15 @@ def _review_prompt(ticker: str, facts: dict[str, Any], headlines: list[str], lan
 
 async def _build_review(
     llm: LLMClient,
-    conn: Connection,
+    db: DbFactory,
     user: UserResponse,
     sym: str,
     lang: str,
     source_for: BrokerSource,
 ) -> dict[str, Any]:
     detail = await run_in_threadpool(fetch_detail, sym)
-    fit = await run_in_threadpool(_stock_fit, conn, user, sym, detail, source_for)
-    facts, _ = await run_in_threadpool(_gather, conn, user, sym, source_for, fit.weight)
+    fit = await run_in_threadpool(_stock_fit, db, user, sym, detail, source_for)
+    facts, _ = await run_in_threadpool(_gather, db, user, sym, source_for, fit.weight)
     if detail:
         facts["company"] = _company_facts(detail)
     facts["fit"] = _fit_facts(fit)
@@ -1222,11 +1227,11 @@ async def _build_review(
 def get_stock_fit(
     ticker: Annotated[str, _TICKER],
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     source_for: Annotated[BrokerSource, Depends(get_broker_source)],
 ):
     sym = ticker.upper()
-    return _stock_fit(conn, user, sym, fetch_detail(sym), source_for)
+    return _stock_fit(db, user, sym, fetch_detail(sym), source_for)
 
 
 @router.get("/{ticker}/review", response_model=StockReviewResponse | None)
@@ -1249,7 +1254,7 @@ def get_stock_review(
 async def review_stock(
     ticker: Annotated[str, _TICKER],
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     llm: Annotated[LLMClient | None, Depends(get_llm)],
     source_for: Annotated[BrokerSource, Depends(get_broker_source)],
     lang: Annotated[Literal["en", "uk"], Query()] = "en",
@@ -1257,8 +1262,8 @@ async def review_stock(
     if llm is None:
         raise HTTPException(status_code=503, detail="AI analysis is not configured: set GEMINI_API_KEY in back/.env")
     sym = ticker.upper()
-    data = await _build_review(llm, conn, user, sym, lang, source_for)
-    created_at = await run_in_threadpool(_save, conn, user.id, _review_key(sym), data)
+    data = await _build_review(llm, db, user, sym, lang, source_for)
+    created_at = await run_in_threadpool(using, db, _save, user.id, _review_key(sym), data)
     return StockReviewResponse(**data, created_at=created_at)
 
 
@@ -1285,7 +1290,7 @@ def get_analysis(
 async def analyze(
     ticker: Annotated[str, _TICKER],
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     llm: Annotated[LLMClient | None, Depends(get_llm)],
     source_for: Annotated[BrokerSource, Depends(get_broker_source)],
     lang: Annotated[Literal["en", "uk"], Query()] = "en",
@@ -1294,7 +1299,7 @@ async def analyze(
     if llm is None:
         raise HTTPException(status_code=503, detail="AI analysis is not configured: set GEMINI_API_KEY in back/.env")
     sym = ticker.upper()
-    facts, price = await run_in_threadpool(_gather, conn, user, sym, source_for, weight)
+    facts, price = await run_in_threadpool(_gather, db, user, sym, source_for, weight)
     news = await run_in_threadpool(get_news, ticker=sym, user=user)
     headlines = [f"{(n.published or '')[:10]} {n.title}".strip() for n in news.items[:8]]
     result = await _run(llm, _prompt(facts, headlines, lang), StockAnalysis, label=sym, context={"lang": lang}, system=_SYSTEM)
@@ -1306,5 +1311,5 @@ async def analyze(
         "price": price,
         "stale_data": bool(facts["broker_data_unavailable"]),
     }
-    created_at = await run_in_threadpool(_save, conn, user.id, sym, data)
+    created_at = await run_in_threadpool(using, db, _save, user.id, sym, data)
     return AnalysisResponse(**data, created_at=created_at)

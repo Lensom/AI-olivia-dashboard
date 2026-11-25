@@ -34,6 +34,7 @@ from app.library.schemas import (
     LibraryResponse,
 )
 from app.llm.client import LLMClient
+from app.versioning import BaseVersion, check_base_version
 
 
 router = APIRouter(prefix="/library", tags=["library"])
@@ -316,7 +317,9 @@ def update_library(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
     gkey: Annotated[str, Depends(get_google_books_key)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "library_items", user.id, base_version)
     data = payload.model_dump()
     if "lists" not in payload.model_fields_set:
         saved = conn.execute("SELECT data->'lists' FROM library_items WHERE user_id = %s", (user.id,)).fetchone()

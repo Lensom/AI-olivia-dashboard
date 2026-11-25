@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.auth.router import get_conn, get_current_user
 from app.auth.schemas import UserResponse
+from app.versioning import BaseVersion, check_base_version
 
 router = APIRouter(prefix="/life/improvements", tags=["improvements"])
 
@@ -82,7 +83,9 @@ def save_improvements(
     payload: Improvements,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "improvement_lists", user.id, base_version)
     row = conn.execute(
         """
         INSERT INTO improvement_lists(user_id, data, updated_at)

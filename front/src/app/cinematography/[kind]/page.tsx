@@ -28,6 +28,7 @@ import {
   scrollRow,
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { facetCounts } from "@/lib/facets";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useCinema } from "@/state/cinema-store";
@@ -92,45 +93,36 @@ export default function CinemaKindPage() {
   // A title opened from global search (?open=<id>).
   const { linked, dismiss } = useLinkedItem(mine);
   const editing = dialog?.mode === "edit" ? dialog : linked ? { mode: "edit" as const, title: linked, isNew: false } : null;
-  const genres = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const t of mine) for (const g of t.genres) counts.set(g, (counts.get(g) ?? 0) + 1);
-    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  }, [mine]);
-  // Years present on this page, newest first, with how many titles each has.
-  const yearOptions = useMemo(() => {
-    const count = (pick: (t: CinemaTitle) => number | null) => {
-      const m = new Map<number, number>();
-      for (const t of mine) {
-        const y = pick(t);
-        if (y != null) m.set(y, (m.get(y) ?? 0) + 1);
-      }
-      return [...m.entries()].sort((a, b) => b[0] - a[0]);
-    };
-    return { release: count((t) => t.year), view: count((t) => t.view_year) };
-  }, [mine]);
-  const statusCounts = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const t of mine) c[t.status] = (c[t.status] ?? 0) + 1;
-    return c;
-  }, [mine]);
-
-  const visible = useMemo(() => {
+  // Whether a title passes the filters. `skip` leaves one filter out: a status chip or a year/genre option counts
+  // the titles you'd see after picking it, i.e. with every *other* filter applied. Counting them over the whole
+  // list made "Watched in 2026 (27)" show 21 titles while the Watched chip was on.
+  const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = mine.filter(
-      (t) =>
-        (status === "all" || t.status === status) &&
-        (!genre || t.genres.includes(genre)) &&
-        (!releaseYear || String(t.year) === releaseYear) &&
-        (!viewYear || String(t.view_year) === viewYear) &&
-        (!onlyRecommended || t.recommended) &&
-        (!onlyNewSeasons || newSeasons(t) > 0) &&
-        (!onlyInCinema || t.in_cinema) &&
-        (!q ||
-          [t.title, t.original_title, ...t.actors, ...t.studios, ...t.directors, ...t.genres].some((s) => s.toLowerCase().includes(q))),
-    );
-    return sortTitles(filtered, sort);
-  }, [mine, query, status, genre, releaseYear, viewYear, onlyRecommended, onlyNewSeasons, onlyInCinema, sort]);
+    return (t: CinemaTitle, skip?: "status" | "genre" | "releaseYear" | "viewYear") =>
+      (skip === "status" || status === "all" || t.status === status) &&
+      (skip === "genre" || !genre || t.genres.includes(genre)) &&
+      (skip === "releaseYear" || !releaseYear || String(t.year) === releaseYear) &&
+      (skip === "viewYear" || !viewYear || String(t.view_year) === viewYear) &&
+      (!onlyRecommended || t.recommended) &&
+      (!onlyNewSeasons || newSeasons(t) > 0) &&
+      (!onlyInCinema || t.in_cinema) &&
+      (!q || [t.title, t.original_title, ...t.actors, ...t.studios, ...t.directors, ...t.genres].some((s) => s.toLowerCase().includes(q)));
+  }, [query, status, genre, releaseYear, viewYear, onlyRecommended, onlyNewSeasons, onlyInCinema]);
+
+  const genres = useMemo(
+    () => [...facetCounts(mine, (t) => matches(t, "genre"), (t) => t.genres, genre)].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+    [mine, matches, genre],
+  );
+  // Years present on this page, newest first, with how many titles each would show.
+  const yearOptions = useMemo(() => {
+    const byYear = (pick: (t: CinemaTitle) => number | null, skip: "releaseYear" | "viewYear", picked: string) =>
+      [...facetCounts(mine, (t) => matches(t, skip), (t) => [pick(t)], picked ? Number(picked) : null)].sort((a, b) => b[0] - a[0]);
+    return { release: byYear((t) => t.year, "releaseYear", releaseYear), view: byYear((t) => t.view_year, "viewYear", viewYear) };
+  }, [mine, matches, releaseYear, viewYear]);
+  const statusCounts = useMemo(() => facetCounts(mine, (t) => matches(t, "status"), (t) => [t.status]), [mine, matches]);
+  const statusTotal = useMemo(() => [...statusCounts.values()].reduce((a, n) => a + n, 0), [statusCounts]);
+
+  const visible = useMemo(() => sortTitles(mine.filter((t) => matches(t)), sort), [mine, matches, sort]);
   const inCinemaCount = useMemo(() => mine.filter((t) => t.in_cinema).length, [mine]);
 
   const missingTmdb = mine.filter((t) => !t.tmdb_id).length;
@@ -379,11 +371,11 @@ export default function CinemaKindPage() {
         />
         <div className={`${scrollRow} sm:contents`}>
         <button type="button" onClick={() => setStatus("all")} className={chip(status === "all")}>
-          {tr("All")} {mine.length}
+          {tr("All")} {statusTotal}
         </button>
-        {STATUSES.filter((s) => statusCounts[s.value]).map((s) => (
+        {STATUSES.filter((s) => statusCounts.get(s.value) || status === s.value).map((s) => (
           <button key={s.value} type="button" onClick={() => setStatus(s.value)} className={chip(status === s.value)}>
-            {tr(s.label)} {statusCounts[s.value]}
+            {tr(s.label)} {statusCounts.get(s.value) ?? 0}
           </button>
         ))}
         <button type="button" onClick={() => setOnlyRecommended((v) => !v)} className={chip(onlyRecommended)} aria-pressed={onlyRecommended}>

@@ -21,7 +21,7 @@ from psycopg import Connection
 from psycopg.types.json import Json
 
 from app import cache
-from app.auth.router import get_current_user, get_conn
+from app.auth.router import Db, get_current_user, get_conn
 from app.auth.schemas import UserResponse
 from app.cinema.schemas import (
     CinemaAiring,
@@ -41,6 +41,7 @@ from app.cinema.schemas import (
     CinemaTitle,
 )
 from app.investing.router import _read_import_table
+from app.versioning import BaseVersion, check_base_version
 
 
 router = APIRouter(prefix="/cinema", tags=["cinema"])
@@ -318,6 +319,16 @@ def _language(conn: Connection, user_id: int) -> str:
     return (row[0] if row and row[0] else None) or CinemaData().language
 
 
+def user_language(user: Annotated[UserResponse, Depends(get_current_user)], db: Db) -> str:
+    """The account's TMDB language, read over a connection returned at once: the TMDB calls that follow can take
+    seconds, and holding a pool connection idle for them made other requests wait for one."""
+    with db() as conn:
+        return _language(conn, user.id)
+
+
+Language = Annotated[str, Depends(user_language)]
+
+
 @router.get("", response_model=CinemaResponse)
 def get_cinema(
     user: Annotated[UserResponse, Depends(get_current_user)],
@@ -335,7 +346,9 @@ def update_cinema(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
     tmdb_key: Annotated[str, Depends(get_tmdb_key)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "cinema_titles", user.id, base_version)
     data = payload.model_dump()
     if "lists" not in payload.model_fields_set:
         # A client that doesn't know about lists (e.g. a tab opened before they existed) must not wipe them.
@@ -365,24 +378,24 @@ def update_cinema(
 @router.get("/search", response_model=list[CinemaSearchResult])
 def search_titles(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    language: Language,
     tmdb_key: Annotated[str, Depends(get_tmdb_key)],
     q: str = Query(min_length=1, max_length=200),
     kind: CinemaKind = "film",
     year: int | None = None,
 ):
-    return _search(tmdb_key, _language(conn, user.id), q.strip(), kind, year)
+    return _search(tmdb_key, language, q.strip(), kind, year)
 
 
 @router.get("/details", response_model=CinemaDetails)
 def title_details(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    language: Language,
     tmdb_key: Annotated[str, Depends(get_tmdb_key)],
     media: Literal["movie", "tv"],
     tmdb_id: int,
 ):
-    return _details(tmdb_key, _language(conn, user.id), media, tmdb_id)
+    return _details(tmdb_key, language, media, tmdb_id)
 
 
 def _kind_fit(r: CinemaSearchResult, kind: str) -> int:
@@ -445,14 +458,14 @@ def _best_match(key: str, language: str, title: str, kind: str, year: int | None
 @router.get("/match", response_model=CinemaDetails | None)
 def match_title(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    language: Language,
     tmdb_key: Annotated[str, Depends(get_tmdb_key)],
     title: str = Query(min_length=1, max_length=200),
     kind: CinemaKind = "film",
     year: int | None = None,
 ):
     """Best TMDB match for a title typed by hand or imported (null when nothing fits)."""
-    return _best_match(tmdb_key, _language(conn, user.id), title, kind, year)
+    return _best_match(tmdb_key, language, title, kind, year)
 
 
 # Header aliases, lower-cased: English and Ukrainian, as exported from Notion or typed by hand.
@@ -610,13 +623,12 @@ async def import_titles(
 def match_many(
     payload: list[CinemaTitle],
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    language: Language,
     tmdb_key: Annotated[str, Depends(get_tmdb_key)],
 ):
     """Best match for up to 20 titles at once (used by "Fill from TMDB"), in the same order."""
     if not tmdb_key:
         _tmdb_get(tmdb_key, "", {})  # raises the "not configured" error
-    language = _language(conn, user.id)
 
     def one(t: CinemaTitle) -> CinemaDetails | None:
         try:
@@ -664,13 +676,12 @@ def imdb_ratings(
 def airing(
     payload: list[CinemaTitle],
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    language: Language,
     tmdb_key: Annotated[str, Depends(get_tmdb_key)],
 ):
     """Fresh seasons, next episode / premiere and franchise per title id, for up to 60 TMDB-linked titles."""
     if not tmdb_key:
         return {}
-    language = _language(conn, user.id)
 
     def one(t: CinemaTitle) -> tuple[str, CinemaAiring | None]:
         media: Literal["movie", "tv"] = "tv" if t.tmdb_media == "tv" else "movie"
@@ -689,13 +700,12 @@ def airing(
 def collections(
     payload: list[int],
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    language: Language,
     tmdb_key: Annotated[str, Depends(get_tmdb_key)],
 ):
     """The films of each TMDB collection (franchise), in release order; unknown ids are left out."""
     if not tmdb_key:
         return []
-    language = _language(conn, user.id)
 
     def one(cid: int) -> CinemaCollection | None:
         try:
@@ -737,14 +747,13 @@ def collections(
 def people(
     payload: CinemaPeopleRequest,
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    language: Language,
     tmdb_key: Annotated[str, Depends(get_tmdb_key)],
 ):
     """Released films of each director or actor, found on TMDB by name: what of theirs you haven't seen.
     Names TMDB can't place are left out. Answers are kept a week (app/cache.py)."""
     if not tmdb_key:
         return []
-    language = _language(conn, user.id)
     department = "Directing" if payload.role == "director" else "Acting"
     today = date.today().isoformat()
     names = list(dict.fromkeys(n.strip() for n in payload.names if n.strip()))
@@ -807,15 +816,16 @@ def fix_year(
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
 ):
-    """Fixes a year: the titles you watched in it, as they are now. Fixing it again replaces the copy."""
+    """Fixes a year: the titles you watched in it, as they are now. Fixing it again replaces the copy.
+    Leaves `updated_at` alone: it is the list's version (app/versioning.py), and the list doesn't change here, so
+    the next save of the list from this tab must not look like a conflict."""
     if len(payload) > 3000:
         raise HTTPException(status_code=422, detail="Too many titles for one year")
     fixed = CinemaYear(taken_at=date.today().isoformat(), items=[t.model_copy(update=_YEAR_BLANKS) for t in payload])
     row = conn.execute(
         """
         UPDATE cinema_titles
-        SET data = jsonb_set(data, '{years}', COALESCE(data->'years', '{}'::jsonb) || jsonb_build_object(%s::text, %s::jsonb)),
-            updated_at = NOW()
+        SET data = jsonb_set(data, '{years}', COALESCE(data->'years', '{}'::jsonb) || jsonb_build_object(%s::text, %s::jsonb))
         WHERE user_id = %s
         RETURNING 1
         """,

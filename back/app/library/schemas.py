@@ -2,13 +2,26 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.cinema.schemas import CinemaList
 
 LibraryKind = Literal["book", "comic", "manga", "magazine"]
 LibraryStatus = Literal["read", "reading", "planned", "dropped"]
 LibrarySource = Literal["openlibrary", "google", ""]
+
+
+def unique_genres(genres: list[str]) -> list[str]:
+    """Each genre once, in its first spelling: catalogues repeat subjects ("Mythology", …, "Mythology"), which
+    counted a book twice in the genre filter and gave React two children with one key."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for g in genres:
+        g = g.strip()
+        if g and g.casefold() not in seen:
+            seen.add(g.casefold())
+            out.append(g)
+    return out
 
 
 class LibraryItem(BaseModel):
@@ -42,6 +55,11 @@ class LibraryItem(BaseModel):
     series_name: str = ""
     wikidata_synced: str = ""  # ISO date of the last lookup
 
+    @field_validator("genres")
+    @classmethod
+    def _unique_genres(cls, v: list[str]) -> list[str]:
+        return unique_genres(v)
+
 
 class LibraryData(BaseModel):
     items: list[LibraryItem] = Field(default_factory=list)
@@ -71,6 +89,11 @@ class LibraryDetails(BaseModel):
     language: str = ""
     source_rating: float | None = None
     source_votes: int | None = None
+
+    @field_validator("genres")
+    @classmethod
+    def _unique_genres(cls, v: list[str]) -> list[str]:
+        return unique_genres(v)
 
 
 class LibraryMatchRequest(BaseModel):

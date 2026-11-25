@@ -2,6 +2,7 @@
 Run: python -m unittest discover -s tests"""
 
 import asyncio
+from contextlib import nullcontext
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -12,6 +13,9 @@ from pydantic import ValidationError
 from app.investing import chat as chat_module
 from app.investing.chat import ChatRequest, build_context, chat, system_instruction
 from app.llm.client import StructuredResult
+
+# Stands in for the pool: the facts that need a connection are mocked, so they get None.
+NO_DB = lambda: nullcontext(None)  # noqa: E731
 
 USER = SimpleNamespace(id=7, email="me@example.com")
 ACCOUNT = {"account": {"cash": "$844.98"}, "positions": [{"ticker": "TSLA"}], "broker_data_unavailable": None}
@@ -45,7 +49,7 @@ class Base(unittest.TestCase):
             self.addCleanup(patcher.stop)
 
     def run_chat(self, payload, llm=None, gather=None):
-        return asyncio.run(chat(ChatRequest(**payload), USER, None, llm, lambda user: None))
+        return asyncio.run(chat(ChatRequest(**payload), USER, NO_DB, llm, lambda user: None))
 
 
 class Context(Base):
@@ -60,19 +64,19 @@ class Context(Base):
 
     def test_a_conversation_reuses_the_account_for_a_while(self):
         for _ in range(3):
-            build_context(None, USER, None, lambda user: None)
+            build_context(NO_DB, USER, None, lambda user: None)
         self.assertEqual(self.gather.call_count, 1)
 
     def test_accounts_never_share_a_context(self):
-        build_context(None, USER, None, lambda user: None)
-        build_context(None, SimpleNamespace(id=8, email="x@example.com"), None, lambda user: None)
+        build_context(NO_DB, USER, None, lambda user: None)
+        build_context(NO_DB, SimpleNamespace(id=8, email="x@example.com"), None, lambda user: None)
         self.assertEqual(self.gather.call_count, 2)
 
     def test_a_broker_outage_is_flagged_and_not_remembered(self):
         self.gather.return_value = ({**ACCOUNT, "broker_data_unavailable": True}, 1000.0, set())
         res = self.run_chat({"messages": turns("Hi")}, FakeLLM())
         self.assertTrue(res.stale_data)
-        build_context(None, USER, None, lambda user: None)
+        build_context(NO_DB, USER, None, lambda user: None)
         self.assertEqual(self.gather.call_count, 2)
 
     def test_no_holdings_still_answers(self):
@@ -83,7 +87,7 @@ class Context(Base):
 
     def test_the_open_stock_is_added_and_a_failure_there_is_survivable(self):
         with mock.patch.object(chat_module, "fetch_detail", return_value=None):
-            context = build_context(None, USER, "aapl", lambda user: None)
+            context = build_context(NO_DB, USER, "aapl", lambda user: None)
         self.assertIsNone(context["stock_open_on_screen"])
         self.assertIn("stock_open_on_screen", system_instruction(context))
 

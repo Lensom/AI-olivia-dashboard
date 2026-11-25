@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from app.investing import analysis
+from app.investing.router import borrowed
 
 USER = SimpleNamespace(id=1, email="me@example.com")
 
@@ -109,7 +110,7 @@ class LiveData(unittest.TestCase):
             self.addCleanup(patcher.stop)
 
     def portfolio(self, source):
-        facts, account, _ = analysis._gather_portfolio(Saved(), USER, lambda user: source)
+        facts, account, _ = analysis._gather_portfolio(borrowed(Saved()), USER, lambda user: source)
         return facts, account
 
     def test_portfolio_review_uses_the_brokers_numbers(self):
@@ -139,23 +140,23 @@ class LiveData(unittest.TestCase):
         self.assertTrue(facts["broker_data_unavailable"])
 
     def test_buy_check_and_one_ticker_carry_the_flag(self):
-        self.assertFalse(analysis._stock_fit(Saved(), USER, "AAA", None, lambda user: Broker()).stale_data)
-        self.assertTrue(analysis._stock_fit(Saved(), USER, "AAA", None, lambda user: BrokerDown()).stale_data)
-        self.assertIsNone(analysis._gather(Saved(), USER, "AAA", lambda user: Broker())[0]["broker_data_unavailable"])
-        self.assertTrue(analysis._gather(Saved(), USER, "AAA", lambda user: BrokerDown())[0]["broker_data_unavailable"])
+        self.assertFalse(analysis._stock_fit(borrowed(Saved()), USER, "AAA", None, lambda user: Broker()).stale_data)
+        self.assertTrue(analysis._stock_fit(borrowed(Saved()), USER, "AAA", None, lambda user: BrokerDown()).stale_data)
+        self.assertIsNone(analysis._gather(borrowed(Saved()), USER, "AAA", lambda user: Broker())[0]["broker_data_unavailable"])
+        self.assertTrue(analysis._gather(borrowed(Saved()), USER, "AAA", lambda user: BrokerDown())[0]["broker_data_unavailable"])
 
     def test_buy_check_counts_the_brokers_cash(self):
-        fit = analysis._stock_fit(Saved(), USER, "AAA", None, lambda user: Broker())
+        fit = analysis._stock_fit(borrowed(Saved()), USER, "AAA", None, lambda user: Broker())
         self.assertEqual(fit.cash, 844.98)
         self.assertEqual(fit.shares, 3)
 
     def test_target_set_before_owning_the_stock_is_kept(self):
-        fit = analysis._stock_fit(Saved(), USER, "WANT", None, lambda user: Broker())
+        fit = analysis._stock_fit(borrowed(Saved()), USER, "WANT", None, lambda user: Broker())
         self.assertFalse(fit.owned)
         self.assertEqual(fit.target_weight, 7)
 
     def test_one_ticker_sees_live_position_and_trades_in_date_order(self):
-        facts, _ = analysis._gather(Saved(), USER, "AAA", lambda user: Broker())
+        facts, _ = analysis._gather(borrowed(Saved()), USER, "AAA", lambda user: Broker())
         self.assertEqual(facts["your_position"]["shares"], 3)
         self.assertEqual([t["date"] for t in facts["your_trades"]], ["28.01.2026", "05.11.2026"])
 

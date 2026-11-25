@@ -23,11 +23,12 @@ from psycopg.types.json import Json
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from app import cache
-from app.auth.router import get_conn, get_current_user
+from app.auth.router import Db, get_conn, get_current_user, using
 from app.auth.schemas import UserResponse
 from app.investing.analysis import StockAnalysis, _load, _run, _save, get_llm
 from app.llm.client import LLMClient
 from app.places.seed import SUGGESTIONS, starting_list, suggestion_id
+from app.versioning import BaseVersion, check_base_version
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/life/places", tags=["places"])
@@ -125,7 +126,9 @@ def save_places(
     payload: Places,
     user: Annotated[UserResponse, Depends(get_current_user)],
     conn: Annotated[Connection, Depends(get_conn)],
+    base_version: BaseVersion = None,
 ):
+    check_base_version(conn, "places_lists", user.id, base_version)
     row = conn.execute(
         """
         INSERT INTO places_lists(user_id, data, updated_at)
@@ -390,20 +393,21 @@ def _ideas_prompt(data: Places, turned_down: list[str], lang: str) -> str:
 @router.post("/ideas", response_model=PlacesResponse)
 async def make_ideas(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     llm: Annotated[LLMClient | None, Depends(get_llm)],
     lang: Annotated[Literal["en", "uk"], Query()] = "en",
 ):
     """New ideas for "Maybe add to the list", from Gemini, made for this list. They replace the previous ones."""
 
-    def read() -> tuple[Places, str | None, list[Suggestion]]:
+    def read(conn: Connection) -> tuple[Places, str | None, list[Suggestion]]:
         row = conn.execute("SELECT data, updated_at FROM places_lists WHERE user_id = %s", (user.id,)).fetchone()
         data = Places(**(row[0] if row and isinstance(row[0], dict) else starting_list()))
         saved = _load(conn, user.id, _IDEAS_KEY)
         shown = [Suggestion(**i) for i in saved[0].get("ideas", [])] if saved else []
         return data, str(row[1]) if row else None, shown + _static_ideas()
 
-    data, updated_at, offered = await run_in_threadpool(read)
+    # Reads and saves borrow a connection each (`using`): none is held while the model and Wikipedia answer.
+    data, updated_at, offered = await run_in_threadpool(using, db, read)
     dismissed = set(data.dismissed)
     turned_down = list(dict.fromkeys(s.wiki for s in offered if s.id in dismissed))
     taken = {p.wiki.strip().lower() for c in data.categories for p in c.items if p.wiki} | {w.lower() for w in turned_down}
@@ -421,5 +425,5 @@ async def make_ideas(
     if found is not None:
         ideas = [i for i in ideas if found.get(i.wiki)]
     stored = [Suggestion(id=suggestion_id(i.wiki), **i.model_dump()).model_dump() for i in ideas]
-    await run_in_threadpool(_save, conn, user.id, _IDEAS_KEY, {"ideas": stored, "model": result.model})
-    return await run_in_threadpool(_response, conn, user.id, data, updated_at)
+    await run_in_threadpool(using, db, _save, user.id, _IDEAS_KEY, {"ideas": stored, "model": result.model})
+    return await run_in_threadpool(using, db, _response, user.id, data, updated_at)

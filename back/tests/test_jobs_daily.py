@@ -1,6 +1,7 @@
 """Jobs: what's new since you looked, what's interesting, and the daily run. Run: python -m unittest discover -s tests"""
 
 import asyncio
+from contextlib import nullcontext
 import unittest
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -57,7 +58,7 @@ class NewSinceYouLooked(unittest.TestCase):
 class DailyRun(unittest.TestCase):
     def call(self, secret, header, **patches):
         conn = SimpleNamespace(execute=lambda sql, params=None: SimpleNamespace(fetchall=lambda: [(1, "uk"), (2, "en")]))
-        return asyncio.run(daily_run(conn, object(), secret, header))
+        return asyncio.run(daily_run(lambda: nullcontext(conn), object(), secret, header))
 
     def test_off_without_a_secret(self):
         with self.assertRaises(HTTPException) as caught:

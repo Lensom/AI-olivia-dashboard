@@ -22,7 +22,7 @@ from psycopg.types.json import Json
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 from pypdf import PdfReader
 
-from app.auth.router import get_conn, get_current_user
+from app.auth.router import Db, DbFactory, get_conn, get_current_user, using
 from app.auth.schemas import UserResponse
 from app.investing.analysis import StockAnalysis, _run, get_llm
 from app.jobs.sources import DESCRIPTION_LIMIT, SourceError, fetch_all, job_role, load_detail, written_in_local_language
@@ -270,7 +270,7 @@ def _clear_assessments(conn: Connection, user_id: int) -> None:
 @router.post("/cv", response_model=JobsState)
 async def upload_cv(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     file: UploadFile = File(...),
 ):
     content = await file.read(_CV_MAX_BYTES + 1)
@@ -279,7 +279,7 @@ async def upload_cv(
     text = await run_in_threadpool(extract_cv_text, content)
     name = re.sub(r"[\x00-\x1f]", "", file.filename or "CV.pdf")[:200]
 
-    def save() -> JobsState:
+    def save(conn: Connection) -> JobsState:
         conn.execute(
             """
             INSERT INTO job_search_profiles(user_id, cv_text, cv_name, cv_updated_at)
@@ -292,7 +292,8 @@ async def upload_cv(
         conn.commit()
         return _state(conn, user.id)
 
-    return await run_in_threadpool(save)
+    # Borrowed only to save: none is held while the PDF uploads and its text is read.
+    return await run_in_threadpool(using, db, save)
 
 
 @router.delete("/cv", response_model=JobsState)
@@ -366,20 +367,22 @@ def apply_sponsors(conn: Connection, user_id: int, registers: dict[str, dict[str
 @router.post("/refresh", response_model=JobsState)
 def refresh_jobs(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
 ):
-    profile = _profile(conn, user.id)
+    # The job sites can take a minute: connections are borrowed before and after, none held while they answer.
+    profile = using(db, _profile, user.id)
     if profile and profile[3] and (datetime.now(timezone.utc) - profile[3]).total_seconds() < _MIN_REFRESH_SECONDS:
-        return _state(conn, user.id)
+        return using(db, _state, user.id)
     found, statuses = fetch_all()
     # All sources failing mustn't look like every vacancy having closed.
     if not any(s.ok for s in statuses):
         raise HTTPException(status_code=502, detail="None of the job sites answered. Try again later.")
     registers, register_statuses = fetch_registers()
     # A register is shown only when it failed: its company count isn't a number of vacancies.
-    save_found(conn, user.id, found, statuses + [s for s in register_statuses if not s.ok])
-    apply_sponsors(conn, user.id, registers)
-    return _state(conn, user.id)
+    with db() as conn:
+        save_found(conn, user.id, found, statuses + [s for s in register_statuses if not s.ok])
+        apply_sponsors(conn, user.id, registers)
+        return _state(conn, user.id)
 
 
 @router.patch("/{job_id}", response_model=JobView)
@@ -446,18 +449,20 @@ def _with_details(row: tuple[str, dict[str, Any]]) -> tuple[str, dict[str, Any]]
     return job_id, data
 
 
-async def _assess_next(conn: Connection, user_id: int, llm: LLMClient, lang: str, fullstack: bool) -> int:
-    """Assesses the next few vacancies of one person; how many it did (0: none left). 409 without a CV."""
+async def _assess_next(db: DbFactory, user_id: int, llm: LLMClient, lang: str, fullstack: bool) -> int:
+    """Assesses the next few vacancies of one person; how many it did (0: none left). 409 without a CV.
+    `begin` and `finish` borrow a connection each: none is held while the ads load and the model reads them."""
 
     def begin() -> tuple[str | None, list[tuple[str, dict[str, Any]]]]:
-        profile = _profile(conn, user_id)
-        rows = conn.execute(
-            """
-            SELECT id, data FROM job_search_jobs WHERE user_id = %s AND assessed_at IS NULL AND status <> 'hidden'
-            ORDER BY first_seen, id
-            """,
-            (user_id,),
-        ).fetchall()
+        with db() as conn:
+            profile = _profile(conn, user_id)
+            rows = conn.execute(
+                """
+                SELECT id, data FROM job_search_jobs WHERE user_id = %s AND assessed_at IS NULL AND status <> 'hidden'
+                ORDER BY first_seen, id
+                """,
+                (user_id,),
+            ).fetchall()
         wanted = [(r[0], r[1]) for r in rows if fullstack or _role(r[1]) == "frontend"]
         return (profile[0] if profile else None), wanted[:_BATCH]
 
@@ -503,15 +508,16 @@ async def _assess_next(conn: Connection, user_id: int, llm: LLMClient, lang: str
             assessments[a.job_id] = a.model_dump(exclude={"job_id"})
 
     def finish() -> None:
-        for job_id, data in loaded:
-            update = {k: data[k] for k in ("description", "company", "location", "posted", "english_stated") if data.get(k)}
-            update["assessment"] = assessments[job_id]
-            update["assessed_on_title"] = len(data.get("description") or "") < 200
-            conn.execute(
-                "UPDATE job_search_jobs SET data = data || %s::jsonb, assessed_at = NOW() WHERE user_id = %s AND id = %s",
-                (Json(update), user_id, job_id),
-            )
-        conn.commit()
+        with db() as conn:
+            for job_id, data in loaded:
+                update = {k: data[k] for k in ("description", "company", "location", "posted", "english_stated") if data.get(k)}
+                update["assessment"] = assessments[job_id]
+                update["assessed_on_title"] = len(data.get("description") or "") < 200
+                conn.execute(
+                    "UPDATE job_search_jobs SET data = data || %s::jsonb, assessed_at = NOW() WHERE user_id = %s AND id = %s",
+                    (Json(update), user_id, job_id),
+                )
+            conn.commit()
 
     await run_in_threadpool(finish)
     return len(loaded)
@@ -525,7 +531,7 @@ def _remember_lang(conn: Connection, user_id: int, lang: str) -> None:
 @router.post("/score", response_model=JobsState)
 async def score_jobs(
     user: Annotated[UserResponse, Depends(get_current_user)],
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     llm: Annotated[LLMClient | None, Depends(get_llm)],
     lang: Annotated[Literal["en", "uk"], Query()] = "en",
     fullstack: Annotated[bool, Query()] = False,
@@ -535,9 +541,9 @@ async def score_jobs(
     if llm is None:
         raise HTTPException(status_code=503, detail="AI analysis is not configured: set GEMINI_API_KEY in back/.env")
     # Remembered, so the daily run writes its assessments in the language you read them in.
-    await run_in_threadpool(_remember_lang, conn, user.id, lang)
-    await _assess_next(conn, user.id, llm, lang, fullstack)
-    return await run_in_threadpool(_state, conn, user.id)
+    await run_in_threadpool(using, db, _remember_lang, user.id, lang)
+    await _assess_next(db, user.id, llm, lang, fullstack)
+    return await run_in_threadpool(using, db, _state, user.id)
 
 
 @router.post("/seen", status_code=204)
@@ -563,9 +569,14 @@ def jobs_news(
     return JobsNews(new_interesting=_state(conn, user.id).new_interesting)
 
 
+def _save_and_mark(conn: Connection, user_id: int, found: Any, statuses: Any, registers: Any) -> None:
+    save_found(conn, user_id, found, statuses)
+    apply_sponsors(conn, user_id, registers)
+
+
 @router.get("/cron", include_in_schema=False)
 async def daily_run(
-    conn: Annotated[Connection, Depends(get_conn)],
+    db: Db,
     llm: Annotated[LLMClient | None, Depends(get_llm)],
     secret: Annotated[str, Depends(get_cron_secret)],
     authorization: Annotated[str | None, Header()] = None,
@@ -578,10 +589,10 @@ async def daily_run(
         raise HTTPException(status_code=401, detail="Not allowed")
     started = time.monotonic()
 
-    def people_with_cv() -> list[tuple[int, str]]:
+    def people_with_cv(conn: Connection) -> list[tuple[int, str]]:
         return conn.execute("SELECT user_id, COALESCE(lang, 'en') FROM job_search_profiles WHERE cv_text IS NOT NULL").fetchall()
 
-    people = await run_in_threadpool(people_with_cv)
+    people = await run_in_threadpool(using, db, people_with_cv)
     if not people:
         return {"people": 0}
     found, statuses = await run_in_threadpool(fetch_all)
@@ -590,11 +601,10 @@ async def daily_run(
     registers, register_statuses = await run_in_threadpool(fetch_registers)
     assessed = 0
     for user_id, lang in people:
-        await run_in_threadpool(save_found, conn, user_id, found, statuses + [s for s in register_statuses if not s.ok])
-        await run_in_threadpool(apply_sponsors, conn, user_id, registers)
+        await run_in_threadpool(using, db, _save_and_mark, user_id, found, statuses + [s for s in register_statuses if not s.ok], registers)
         while llm is not None and time.monotonic() - started < _CRON_BUDGET_SECONDS:
             try:
-                done = await _assess_next(conn, user_id, llm, lang if lang in ("en", "uk") else "en", False)
+                done = await _assess_next(db, user_id, llm, lang if lang in ("en", "uk") else "en", False)
             except HTTPException:  # quota spent or the AI unreachable: the page carries on later
                 break
             if not done:

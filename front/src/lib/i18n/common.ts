@@ -93,6 +93,8 @@ export const COMMON: Record<string, string | string[]> = {
   "Add task": "Додати завдання",
   "Could not load your tasks. Is the backend running?": "Не вдалося завантажити завдання. Бекенд запущено?",
   "Could not save — the change was undone.": "Не вдалося зберегти — зміну скасовано.",
+  "This was changed in another tab or on another device, so your last change wasn't saved. Reload to get the latest version.":
+    "Це змінили в іншій вкладці чи на іншому пристрої, тож вашу останню зміну не збережено. Перезавантажте сторінку, щоб отримати актуальну версію.",
   "Drop here": "Відпустіть тут",
   "Add a task above": "Додайте завдання вище",
   "Drag tasks here": "Перетягніть завдання сюди",

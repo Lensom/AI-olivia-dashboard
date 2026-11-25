@@ -4,6 +4,7 @@ import { Header } from "./header";
 import { ScrollActiveTab } from "./scroll-active-tab";
 import { StackTableLabels } from "./stack-table-labels";
 import { Sidebar } from "./sidebar";
+import { VersionConflictBanner } from "./version-conflict-banner";
 import { AuthProvider, SessionScope } from "@/state/auth-store";
 import { CategoriesProvider } from "@/state/categories-store";
 import { BrokerProvider } from "@/state/broker-store";
@@ -29,6 +30,7 @@ export function AppShell({ children }: AppShellProps) {
                   <ScrollActiveTab />
                   <StackTableLabels />
                 </div>
+                <VersionConflictBanner />
               </BrokerProvider>
             </InvestingProvider>
           </CategoriesProvider>

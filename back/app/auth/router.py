@@ -30,6 +30,18 @@ def get_db() -> Callable[[], AbstractContextManager[Connection]]:
     raise RuntimeError("DB dependency not wired")
 
 
+# A pool connection borrowed for one block (`with db() as conn:`); see `get_db`.
+DbFactory = Callable[[], AbstractContextManager[Connection]]
+Db = Annotated[DbFactory, Depends(get_db)]
+
+
+def using[T](db: DbFactory, fn: Callable[..., T], *args: object) -> T:
+    """`fn(conn, *args)` on a connection borrowed just for it. Async handlers that wait on AI run their reads and
+    writes this way (`await run_in_threadpool(using, db, fn, ...)`), holding no connection while the model thinks."""
+    with db() as conn:
+        return fn(conn, *args)
+
+
 def get_settings():
     raise RuntimeError("Settings dependency not wired")
 

@@ -27,6 +27,7 @@ import {
   scrollRow,
 } from "@/features/investing/ui/investing-classes";
 import { apiFetch } from "@/lib/api";
+import { facetCounts } from "@/lib/facets";
 import { useLocale, useT } from "@/lib/i18n";
 import { useAuth } from "@/state/auth-store";
 import { useLibrary } from "@/state/library-store";
@@ -100,33 +101,27 @@ export default function LibraryKindPage() {
   // A book opened from global search (?open=<id>).
   const { linked, dismiss } = useLinkedItem(mine);
   const editing = dialog?.mode === "edit" ? dialog : linked ? { mode: "edit" as const, item: linked, isNew: false } : null;
-  const genres = useMemo(() => {
-    const c = new Map<string, number>();
-    for (const t of mine) for (const g of t.genres) c.set(g, (c.get(g) ?? 0) + 1);
-    return [...c.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  }, [mine]);
-  const years = useMemo(() => [...new Set(mine.map((t) => t.finish_date.slice(0, 4)).filter(Boolean))].sort().reverse(), [mine]);
-  const statusCounts = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const t of mine) c[t.status] = (c[t.status] ?? 0) + 1;
-    return c;
-  }, [mine]);
-
-  const visible = useMemo(() => {
+  // Whether a book passes the filters; `skip` leaves one out, for that filter's own counts (see facetCounts).
+  const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return sortItems(
-      mine.filter(
-        (t) =>
-          (status === "all" || t.status === status) &&
-          (!genre || t.genres.includes(genre)) &&
-          (!finishedYear || t.finish_date.startsWith(finishedYear)) &&
-          (!onlyRecommended || t.recommended) &&
-          (!onlyMissing || !t.source_id) &&
-          (!q || [t.title, t.original_title, ...t.authors, ...t.genres, t.publisher].some((s) => s.toLowerCase().includes(q))),
-      ),
-      sort,
-    );
-  }, [mine, query, status, genre, finishedYear, onlyRecommended, onlyMissing, sort]);
+    return (t: LibraryItem, skip?: "status" | "genre") =>
+      (skip === "status" || status === "all" || t.status === status) &&
+      (skip === "genre" || !genre || t.genres.includes(genre)) &&
+      (!finishedYear || t.finish_date.startsWith(finishedYear)) &&
+      (!onlyRecommended || t.recommended) &&
+      (!onlyMissing || !t.source_id) &&
+      (!q || [t.title, t.original_title, ...t.authors, ...t.genres, t.publisher].some((s) => s.toLowerCase().includes(q)));
+  }, [query, status, genre, finishedYear, onlyRecommended, onlyMissing]);
+
+  const genres = useMemo(
+    () => [...facetCounts(mine, (t) => matches(t, "genre"), (t) => t.genres, genre)].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])),
+    [mine, matches, genre],
+  );
+  const years = useMemo(() => [...new Set(mine.map((t) => t.finish_date.slice(0, 4)).filter(Boolean))].sort().reverse(), [mine]);
+  const statusCounts = useMemo(() => facetCounts(mine, (t) => matches(t, "status"), (t) => [t.status]), [mine, matches]);
+  const statusTotal = useMemo(() => [...statusCounts.values()].reduce((a, n) => a + n, 0), [statusCounts]);
+
+  const visible = useMemo(() => sortItems(mine.filter((t) => matches(t)), sort), [mine, matches, sort]);
 
   if (!meta) {
     return (
@@ -352,11 +347,11 @@ export default function LibraryKindPage() {
         />
         <div className={`${scrollRow} sm:contents`}>
         <button type="button" onClick={() => setStatus("all")} className={chip(status === "all")}>
-          {tr("All")} {mine.length}
+          {tr("All")} {statusTotal}
         </button>
-        {READ_STATUSES.filter((s) => statusCounts[s.value]).map((s) => (
+        {READ_STATUSES.filter((s) => statusCounts.get(s.value) || status === s.value).map((s) => (
           <button key={s.value} type="button" onClick={() => setStatus(s.value)} className={chip(status === s.value)}>
-            {tr(s.label)} {statusCounts[s.value]}
+            {tr(s.label)} {statusCounts.get(s.value) ?? 0}
           </button>
         ))}
         <button type="button" onClick={() => setOnlyRecommended((v) => !v)} className={chip(onlyRecommended)} aria-pressed={onlyRecommended}>
