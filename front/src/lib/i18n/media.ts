@@ -91,6 +91,8 @@ export const MEDIA: Record<string, string | string[]> = {
   "All genres": "Усі жанри",
   "Sort by": "Сортування",
   "Sort: {v}": "Сорт.: {v}",
+  "Ascending: tap for descending": "За зростанням — натисніть, щоб за спаданням",
+  "Descending: tap for ascending": "За спаданням — натисніть, щоб за зростанням",
   Table: "Таблиця",
   "Nothing here yet": "Тут ще нічого немає",
   "Nothing matches these filters.": "Нічого не відповідає цим фільтрам.",

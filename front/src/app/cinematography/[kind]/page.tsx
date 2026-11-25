@@ -43,17 +43,57 @@ const SORTS: { value: SortKey; label: string }[] = [
   { value: "added", label: "Recently added" },
 ];
 
-const nullsLast = (a: number | null, b: number | null) => (b ?? -Infinity) - (a ?? -Infinity);
+type SortDir = "asc" | "desc";
+/** The direction a sort starts in: best scores and newest years first, titles A–Z. A second click flips it. */
+const defaultDir = (key: SortKey): SortDir => (key === "title" ? "asc" : "desc");
 
-function sortTitles(list: CinemaTitle[], key: SortKey): CinemaTitle[] {
+/** Numbers in the given direction; titles without the number go last either way, so they don't crowd the top. */
+const byNumber = (a: number | null, b: number | null, dir: SortDir) => {
+  if (a == null || b == null) return a == null && b == null ? 0 : a == null ? 1 : -1;
+  return dir === "asc" ? a - b : b - a;
+};
+
+function sortTitles(list: CinemaTitle[], key: SortKey, dir: SortDir): CinemaTitle[] {
   const byTitle = (a: CinemaTitle, b: CinemaTitle) => a.title.localeCompare(b.title);
+  const sign = dir === "asc" ? 1 : -1;
   return [...list].sort((a, b) => {
-    if (key === "title") return byTitle(a, b);
-    if (key === "added") return b.added_at.localeCompare(a.added_at) || byTitle(a, b);
-    const primary = nullsLast(a[key], b[key]);
+    if (key === "title") return sign * byTitle(a, b);
+    if (key === "added") return sign * a.added_at.localeCompare(b.added_at) || byTitle(a, b);
+    const primary = byNumber(a[key], b[key], dir);
     // Ties: higher score, then recommended, then alphabetical.
-    return primary || nullsLast(a.score, b.score) || Number(b.recommended) - Number(a.recommended) || byTitle(a, b);
+    return primary || byNumber(a.score, b.score, "desc") || Number(b.recommended) - Number(a.recommended) || byTitle(a, b);
   });
+}
+
+/** A column header that sorts the table by its column; clicking it again flips the direction. */
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: SortKey;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = sort === sortKey;
+  return (
+    <th className="px-3 py-2 font-medium" aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 uppercase tracking-wide hover:text-[#1f1c17] ${active ? "text-[#1f1c17]" : ""}`}
+      >
+        {label}
+        <span aria-hidden className={active ? "" : "opacity-0"}>
+          {dir === "asc" && active ? "↑" : "↓"}
+        </span>
+      </button>
+    </th>
+  );
 }
 
 type Dialog = { mode: "add" } | { mode: "edit"; title: CinemaTitle; isNew: boolean } | null;
@@ -74,7 +114,16 @@ export default function CinemaKindPage() {
   const [onlyRecommended, setOnlyRecommended] = useState(false);
   const [onlyNewSeasons, setOnlyNewSeasons] = useState(false);
   const [onlyInCinema, setOnlyInCinema] = useState(false);
-  const [sort, setSort] = useState<SortKey>("score");
+  const [sort, setSortKey] = useState<SortKey>("score");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // Another column starts in its natural direction; the same one again flips it.
+  const sortBy = (key: SortKey) => {
+    if (key === sort) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir(defaultDir(key));
+    }
+  };
   const [view, setView] = useState<"table" | "posters">("table");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
@@ -122,7 +171,7 @@ export default function CinemaKindPage() {
   const statusCounts = useMemo(() => facetCounts(mine, (t) => matches(t, "status"), (t) => [t.status]), [mine, matches]);
   const statusTotal = useMemo(() => [...statusCounts.values()].reduce((a, n) => a + n, 0), [statusCounts]);
 
-  const visible = useMemo(() => sortTitles(mine.filter((t) => matches(t)), sort), [mine, matches, sort]);
+  const visible = useMemo(() => sortTitles(mine.filter((t) => matches(t)), sort, sortDir), [mine, matches, sort, sortDir]);
   const inCinemaCount = useMemo(() => mine.filter((t) => t.in_cinema).length, [mine]);
 
   const missingTmdb = mine.filter((t) => !t.tmdb_id).length;
@@ -432,13 +481,32 @@ export default function CinemaKindPage() {
           </select>
         ) : null}
         <span className="ml-auto flex items-center gap-2">
-          <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]" aria-label={tr("Sort by")}>
+          <select
+            value={sort}
+            onChange={(e) => {
+              const key = e.target.value as SortKey;
+              setSortKey(key);
+              setSortDir(defaultDir(key));
+            }}
+            className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs text-[#3b352d]"
+            aria-label={tr("Sort by")}
+          >
             {SORTS.map((s) => (
               <option key={s.value} value={s.value}>
                 {tr("Sort: {v}", { v: tr(s.label) })}
               </option>
             ))}
           </select>
+          {/* Posters and phones have no column headers to click: the direction lives here too. */}
+          <button
+            type="button"
+            onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+            className="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs text-[#3b352d] hover:bg-[#faf8f2]"
+            aria-label={sortDir === "asc" ? tr("Ascending: tap for descending") : tr("Descending: tap for ascending")}
+            title={sortDir === "asc" ? tr("Ascending: tap for descending") : tr("Descending: tap for ascending")}
+          >
+            {sortDir === "asc" ? "↑" : "↓"}
+          </button>
           <span className="inline-flex rounded-full border border-black/10 bg-white p-0.5">
             {(["table", "posters"] as const).map((v) => (
               <button
@@ -525,7 +593,7 @@ export default function CinemaKindPage() {
                 <th className="w-10 px-3 py-2 font-medium" title={tr("I recommend it")}>
                   <span className="sr-only">{tr("Recommended")}</span>✓
                 </th>
-                <th className="px-3 py-2 font-medium">{tr("Title")}</th>
+                <SortHeader label={tr("Title")} sortKey="title" sort={sort} dir={sortDir} onSort={sortBy} />
                 <th className="px-3 py-2 font-medium">{tr("Genre")}</th>
                 <th className="px-3 py-2 font-medium">{tr("Status")}</th>
                 {series ? (
@@ -533,10 +601,10 @@ export default function CinemaKindPage() {
                     {tr("Seasons")}
                   </th>
                 ) : null}
-                <th className="px-3 py-2 font-medium">{tr("Score")}</th>
-                <th className="px-3 py-2 font-medium">IMDb</th>
-                <th className="px-3 py-2 font-medium">{tr("Year")}</th>
-                <th className="px-3 py-2 font-medium">{tr("Year watched")}</th>
+                <SortHeader label={tr("Score")} sortKey="score" sort={sort} dir={sortDir} onSort={sortBy} />
+                <SortHeader label="IMDb" sortKey="imdb_rating" sort={sort} dir={sortDir} onSort={sortBy} />
+                <SortHeader label={tr("Year")} sortKey="year" sort={sort} dir={sortDir} onSort={sortBy} />
+                <SortHeader label={tr("Year watched")} sortKey="view_year" sort={sort} dir={sortDir} onSort={sortBy} />
                 <th className="px-3 py-2 font-medium">{tr("Studio / distributor")}</th>
                 <th className="px-3 py-2 font-medium">{tr("Actors")}</th>
               </tr>
