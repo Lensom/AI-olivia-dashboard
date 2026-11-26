@@ -29,8 +29,11 @@ type Category = TotalCategory;
 type Source = TotalSource;
 type Account = TotalAccount;
 type Month = { id: string; month: string; total_usd: number; breakdown: Record<string, number> };
+/** Spent by year: a figure you type in, in hryvnias. */
+type ExpenseYear = { id: string; year: number; amount_uah: number };
 type TotalData = {
   accounts: Account[];
+  expenses: ExpenseYear[];
   goals: Record<string, number>;
   months: Month[];
   rate_overrides: Record<string, number>;
@@ -70,6 +73,7 @@ function freshStart(): TotalData {
   return {
     accounts: [acc("Stocks", "stocks", "USD", "stocks"), acc("Crypto", "crypto", "USD", "crypto"), acc("Savings", "savings", "USD")],
     goals: { stocks: 70, savings: 20, crypto: 10 },
+    expenses: [],
     months: [],
     rate_overrides: {},
   };
@@ -93,6 +97,9 @@ function tone(n: number | null | undefined): string {
   if (n == null || n === 0) return "text-[#1f1c17]";
   return n > 0 ? "text-emerald-700" : "text-rose-700";
 }
+/** "₴1,051,133" / "1 051 133 ₴": whole hryvnias unless there are kopecks. */
+const uahFormat = (locale: string) => (n: number) =>
+  new Intl.NumberFormat(locale, { style: "currency", currency: "UAH", currencyDisplay: "narrowSymbol", maximumFractionDigits: n % 1 ? 2 : 0 }).format(n);
 const signedUsd = (n: number) => `${n > 0 ? "+" : ""}${formatUsd(n)}`;
 const signedPct = (n: number | null, d = 1) => (n == null || !Number.isFinite(n) ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(d)}%`);
 
@@ -104,6 +111,7 @@ export default function InvestingTotalPage() {
   const tr = useT();
   const locale = useLocale();
   const monthLabel = useCallback((ym: string, short = false) => formatMonth(ym, short, locale), [locale]);
+  const formatUah = useMemo(() => uahFormat(locale), [locale]);
 
   const [data, setData] = useState<TotalData | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -124,7 +132,7 @@ export default function InvestingTotalPage() {
           setPrefilled(true);
           setDirty(true);
         } else {
-          setData({ accounts: res.accounts, goals: res.goals, months: res.months, rate_overrides: res.rate_overrides });
+          setData({ accounts: res.accounts, expenses: res.expenses ?? [], goals: res.goals, months: res.months, rate_overrides: res.rate_overrides });
         }
         setUpdatedAt(res.updated_at);
       })
@@ -148,6 +156,10 @@ export default function InvestingTotalPage() {
 
   async function save() {
     if (!token || !data) return;
+    if (data.expenses.some((e) => !Number.isInteger(e.year) || e.year < 1900 || e.year > 2200)) {
+      setSaveError("Fix the years in Spent by year: each is a year from 1900 to 2200.");
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -156,7 +168,7 @@ export default function InvestingTotalPage() {
         method: "PUT",
         body: JSON.stringify(data),
       });
-      setData({ accounts: res.accounts, goals: res.goals, months: res.months, rate_overrides: res.rate_overrides });
+      setData({ accounts: res.accounts, expenses: res.expenses ?? [], goals: res.goals, months: res.months, rate_overrides: res.rate_overrides });
       setUpdatedAt(res.updated_at);
       setDirty(false);
       setPrefilled(false);
@@ -643,6 +655,92 @@ export default function InvestingTotalPage() {
               </tbody>
             </table>
             {mode === "edit" ? <p className="mt-2 text-[11px] text-[#8f8676]">{tr("Override = USD per 1 unit. Leave empty to use NBU.")}</p> : null}
+          </CollapsibleCard>
+
+          {/* Spent by year: figures typed in by hand, one row a year. */}
+          <CollapsibleCard
+            id="total-expenses"
+            title="Spent by year"
+            hint={mode === "edit" ? tr("Type what you spent in each year, in hryvnias. Save to keep it.") : tr("Switch to Edit to add a year or change a figure.")}
+            right={
+              mode === "edit" ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    edit((d) => {
+                      const latest = d.expenses.reduce((y, e) => Math.max(y, e.year), 0);
+                      return { ...d, expenses: [...d.expenses, { id: newId(), year: latest ? latest + 1 : Number(nowMonth.slice(0, 4)), amount_uah: 0 }] };
+                    })
+                  }
+                  className={investingToolbarBtn}
+                >
+                  {tr("Add year")}
+                </button>
+              ) : null
+            }
+          >
+            {data.expenses.length === 0 ? (
+              <p className="mt-4 text-sm text-[#8f8676]">{tr("No years yet — switch to Edit and press Add year.")}</p>
+            ) : (
+              <div className={`${investingTableScrollWrap} mt-4`}>
+                <table className="w-full border-collapse text-left text-sm tabular-nums">
+                  <thead className="bg-[#f4efe4] text-xs text-[#7f7668]">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">{tr("Year")}</th>
+                      <th className="px-3 py-2 text-right font-medium">{tr("Spent")}</th>
+                      {mode === "edit" ? <th className="px-3 py-2" /> : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(mode === "edit" ? data.expenses : [...data.expenses].sort((a, b) => a.year - b.year)).map((e) => (
+                      <tr key={e.id} className="border-t border-black/5">
+                        <td className="px-3 py-2 font-medium text-[#1f1c17]">
+                          {mode === "edit" ? (
+                            <input
+                              type="number"
+                              min={1900}
+                              max={2200}
+                              value={e.year || ""}
+                              onChange={(ev) => edit((d) => ({ ...d, expenses: d.expenses.map((x) => (x.id === e.id ? { ...x, year: Number(ev.target.value) || 0 } : x)) }))}
+                              aria-label={tr("Year")}
+                              className={`${input} w-[100px]`}
+                            />
+                          ) : (
+                            e.year
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right text-[#1f1c17]">
+                          {mode === "edit" ? (
+                            <input
+                              defaultValue={e.amount_uah ? String(e.amount_uah) : ""}
+                              onChange={(ev) =>
+                                edit((d) => ({ ...d, expenses: d.expenses.map((x) => (x.id === e.id ? { ...x, amount_uah: Math.max(0, parseCryptoAmount(ev.target.value)) } : x)) }))
+                              }
+                              placeholder="0"
+                              inputMode="decimal"
+                              aria-label={tr("Spent in {year}", { year: e.year })}
+                              className={`${input} ml-auto w-[150px] text-right`}
+                            />
+                          ) : (
+                            formatUah(e.amount_uah)
+                          )}
+                        </td>
+                        {mode === "edit" ? (
+                          <td className="px-2 py-2 text-right">
+                            <button type="button" onClick={() => edit((d) => ({ ...d, expenses: d.expenses.filter((x) => x.id !== e.id) }))} className={investingToolbarBtn}>
+                              {tr("Delete")}
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {mode === "edit" && new Set(data.expenses.map((e) => e.year)).size < data.expenses.length ? (
+              <p className="mt-2 text-xs text-rose-700">{tr("A year appears twice: only the last row of it is kept when you save.")}</p>
+            ) : null}
           </CollapsibleCard>
         </div>
       </section>

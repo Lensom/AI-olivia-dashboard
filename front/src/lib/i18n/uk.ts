@@ -17,6 +17,7 @@ export const UK: Record<string, string | string[]> = {
 /** English plural forms [one, other] for keys that take `n`. */
 export const EN_PLURALS: Record<string, [string, string]> = {
   "{n} titles": ["{n} title", "{n} titles"],
+  "{n} items": ["{n} item", "{n} items"],
   "{n} films": ["{n} film", "{n} films"],
   "Starts in {n} days": ["Starts in {n} day", "Starts in {n} days"],
   "You: {n} applications": ["You: {n} application", "You: {n} applications"],

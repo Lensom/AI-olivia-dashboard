@@ -63,6 +63,7 @@ from app.investing.schemas import (
     InvestingBrokerResponse,
     InvestingTotalData,
     InvestingTotalResponse,
+    TotalExpenseYear,
 )
 
 
@@ -1733,6 +1734,14 @@ def update_total(
     # One row per month (last one wins), oldest first.
     months = {m.month: m for m in payload.months if re.fullmatch(r"\d{4}-\d{2}", m.month)}
     payload.months = [months[k] for k in sorted(months)]
+    if "expenses" in payload.model_fields_set:
+        # One row per year (last one wins), oldest first.
+        years = {e.year: e for e in payload.expenses}
+        payload.expenses = [years[y] for y in sorted(years)]
+    else:
+        # A tab opened before "Spent by year" existed doesn't send it: keep what's saved instead of wiping it.
+        saved = conn.execute("SELECT data->'expenses' FROM investing_total WHERE user_id = %s", (user.id,)).fetchone()
+        payload.expenses = [TotalExpenseYear(**e) for e in (saved[0] if saved and isinstance(saved[0], list) else []) if isinstance(e, dict)]
     data = payload.model_dump()
     row = conn.execute(
         """

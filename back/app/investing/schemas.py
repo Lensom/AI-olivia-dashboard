@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class InvestingMetricsResponse(BaseModel):
@@ -352,8 +352,18 @@ class TotalMonth(BaseModel):
     breakdown: dict[str, float] = Field(default_factory=dict)
 
 
+class TotalExpenseYear(BaseModel):
+    """What was spent in a year, in hryvnias: a figure you type in (Total → Spent by year)."""
+
+    id: str = Field(min_length=1, max_length=64)
+    year: int = Field(ge=1900, le=2200)
+    # Briefly saved as amount_usd before the table moved to hryvnias: the same figure, still read.
+    amount_uah: float = Field(default=0, ge=0, le=1_000_000_000_000, validation_alias=AliasChoices("amount_uah", "amount_usd"))
+
+
 class InvestingTotalData(BaseModel):
     accounts: list[TotalAccount] = Field(default_factory=list)
+    expenses: list[TotalExpenseYear] = Field(default_factory=list, max_length=300)
     # Target share per group, %: stocks / savings / crypto.
     goals: dict[str, float] = Field(default_factory=lambda: {"stocks": 70.0, "savings": 20.0, "crypto": 10.0})
     months: list[TotalMonth] = Field(default_factory=list)

@@ -1,6 +1,6 @@
 /** Mirrors back/app/collection/router.py. */
 export type Status = "idea" | "collecting" | "done" | "dropped";
-export type Currency = "UAH" | "USD" | "EUR";
+export type Currency = "UAH" | "USD" | "EUR" | "RON";
 export type Wish = { id: string; title: string; url: string; price: number | null; currency: Currency; bought: boolean };
 export type Piece = {
   id: string;
@@ -25,7 +25,7 @@ export const STATUSES: { value: Status; label: string; pill: string; dot: string
 ];
 export const statusMeta = (s: Status) => STATUSES.find((x) => x.value === s) ?? STATUSES[2];
 
-export const CURRENCIES: Currency[] = ["UAH", "USD", "EUR"];
+export const CURRENCIES: Currency[] = ["UAH", "USD", "EUR", "RON"];
 
 export const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID().replace(/-/g, "") : `${Date.now()}${Math.random().toString(36).slice(2, 8)}`);
 

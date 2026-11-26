@@ -19,7 +19,7 @@ from app.versioning import BaseVersion, check_base_version
 router = APIRouter(prefix="/life/collection", tags=["collection"])
 
 Status = Literal["idea", "collecting", "done", "dropped"]  # to decide · in progress · complete · decided against
-Currency = Literal["UAH", "USD", "EUR"]
+Currency = Literal["UAH", "USD", "EUR", "RON"]
 Id = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,40}$")]
 _WEB_LINK = re.compile(r"^https?://[^\s\"'<>]+$", re.I)
 
